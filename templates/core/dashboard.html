@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — CAMS HMS{% endblock %}
+
+{% block heading %}
+  <div class="page-head">
+    <div>
+      <h1>Dashboard</h1>
+      <p class="page-sub">Hospital overview · live counts</p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+<div class="stats">
+  <div class="stat-card">
+    <span class="stat-icon lime">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#27272b" stroke-width="1.8" aria-hidden="true">
+        <circle cx="8" cy="6" r="3.5"/><path d="M2 17c.8-5 3-6.5 6-6.5s5.2 1.5 6 6.5M15 5a3.5 3.5 0 0 1 0 7"/>
+      </svg>
+    </span>
+    <div>
+      <div class="stat-value">{{ total_patients }}</div>
+      <div class="stat-label">Total patients</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-icon lav">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#29272f" stroke-width="1.7" aria-hidden="true">
+        <rect x="1" y="3" width="18" height="16" rx="3"/><path d="M1 8h18M6 1v4M14 1v4"/>
+      </svg>
+    </span>
+    <div>
+      <div class="stat-value">{{ todays_appointments|length }}</div>
+      <div class="stat-label">Appointments today</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-icon lav-soft">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#70659e" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="9" cy="9" r="7"/><path d="M9 4.5V9l4 2.5"/>
+      </svg>
+    </span>
+    <div>
+      <div class="stat-value">{{ upcoming_count }}</div>
+      <div class="stat-label">Upcoming</div>
+    </div>
+  </div>
+  <div class="stat-card dark">
+    <span class="stat-icon lime">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#252529" stroke-width="1.7" aria-hidden="true">
+        <path d="M5 2v5a4 4 0 0 0 8 0V2M3 2h3M11 2h3M7 11v2a4 4 0 0 0 8 0v-1"/>
+      </svg>
+    </span>
+    <div>
+      <div class="stat-value">{{ total_doctors }}</div>
+      <div class="stat-label">Doctors</div>
+    </div>
+  </div>
+</div>
+
+<div class="two-col">
+  <section class="card">
+    <div class="card-header">
+      <h2>Today's schedule</h2>
+      <a href="{% url 'appointment_list' %}" class="link">View all
+        <svg width="16" height="12" viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M1 6h16M12 1l5 5-5 5"/></svg>
+      </a>
+    </div>
+    {% if todays_appointments %}
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Patient</th><th>Doctor</th><th class="ta-r">Status</th></tr>
+        </thead>
+        <tbody>
+          {% for appointment in todays_appointments %}
+          <tr>
+            <td class="cell-strong">{{ appointment.start_time|time:"H:i" }}</td>
+            <td><a href="{% url 'patient_detail' appointment.patient.pk %}">{{ appointment.patient }}</a></td>
+            <td class="muted">{{ appointment.doctor }}</td>
+            <td class="ta-r"><span class="badge badge-{{ appointment.status|lower }}">{{ appointment.get_status_display }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">No appointments today. 🎉</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <h2>Recently registered</h2>
+      <a href="{% url 'patient_list' %}" class="link">View all
+        <svg width="16" height="12" viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M1 6h16M12 1l5 5-5 5"/></svg>
+      </a>
+    </div>
+    {% if recent_patients %}
+      <ul class="simple-list">
+        {% for patient in recent_patients %}
+          <li>
+            <a href="{% url 'patient_detail' patient.pk %}">{{ patient.full_name }}</a>
+            <small>{{ patient.created_at|date:"M j, Y" }}</small>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">No patients yet. <a href="{% url 'patient_create' %}">Register the first one →</a></p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Patients — Cams HMS{% endblock %}
+
+{% block heading %}
+  <div class="page-header">
+    <h1>Patients ({{ patients|length }})</h1>
+    <a href="{% url 'patient_create' %}" class="btn">+ Register patient</a>
+  </div>
+{% endblock %}
+
+{% block content %}
+<form class="search-bar" method="get" action="{% url 'patient_list' %}">
+  <input type="search" name="q" value="{{ query }}" placeholder="Search by name or phone…">
+  <button type="submit" class="btn btn-outline">Search</button>
+  {% if query %}<a href="{% url 'patient_list' %}" class="btn btn-plain">Clear</a>{% endif %}
+</form>
+
+<section class="card">
+  {% if patients %}
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th><th>Age</th><th>Gender</th><th>Blood</th><th>Phone</th><th>Registered</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for patient in patients %}
+        <tr>
+          <td><a href="{% url 'patient_detail' patient.pk %}">{{ patient.full_name }}</a></td>
+          <td>{{ patient.age|default:"—" }}</td>
+          <td>{{ patient.get_gender_display|default:"—" }}</td>
+          <td>{{ patient.blood_group|default:"—" }}</td>
+          <td>{{ patient.phone|default:"—" }}</td>
+          <td>{{ patient.created_at|date:"M j, Y" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">
+      {% if query %}No patients match “{{ query }}”.{% else %}No patients registered yet.{% endif %}
+      <a href="{% url 'patient_create' %}">Register one →</a>
+    </p>
+  {% endif %}
+</section>
+{% endblock %}

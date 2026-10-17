@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}{{ patient.full_name }} — Cams HMS{% endblock %}
+
+{% block heading %}
+  <div class="page-header">
+    <h1>{{ patient.full_name }}</h1>
+    <div class="actions">
+      <a class="btn btn-outline" href="{% url 'appointment_create' %}?patient={{ patient.pk }}">+ Book appointment</a>
+      <a class="btn btn-plain" href="{% url 'patient_list' %}">← Back to list</a>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+<div class="two-col">
+  <section class="card">
+    <h2>Patient record</h2>
+    <dl class="details">
+      <dt>Date of birth</dt>
+      <dd>{{ patient.date_of_birth|date:"M j, Y"|default:"—" }}{% if patient.age is not None %} ({{ patient.age }} yrs){% endif %}</dd>
+      <dt>Gender</dt>
+      <dd>{{ patient.get_gender_display|default:"—" }}</dd>
+      <dt>Blood group</dt>
+      <dd>{{ patient.blood_group|default:"—" }}</dd>
+      <dt>Phone</dt>
+      <dd>{{ patient.phone|default:"—" }}</dd>
+      <dt>Email</dt>
+      <dd>{{ patient.email|default:"—" }}</dd>
+      <dt>Address</dt>
+      <dd>{{ patient.address|default:"—"|linebreaksbr }}</dd>
+      <dt>Allergies</dt>
+      <dd>{% if patient.allergies %}<strong class="warn">{{ patient.allergies }}</strong>{% else %}None recorded{% endif %}</dd>
+      <dt>Registered</dt>
+      <dd>{{ patient.created_at|date:"M j, Y H:i" }}</dd>
+    </dl>
+  </section>
+
+  <section class="card">
+    <h2>Visit history</h2>
+    {% if appointments %}
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Time</th><th>Doctor</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {% for appointment in appointments %}
+          <tr>
+            <td>{{ appointment.date|date:"M j, Y" }}</td>
+            <td>{{ appointment.start_time|time:"H:i" }}</td>
+            <td>{{ appointment.doctor }}<br><small>{{ appointment.reason }}</small></td>
+            <td><span class="badge badge-{{ appointment.status|lower }}">{{ appointment.get_status_display }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">No visits yet. <a href="{% url 'appointment_create' %}?patient={{ patient.pk }}">Book one →</a></p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

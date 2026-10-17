@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — Cams HMS{% endblock %}
+
+{% block heading %}<h1>{{ title }}</h1>{% endblock %}
+
+{% block content %}
+<section class="card card-form">
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "partials/form_fields.html" %}
+    <div class="form-actions">
+      <button type="submit" class="btn">Save</button>
+      <a href="{% url 'patient_list' %}" class="btn btn-plain">Cancel</a>
+    </div>
+  </form>
+</section>
+{% endblock %}
