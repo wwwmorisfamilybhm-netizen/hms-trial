@@ -60,6 +60,7 @@
   .status-badge.red { background: #fee2e2; color: #b91c1c; }
   .status-badge.green { background: #dcfce7; color: #15803d; }
   .status-badge.slate { background: #e2e8f0; color: #475569; }
+  .status-badge.unassigned { background: #f1f5f9; color: #94a3b8; border: 1px dashed #cbd5e1; }
   .status-sub { font-size: 10px; color: #94a3b8; }
   .doc-name { font-weight: 600; color: #0f172a; font-size: 12px; }
   .doc-spec { font-size: 10px; color: #64748b; }
@@ -201,11 +202,13 @@
           <td>
             <div class="status-cell">
               {% if patient.is_emergency %}
+              {# Only status the registration desk can assign today. #}
               <span class="status-badge red"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> Emergency</span>
               <span class="status-sub">Emergency Counter</span>
               {% else %}
-              <span class="status-badge slate"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> Waiting / In Queue</span>
-              <span class="status-sub">OPD Waiting Area</span>
+              {# Not yet routed — nurse / other designation will assign status. #}
+              <span class="status-badge unassigned"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="5" cy="5" r="4"/><path d="M5 3v2.4M5 6.8v.4"/></svg> Not Routed</span>
+              <span class="status-sub">Awaiting assignment</span>
               {% endif %}
             </div>
           </td>
