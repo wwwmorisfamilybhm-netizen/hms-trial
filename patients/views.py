@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import PatientForm
+from .forms import PatientForm, PatientRegistrationForm
 from .models import Patient
 
 
@@ -61,5 +61,24 @@ def patient_create(request):
     context = {
         "form": form,
         "title": "Register new patient",
+    }
+    return render(request, "patients/patient_form.html", context)
+
+
+@login_required(login_url="login")
+def patient_edit(request, pk):
+    """Edit a registered patient's full record."""
+    patient = get_object_or_404(Patient, pk=pk)
+    if request.method == "POST":
+        form = PatientRegistrationForm(request.POST, request.FILES, instance=patient)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Patient {patient.full_name} updated.")
+            return redirect("patient_detail", pk=patient.pk)
+    else:
+        form = PatientRegistrationForm(instance=patient)
+    context = {
+        "form": form,
+        "title": f"Edit patient — {patient.full_name}",
     }
     return render(request, "patients/patient_form.html", context)
