@@ -126,9 +126,12 @@ a:hover { text-decoration: underline; }
 .doctor { display: flex; align-items: center; gap: 12px; }
 .avatar { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; }
 .avatar.lav { background: linear-gradient(135deg, #c9bdf8, #a99ae9); }
-.doctor-text { display: flex; flex-direction: column; line-height: 1.3; }
-.doctor-name { font-size: 15px; font-weight: 700; }
-.doctor-spec { font-size: 12px; color: var(--muted); }
+.doctor-text { display: flex; flex-direction: column; line-height: 1.25; }
+.doctor-name { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; color: var(--ink); }
+.doctor-spec { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: 1.6px; text-transform: uppercase; margin-top: 2px; }
+.reception-name { color: #5b4a8a; }
+.reception-spec { color: #7a6fa0; }
+.avatar.reception-avatar { background: linear-gradient(135deg, #e8e3f7, #c9bdf8); box-shadow: 0 4px 14px rgba(91,74,138,0.25); }
 
 .search {
   margin-left: auto;

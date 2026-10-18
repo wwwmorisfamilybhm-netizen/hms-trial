@@ -176,16 +176,34 @@
   <div class="main">
     <header class="topbar">
       <div class="doctor">
-        <div class="avatar lav">
-          <svg width="26" height="26" viewBox="0 0 30 30" aria-hidden="true">
-            <circle cx="15" cy="11" r="5.5" fill="#7669a3"/>
-            <path d="M5 27c1.5-8 5-11 10-11s8.5 3 10 11" fill="#7669a3"/>
-          </svg>
+        <div class="avatar lav reception-avatar">
+          {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}
+            <svg width="26" height="26" viewBox="0 0 30 30" aria-hidden="true">
+              <path d="M4 29c1.6-7.5 5.2-10.5 11-10.5s9.4 3 11 10.5" fill="#7669a3"/>
+              <circle cx="15" cy="10.5" r="5.2" fill="#c5b9f4"/>
+              <path d="M9.8 10.5a5.2 5.2 0 0 1 10.4 0" fill="none" stroke="#202024" stroke-width="1.6" stroke-linecap="round"/>
+              <rect x="8.6" y="9.6" width="2" height="3.6" rx="1" fill="#202024"/>
+              <rect x="19.4" y="9.6" width="2" height="3.6" rx="1" fill="#202024"/>
+              <path d="M21.4 12.6c1.9 1 2.4 2.9 1.4 4.3" fill="none" stroke="#202024" stroke-width="1.4" stroke-linecap="round"/>
+              <circle cx="22.4" cy="17.4" r="1.2" fill="#202024"/>
+            </svg>
+          {% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}
+            <svg width="26" height="26" viewBox="0 0 30 30" aria-hidden="true">
+              <circle cx="15" cy="11" r="5.5" fill="#7669a3"/>
+              <path d="M5 27c1.5-8 5-11 10-11s8.5 3 10 11" fill="#7669a3"/>
+              <rect x="12" y="3" width="6" height="4" rx="1" fill="#c5b9f4"/>
+            </svg>
+          {% else %}
+            <svg width="26" height="26" viewBox="0 0 30 30" aria-hidden="true">
+              <circle cx="15" cy="11" r="5.5" fill="#7669a3"/>
+              <path d="M5 27c1.5-8 5-11 10-11s8.5 3 10 11" fill="#7669a3"/>
+            </svg>
+          {% endif %}
         </div>
         <div class="doctor-text">
           {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}
-            <span class="doctor-name">Registration Desk</span>
-            <span class="doctor-spec">Reception Desk Portal</span>
+            <span class="doctor-name reception-name">Registration Desk</span>
+            <span class="doctor-spec reception-spec">Reception Desk Portal</span>
           {% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}
             <span class="doctor-name">Hospital Admin</span>
             <span class="doctor-spec">Administration Portal</span>
