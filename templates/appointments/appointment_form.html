@@ -10,7 +10,7 @@
     {% csrf_token %}
     {% include "partials/form_fields.html" %}
     <div class="form-actions">
-      <button type="submit" class="btn">Book appointment</button>
+      <button type="submit" class="btn">{{ submit_label|default:"Book appointment" }}</button>
       <a href="{% url 'appointment_list' %}" class="btn btn-plain">Cancel</a>
     </div>
   </form>
