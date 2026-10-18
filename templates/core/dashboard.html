@@ -96,10 +96,15 @@
   /* ── Queue table ── */
   .queue-card {
     background: var(--card); border-radius: var(--radius);
-    overflow: hidden; padding: 4px 0 0;
+    padding: 4px 0 0;
   }
-  .queue-scroll { overflow-x: auto; }
-  .queue-card table { width: 100%; border-collapse: collapse; min-width: 1180px; }
+  /* NOTE: no overflow:hidden on the card — it would break position:sticky
+     on the frozen columns. The scroll box clips with its own radius instead. */
+  .queue-scroll {
+    overflow-x: auto; overflow-y: hidden;
+    border-radius: 0 0 var(--radius) var(--radius);
+  }
+  .queue-card table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1400px; }
   .queue-card th {
     padding: 14px 14px; text-align: left; white-space: nowrap;
     font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em;
@@ -108,7 +113,37 @@
   }
   .queue-card td { padding: 13px 14px; border-bottom: 1px solid #f0f0f2; vertical-align: middle; }
   .queue-card tbody tr:last-child td { border-bottom: none; }
-  .queue-card tbody tr:hover { background: #fafafb; }
+
+  /* ── Frozen columns: identity stays pinned left, Action stays pinned right ── */
+  .queue-card th.col-idx,  .queue-card td.col-idx  { position: sticky; left: 0;     width: 52px;  min-width: 52px;  z-index: 2; background: var(--card); }
+  .queue-card th.col-uhid, .queue-card td.col-uhid { position: sticky; left: 52px;  width: 122px; min-width: 122px; z-index: 2; background: var(--card); }
+  .queue-card th.col-name, .queue-card td.col-name { position: sticky; left: 174px; width: 188px; min-width: 188px; z-index: 2; background: var(--card); }
+  .queue-card th.col-action, .queue-card td.col-action {
+    position: sticky; right: 0; width: 196px; min-width: 196px; z-index: 2;
+    background: var(--card);
+  }
+
+  /* Header frozen cells sit above everything */
+  .queue-card th.col-idx, .queue-card th.col-uhid,
+  .queue-card th.col-name, .queue-card th.col-action { z-index: 4; background: #fafafb; }
+
+  /* Subtle edge shadows to read as "pinned" */
+  .queue-card td.col-name, .queue-card th.col-name {
+    box-shadow: 12px 0 14px -12px rgba(32, 32, 36, 0.16);
+    border-right: 1px solid #f0f0f2;
+  }
+  .queue-card td.col-action, .queue-card th.col-action {
+    box-shadow: -12px 0 14px -12px rgba(32, 32, 36, 0.16);
+    border-left: 1px solid #f0f0f2;
+  }
+
+  .queue-card tbody tr:hover td.col-idx,
+  .queue-card tbody tr:hover td.col-uhid,
+  .queue-card tbody tr:hover td.col-name,
+  .queue-card tbody tr:hover td.col-action { background: #fafafb; }
+
+  /* Empty state spans full width, no pinning */
+  .queue-card td[colspan] { position: static; box-shadow: none; background: transparent; }
 
   .q-uhid {
     font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -296,9 +331,9 @@
     <table>
       <thead>
         <tr>
-          <th>#</th>
-          <th>UHID</th>
-          <th>Patient Name</th>
+          <th class="col-idx">#</th>
+          <th class="col-uhid">UHID</th>
+          <th class="col-name">Patient Name</th>
           <th>Age / Sex</th>
           <th>Arrival</th>
           <th>Current Location / Status</th>
@@ -307,15 +342,15 @@
           <th>Alerts</th>
           <th>Billing</th>
           <th>Last Update</th>
-          <th>Action</th>
+          <th class="col-action">Action</th>
         </tr>
       </thead>
       <tbody>
         {% for patient in queue_patients %}
         <tr>
-          <td class="q-sub">{{ forloop.counter }}</td>
-          <td class="q-uhid">{{ patient.uhid }}</td>
-          <td class="q-name"><a href="{% url 'patient_detail' patient.pk %}">{{ patient.full_name }}</a></td>
+          <td class="q-sub col-idx">{{ forloop.counter }}</td>
+          <td class="q-uhid col-uhid">{{ patient.uhid }}</td>
+          <td class="q-name col-name"><a href="{% url 'patient_detail' patient.pk %}">{{ patient.full_name }}</a></td>
           <td class="q-sub">{{ patient.age|default:"—" }} / {{ patient.gender|default:"—" }}</td>
           <td class="q-time">{{ patient.created_at|time:"h:i A" }}</td>
           <td>
@@ -379,7 +414,7 @@
             {% endwith %}
           </td>
           <td class="q-sub">{{ patient.updated_at|time:"h:i A" }} · Registration</td>
-          <td>
+          <td class="col-action">
             <div class="q-actions">
               <a class="q-action primary" href="{% url 'patient_detail' patient.pk %}">Assess</a>
               <a class="q-action" href="{% url 'patient_detail' patient.pk %}">Track</a>
