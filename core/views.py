@@ -2,15 +2,17 @@ from datetime import date, timedelta
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.db.models import Count
 from django.db.models.functions import TruncDate
-from django.http import HttpResponseForbidden
+from django.http import FileResponse, HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 
 
 from .models import UserProfile
+from .backup import BackupArchiveError, build_patient_backup, import_patient_backup
 
 
 def home(request):
@@ -213,6 +215,73 @@ def admin_dashboard(request):
     })
 
 
+def _require_admin(request):
+    profile = getattr(request.user, "profile", None)
+    user_desig = getattr(profile, "designation", None)
+    if user_desig == UserProfile.Designation.ADMIN:
+        return None
+    messages.warning(request, "Access restricted: Hospital administrators only.")
+    if user_desig == UserProfile.Designation.REGISTRATION_DESK:
+        return redirect("reception_dashboard")
+    return redirect("dashboard")
+
+
+@login_required(login_url="login")
+def admin_settings(request):
+    """Admin-only settings landing page."""
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    return render(request, "core/admin_settings.html")
+
+
+@login_required(login_url="login")
+def admin_backup_import(request):
+    """Detailed backup and import page for administrators."""
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    if request.method == "POST":
+        upload = request.FILES.get("backup_file")
+        if not upload:
+            messages.error(request, "Choose a backup ZIP file to import.")
+            return redirect("admin_backup_import")
+        if request.POST.get("confirm_import") != "yes":
+            messages.error(request, "Confirm the import behavior before continuing.")
+            return redirect("admin_backup_import")
+        try:
+            result = import_patient_backup(upload)
+        except BackupArchiveError as exc:
+            messages.error(request, str(exc))
+        except Exception:
+            messages.error(request, "The backup could not be imported. Check the ZIP and try again.")
+        else:
+            messages.success(
+                request,
+                f"Import finished: {result['created']} patients added; {result['skipped']} existing patients skipped.",
+            )
+        return redirect("admin_backup_import")
+
+    return render(request, "core/admin_backup_import.html")
+
+
+@login_required(login_url="login")
+def admin_backup_export(request):
+    """Download a ZIP backup of patient records and linked appointments."""
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    try:
+        backup = build_patient_backup()
+    except BackupArchiveError as exc:
+        messages.error(request, str(exc))
+        return redirect("admin_backup_import")
+    filename = f"cams-hms-patient-backup-{date.today():%Y%m%d}.zip"
+    return FileResponse(backup, as_attachment=True, filename=filename, content_type="application/zip")
+
+
 # ── Registration Desk ─────────────────────────────────────────────────────────
 
 @login_required(login_url="login")
@@ -228,12 +297,18 @@ def reception_dashboard(request):
     today = date.today()
     todays_patients = Patient.objects.filter(created_at__date=today).order_by("-created_at")
     recent_patients = Patient.objects.order_by("-created_at")[:8]
+    todays_appointments = (
+        Appointment.objects.filter(date=today)
+        .select_related("patient", "doctor")
+        .order_by("start_time")
+    )
 
     return render(request, "core/reception_dashboard.html", {
         "today": today,
         "total_patients": Patient.objects.count(),
         "today_count": todays_patients.count(),
         "todays_patients": todays_patients,
+        "todays_appointments": todays_appointments,
         "recent_patients": recent_patients,
         "user": request.user,
     })
@@ -327,4 +402,113 @@ def patient_print_card(request, patient_id):
         "gross_amount": gross_amount,
         "discount": discount,
         "net_amount": net_amount,
+    })
+
+
+# ── History ───────────────────────────────────────────────────────────────────
+
+@login_required(login_url="login")
+def history(request):
+    """Combined history of patient registrations and booked appointments.
+
+    Supports filtering by record type, calendar date, appointment status and a
+    free-text search. Every row links to its edit form so the desk can correct
+    information when needed.
+    """
+    from datetime import datetime
+
+    from django.db.models import Q
+    from django.urls import reverse
+
+    item_type = request.GET.get("type", "all")
+    if item_type not in ("all", "patients", "appointments"):
+        item_type = "all"
+    query = request.GET.get("q", "").strip()
+    status = request.GET.get("status", "").strip()
+    date_str = request.GET.get("date", "")
+    selected_date = None
+    if date_str:
+        try:
+            selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            selected_date = None
+
+    include_patients = item_type in ("all", "patients")
+    include_appointments = item_type in ("all", "appointments")
+
+    rows = []
+
+    if include_patients:
+        patients = Patient.objects.all()
+        if query:
+            patients = patients.filter(
+                Q(first_name__icontains=query)
+                | Q(second_name__icontains=query)
+                | Q(last_name__icontains=query)
+                | Q(mr_number__icontains=query)
+                | Q(phone__icontains=query)
+                | Q(aadhar_no__icontains=query)
+                | Q(abha_no__icontains=query)
+            )
+        if selected_date:
+            patients = patients.filter(created_at__date=selected_date)
+        for patient in patients:
+            rows.append({
+                "kind": "patient",
+                "when": patient.created_at,
+                "badge": f"Patient · MR #{patient.mr_number or patient.id}",
+                "title": patient.full_name,
+                "detail": patient.phone or "—",
+                "status": None,
+                "status_lower": "",
+                "view_url": reverse("patient_detail", args=[patient.pk]),
+                "edit_url": reverse("patient_edit", args=[patient.pk]),
+            })
+
+    if include_appointments:
+        appointments = Appointment.objects.select_related("patient", "doctor")
+        if query:
+            appointments = appointments.filter(
+                Q(patient__first_name__icontains=query)
+                | Q(patient__second_name__icontains=query)
+                | Q(patient__last_name__icontains=query)
+                | Q(patient__mr_number__icontains=query)
+                | Q(doctor__first_name__icontains=query)
+                | Q(doctor__last_name__icontains=query)
+                | Q(reason__icontains=query)
+            )
+        if selected_date:
+            appointments = appointments.filter(date=selected_date)
+        if status:
+            appointments = appointments.filter(status=status)
+        for appointment in appointments:
+            from django.utils import timezone
+            start = timezone.make_aware(
+                datetime.combine(appointment.date, appointment.start_time)
+            )
+            rows.append({
+                "kind": "appointment",
+                "when": start,
+                "badge": f"Appointment · {appointment.doctor}",
+                "title": appointment.patient.full_name,
+                "detail": appointment.reason or "—",
+                "status": appointment.get_status_display(),
+                "status_lower": appointment.status.lower(),
+                "view_url": reverse("patient_detail", args=[appointment.patient_id]),
+                "edit_url": reverse("appointment_edit", args=[appointment.pk]),
+            })
+
+    rows.sort(key=lambda row: (row["when"] is not None, row["when"]), reverse=True)
+    rows = rows[:200]
+
+    return render(request, "core/history.html", {
+        "rows": rows,
+        "row_count": len(rows),
+        "item_type": item_type,
+        "query": query,
+        "status": status,
+        "selected_date": selected_date,
+        "date_str": date_str,
+        "status_choices": Appointment.Status.choices,
+        "user": request.user,
     })
