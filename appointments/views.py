@@ -1,14 +1,20 @@
 from datetime import date, datetime, timedelta
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
 from .forms import AppointmentForm
 from .models import Appointment
 
 
+@login_required(login_url="login")
 def appointment_list(request):
     """Appointments for a chosen date (defaults to today)."""
+    user_desig = getattr(getattr(request.user, "profile", None), "designation", None)
+    if user_desig == "registration_desk" and not request.user.is_superuser:
+        messages.warning(request, "Registration desk staff do not have access to doctor appointments.")
+        return redirect("reception_dashboard")
     date_str = request.GET.get("date", "")
     try:
         selected = (
@@ -32,8 +38,14 @@ def appointment_list(request):
     return render(request, "appointments/appointment_list.html", context)
 
 
+@login_required(login_url="login")
 def appointment_create(request):
     """Book a new appointment."""
+    user_desig = getattr(getattr(request.user, "profile", None), "designation", None)
+    if user_desig == "registration_desk" and not request.user.is_superuser:
+        messages.warning(request, "Registration desk staff do not have access to doctor appointments.")
+        return redirect("reception_dashboard")
+
     initial = {}
     if request.GET.get("patient"):
         initial["patient"] = request.GET["patient"]

@@ -1,62 +1,287 @@
 {% extends "base.html" %}
 
-{% block title %}{{ patient.full_name }} — Cams HMS{% endblock %}
+{% block title %}{{ patient.full_name }} — Patient Registration & History — Cams HMS{% endblock %}
 
 {% block heading %}
-  <div class="page-header">
-    <h1>{{ patient.full_name }}</h1>
-    <div class="actions">
-      <a class="btn btn-outline" href="{% url 'appointment_create' %}?patient={{ patient.pk }}">+ Book appointment</a>
-      <a class="btn btn-plain" href="{% url 'patient_list' %}">← Back to list</a>
+  <!-- ── PATIENT HERO HEADER ── -->
+  <div class="card" style="border-radius:24px; padding:28px 32px; margin-bottom:24px; box-shadow:0 6px 30px rgba(0,0,0,0.06); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px;">
+    <div style="display:flex; align-items:center; gap:20px;">
+      <!-- Patient Photo -->
+      {% if patient.photo %}
+        <div style="width:84px; height:84px; border-radius:22px; overflow:hidden; border:2.5px solid var(--line); flex-shrink:0; box-shadow:0 4px 16px rgba(0,0,0,0.08);">
+          <img src="{{ patient.photo.url }}" alt="{{ patient.full_name }}" style="width:100%; height:100%; object-fit:cover;">
+        </div>
+      {% else %}
+        <div style="width:84px; height:84px; border-radius:22px; background:var(--lav-soft); color:var(--ink); display:grid; place-items:center; font-size:26px; font-weight:800; flex-shrink:0; border:2px dashed var(--line);">
+          {{ patient.first_name|first }}{{ patient.last_name|first }}
+        </div>
+      {% endif %}
+
+      <div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;">
+          <h1 style="font-size:26px; font-weight:800; margin:0; letter-spacing:-0.5px;">{{ patient.full_name }}</h1>
+          <span class="badge" style="background:var(--lime); color:var(--ink); font-weight:800; font-size:13px; padding:6px 14px; border-radius:99px;">
+            MR #{{ patient.mr_number|default:patient.id }}
+          </span>
+          <span class="badge" style="font-size:12px; font-weight:700;">
+            {{ patient.patient_category|default:"GENERAL" }}
+          </span>
+          {% if patient.mlc %}
+            <span class="badge" style="background:#fee2e2; color:#b91c1c; font-size:11px; font-weight:800;">
+              ⚠️ MLC Case
+            </span>
+          {% endif %}
+        </div>
+        <p style="color:var(--muted); font-size:13px; margin:0;">
+          {% if patient.second_name %}Middle: <strong>{{ patient.second_name }}</strong> · {% endif %}
+          {{ patient.age|default:"—" }} years old · {{ patient.get_gender_display|default:"—" }} ·
+          Registered on {{ patient.created_at|date:"F j, Y · H:i" }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <a class="btn btn-outline" href="{% url 'patient_print_card' patient.pk %}" style="padding:10px 18px; border-radius:12px; font-size:13px; font-weight:750; display:inline-flex; align-items:center; gap:8px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        <span>Print Card</span>
+      </a>
+      <a class="btn" href="{% url 'appointment_create' %}?patient={{ patient.pk }}" style="background:var(--lime); color:var(--ink); font-weight:750; border-radius:12px; padding:10px 18px; font-size:13px;">
+        + Book Appointment
+      </a>
+      <a class="btn btn-outline" href="{% url 'patient_list' %}" style="padding:10px 18px; border-radius:12px; font-size:13px;">
+        ← Back to Patients
+      </a>
     </div>
   </div>
 {% endblock %}
 
 {% block content %}
-<div class="two-col">
-  <section class="card">
-    <h2>Patient record</h2>
-    <dl class="details">
-      <dt>Date of birth</dt>
-      <dd>{{ patient.date_of_birth|date:"M j, Y"|default:"—" }}{% if patient.age is not None %} ({{ patient.age }} yrs){% endif %}</dd>
-      <dt>Gender</dt>
-      <dd>{{ patient.get_gender_display|default:"—" }}</dd>
-      <dt>Blood group</dt>
-      <dd>{{ patient.blood_group|default:"—" }}</dd>
-      <dt>Phone</dt>
-      <dd>{{ patient.phone|default:"—" }}</dd>
-      <dt>Email</dt>
-      <dd>{{ patient.email|default:"—" }}</dd>
-      <dt>Address</dt>
-      <dd>{{ patient.address|default:"—"|linebreaksbr }}</dd>
-      <dt>Allergies</dt>
-      <dd>{% if patient.allergies %}<strong class="warn">{{ patient.allergies }}</strong>{% else %}None recorded{% endif %}</dd>
-      <dt>Registered</dt>
-      <dd>{{ patient.created_at|date:"M j, Y H:i" }}</dd>
-    </dl>
-  </section>
+<div style="display:grid; grid-template-columns:1.4fr 1fr; gap:24px; align-items:start;">
 
-  <section class="card">
-    <h2>Visit history</h2>
-    {% if appointments %}
-      <table>
-        <thead>
-          <tr><th>Date</th><th>Time</th><th>Doctor</th><th>Status</th></tr>
-        </thead>
-        <tbody>
-          {% for appointment in appointments %}
-          <tr>
-            <td>{{ appointment.date|date:"M j, Y" }}</td>
-            <td>{{ appointment.start_time|time:"H:i" }}</td>
-            <td>{{ appointment.doctor }}<br><small>{{ appointment.reason }}</small></td>
-            <td><span class="badge badge-{{ appointment.status|lower }}">{{ appointment.get_status_display }}</span></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <p class="empty">No visits yet. <a href="{% url 'appointment_create' %}?patient={{ patient.pk }}">Book one →</a></p>
-    {% endif %}
-  </section>
+  <!-- ── LEFT COLUMN: COMPLETE REGISTRATION RECORD ── -->
+  <div style="display:flex; flex-direction:column; gap:24px;">
+
+    <!-- Registration Details Card -->
+    <section class="card" style="border-radius:24px; padding:32px 36px; box-shadow:0 6px 30px rgba(0,0,0,0.06);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:12px; border-bottom:1.5px solid var(--line);">
+        <div>
+          <h2 style="font-size:18px; font-weight:800; margin:0 0 4px 0;">Complete Patient Registration Record</h2>
+          <p style="font-size:12px; color:var(--muted); margin:0;">Comprehensive outpatient registration details recorded at intake</p>
+        </div>
+        <span class="badge" style="background:var(--lav-soft); color:var(--ink); font-weight:700;">Verified Record</span>
+      </div>
+
+      <!-- 1. Personal & Identity -->
+      <div style="margin-bottom:24px;">
+        <h3 style="font-size:13px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); font-weight:800; margin-bottom:12px;">
+          1. Identity & Personal Details
+        </h3>
+        <dl class="details" style="display:grid; grid-template-columns:160px 1fr; row-gap:10px; font-size:14px; margin:0;">
+          <dt style="color:var(--muted); font-weight:600;">Medical Record (MR)</dt>
+          <dd style="font-weight:750; color:var(--ink); margin:0;">#{{ patient.mr_number|default:patient.id }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Full Legal Name</dt>
+          <dd style="font-weight:700; margin:0;">{{ patient.first_name }} {% if patient.second_name %}{{ patient.second_name }} {% endif %}{{ patient.last_name }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Date of Birth</dt>
+          <dd style="margin:0;">
+            {{ patient.date_of_birth|date:"M j, Y"|default:"Not specified" }}
+            {% if patient.age is not None %}<span class="badge" style="font-size:11px; margin-left:6px;">{{ patient.age }} yrs</span>{% endif %}
+          </dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Gender</dt>
+          <dd style="margin:0;">{{ patient.get_gender_display|default:"—" }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Marital Status</dt>
+          <dd style="margin:0;">{{ patient.get_marital_status_display|default:"—" }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Care Of (C/O)</dt>
+          <dd style="margin:0;">{{ patient.care_of|default:"—" }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Aadhar Card No.</dt>
+          <dd style="font-family:monospace; font-weight:600; margin:0;">{{ patient.aadhar_no|default:"—" }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">ABHA Number</dt>
+          <dd style="font-family:monospace; margin:0;">{{ patient.abha_no|default:"—" }}</dd>
+        </dl>
+      </div>
+
+      <!-- 2. Contact & Address -->
+      <div style="margin-bottom:24px; padding-top:16px; border-top:1px solid var(--line);">
+        <h3 style="font-size:13px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); font-weight:800; margin-bottom:12px;">
+          2. Contact & Residential Address
+        </h3>
+        <dl class="details" style="display:grid; grid-template-columns:160px 1fr; row-gap:10px; font-size:14px; margin:0;">
+          <dt style="color:var(--muted); font-weight:600;">Phone Number</dt>
+          <dd style="font-weight:700; color:var(--ink); margin:0;">{{ patient.phone|default:"—" }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Email Address</dt>
+          <dd style="margin:0;">{{ patient.email|default:"—" }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Address</dt>
+          <dd style="margin:0;">{{ patient.address|default:"—"|linebreaksbr }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Place / Panchayat</dt>
+          <dd style="margin:0;">{{ patient.place_panch|default:"—" }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">District & State</dt>
+          <dd style="margin:0;">
+            {% if patient.district or patient.state %}
+              {{ patient.district|default:"" }}{% if patient.district and patient.state %}, {% endif %}{{ patient.state|default:"" }}
+            {% else %}—{% endif %}
+          </dd>
+
+          <dt style="color:var(--muted); font-weight:600;">PIN Code</dt>
+          <dd style="font-family:monospace; margin:0;">{{ patient.pin_code|default:"—" }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Nationality</dt>
+          <dd style="margin:0;">{{ patient.nationality|default:"India" }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Zone / Block</dt>
+          <dd style="margin:0;">
+            {% if patient.zone or patient.block %}
+              {{ patient.zone|default:"" }} / {{ patient.block|default:"" }}
+            {% else %}—{% endif %}
+          </dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Religion</dt>
+          <dd style="margin:0;">{{ patient.religion|default:"—" }}</dd>
+        </dl>
+      </div>
+
+      <!-- 3. Billing, Fees & Category -->
+      <div style="margin-bottom:24px; padding-top:16px; border-top:1px solid var(--line);">
+        <h3 style="font-size:13px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); font-weight:800; margin-bottom:12px;">
+          3. Billing, Fees & Category
+        </h3>
+        <dl class="details" style="display:grid; grid-template-columns:160px 1fr; row-gap:10px; font-size:14px; margin:0;">
+          <dt style="color:var(--muted); font-weight:600;">Registration Fee</dt>
+          <dd style="font-weight:750; color:var(--ink); margin:0;">₹{{ patient.reg_fee }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Consultation Fee</dt>
+          <dd style="margin:0;">₹{{ patient.con_fee }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Discount</dt>
+          <dd style="margin:0;">₹{{ patient.discount }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Payment Method</dt>
+          <dd style="text-transform:capitalize; font-weight:700; margin:0;">{{ patient.get_payment_type_display|default:patient.payment_type }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Patient Category</dt>
+          <dd style="margin:0;"><span class="badge">{{ patient.patient_category|default:"GENERAL" }}</span></dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Billing Type</dt>
+          <dd style="margin:0;">{{ patient.billing_type|default:"Individual" }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Reference No.</dt>
+          <dd style="margin:0;">{{ patient.reference_no|default:"—" }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Valid Upto</dt>
+          <dd style="margin:0;">{{ patient.valid_upto|date:"M j, Y"|default:"—" }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">MLC Registration</dt>
+          <dd style="margin:0;">
+            {% if patient.mlc %}
+              <span class="badge" style="background:#fee2e2; color:#b91c1c; font-weight:750;">Yes (Medico-Legal Case)</span>
+            {% else %}
+              Standard OP Case (No)
+            {% endif %}
+          </dd>
+        </dl>
+      </div>
+
+      <!-- 4. Clinical & Allergies -->
+      <div style="padding-top:16px; border-top:1px solid var(--line);">
+        <h3 style="font-size:13px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); font-weight:800; margin-bottom:12px;">
+          4. Clinical Notes & Allergies
+        </h3>
+        <dl class="details" style="display:grid; grid-template-columns:160px 1fr; row-gap:10px; font-size:14px; margin:0;">
+          <dt style="color:var(--muted); font-weight:600;">Blood Group</dt>
+          <dd style="margin:0;">
+            {% if patient.blood_group %}
+              <span class="badge" style="background:var(--lav-soft); color:var(--ink); font-weight:750;">{{ patient.blood_group }}</span>
+            {% else %}—{% endif %}
+          </dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Known Allergies</dt>
+          <dd style="margin:0;">
+            {% if patient.allergies %}
+              <strong style="color:#d32f2f;">{{ patient.allergies }}</strong>
+            {% else %}
+              <span style="color:var(--muted);">None recorded</span>
+            {% endif %}
+          </dd>
+        </dl>
+      </div>
+    </section>
+  </div>
+
+  <!-- ── RIGHT COLUMN: VISIT / CONSULTATION HISTORY ── -->
+  <div style="display:flex; flex-direction:column; gap:24px;">
+
+    <!-- Visit History Card -->
+    <section class="card" style="border-radius:24px; padding:32px 30px; box-shadow:0 6px 30px rgba(0,0,0,0.06);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+        <div>
+          <h2 style="font-size:18px; font-weight:800; margin:0 0 4px 0;">Visit & Consultation History</h2>
+          <p style="font-size:12px; color:var(--muted); margin:0;">Past & scheduled appointments</p>
+        </div>
+        <a class="btn btn-outline" href="{% url 'appointment_create' %}?patient={{ patient.pk }}" style="font-size:12px; padding:6px 12px; border-radius:10px;">
+          + New Visit
+        </a>
+      </div>
+
+      {% if appointments %}
+        <table>
+          <thead>
+            <tr><th>Date</th><th>Time</th><th>Doctor</th><th class="ta-r">Status</th></tr>
+          </thead>
+          <tbody>
+            {% for appointment in appointments %}
+            <tr>
+              <td class="cell-strong">{{ appointment.date|date:"M j, Y" }}</td>
+              <td class="muted">{{ appointment.start_time|time:"H:i" }}</td>
+              <td>
+                <div style="font-weight:600;">{{ appointment.doctor }}</div>
+                {% if appointment.reason %}
+                  <small style="color:var(--muted);">{{ appointment.reason }}</small>
+                {% endif %}
+              </td>
+              <td class="ta-r">
+                <span class="badge badge-{{ appointment.status|lower }}">{{ appointment.get_status_display }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div style="text-align:center; padding:36px 16px; background:var(--lav-soft); border-radius:16px;">
+          <p style="color:var(--muted); font-size:14px; margin-bottom:14px;">No doctor consultation visits recorded yet for this patient.</p>
+          <a href="{% url 'appointment_create' %}?patient={{ patient.pk }}" class="btn" style="background:var(--lime); color:var(--ink); font-weight:750; font-size:13px; padding:8px 18px; border-radius:12px; text-decoration:none;">
+            + Book First Appointment →
+          </a>
+        </div>
+      {% endif %}
+    </section>
+
+    <!-- Quick Counter Card -->
+    <div class="card" style="border-radius:24px; padding:24px 28px; background:var(--lav-soft); border:1px solid var(--line);">
+      <h3 style="font-size:14px; font-weight:750; margin:0 0 8px 0;">Registration Desk Reference</h3>
+      <p style="font-size:12px; color:var(--muted); margin:0 0 14px 0;">
+        All changes to registration data must be authorized at the central registration counter.
+      </p>
+      <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600;">
+        <span style="color:var(--muted);">Initial Registration:</span>
+        <span>{{ patient.created_at|date:"M j, Y H:i" }}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600; margin-top:6px;">
+        <span style="color:var(--muted);">Record Status:</span>
+        <span style="color:#15803d;">Active Outpatient</span>
+      </div>
+    </div>
+
+  </div>
+
 </div>
 {% endblock %}

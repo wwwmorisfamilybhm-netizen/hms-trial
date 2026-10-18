@@ -1,8 +1,15 @@
+# Python
 __pycache__/
 *.py[cod]
 .venv/
-.vscode/
-.idea/
+
+# Django
 db.sqlite3
 staticfiles/
+
+# macOS
 .DS_Store
+
+# Editors
+.vscode/
+.idea/

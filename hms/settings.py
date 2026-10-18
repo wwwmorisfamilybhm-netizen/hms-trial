@@ -66,6 +66,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    # 'core.middleware.AutoLogoutMiddleware',  # disabled
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -148,6 +149,10 @@ STORAGES = {
     },
 }
 
+# Media files (patient photos, uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = False
@@ -175,3 +180,7 @@ MAILERS = {
         } if not DEBUG else {},
     },
 }
+
+# Auth redirects
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/dashboard/'

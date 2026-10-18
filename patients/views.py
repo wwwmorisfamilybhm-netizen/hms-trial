@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -6,15 +7,20 @@ from .forms import PatientForm
 from .models import Patient
 
 
+@login_required(login_url="login")
 def patient_list(request):
-    """List all patients, with a search box."""
+    """List all patients with registration details and search."""
     query = request.GET.get("q", "").strip()
-    patients = Patient.objects.all()
+    patients = Patient.objects.all().order_by("-created_at")
     if query:
         patients = patients.filter(
             Q(first_name__icontains=query)
+            | Q(second_name__icontains=query)
             | Q(last_name__icontains=query)
+            | Q(mr_number__icontains=query)
             | Q(phone__icontains=query)
+            | Q(aadhar_no__icontains=query)
+            | Q(abha_no__icontains=query)
         )
     context = {
         "patients": patients,
@@ -23,6 +29,7 @@ def patient_list(request):
     return render(request, "patients/patient_list.html", context)
 
 
+@login_required(login_url="login")
 def patient_detail(request, pk):
     """One patient's record and visit history."""
     patient = get_object_or_404(Patient, pk=pk)
@@ -36,8 +43,13 @@ def patient_detail(request, pk):
     return render(request, "patients/patient_detail.html", context)
 
 
+@login_required(login_url="login")
 def patient_create(request):
     """Register a new patient."""
+    user_desig = getattr(getattr(request.user, "profile", None), "designation", None)
+    if user_desig == "registration_desk":
+        return redirect("registration_desk")
+
     if request.method == "POST":
         form = PatientForm(request.POST)
         if form.is_valid():

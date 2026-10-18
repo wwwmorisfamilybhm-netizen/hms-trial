@@ -10,12 +10,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
-<body>
+<body data-logout-url="{% url 'logout' %}">
 <div class="app">
 
   <!-- ============ SIDEBAR ============ -->
   <aside class="sidebar">
-    <a class="brand" href="{% url 'dashboard' %}">
+    <a class="brand" href="{% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' %}{% url 'reception_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
       <span class="brand-mark">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M3 10l9-7 5 4-4 4z" fill="#d6f25f"/>
@@ -29,49 +29,74 @@
     </a>
 
     <nav class="side-nav">
-      <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
-        <span class="nav-icon">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-            <rect width="18" height="18" rx="4" fill="currentColor"/>
-            <path d="M9 4v10M4 9h10" stroke="#fff" stroke-width="2"/>
-          </svg>
-        </span>
-        <span class="nav-label">Dashboard</span>
-      </a>
-      <a href="{% url 'patient_list' %}" class="nav-item {% if request.resolver_match.app_name == 'patients' %}active{% endif %}">
-        <span class="nav-icon">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-            <circle cx="8" cy="6" r="4"/><path d="M1 18c1-6 3.5-8 7-8s6 2 7 8M16 5a4 4 0 0 1 0 8"/>
-          </svg>
-        </span>
-        <span class="nav-label">Patients</span>
-      </a>
-      <a href="{% url 'appointment_list' %}" class="nav-item {% if request.resolver_match.app_name == 'appointments' %}active{% endif %}">
-        <span class="nav-icon">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-            <rect x="1" y="3" width="18" height="16" rx="3"/><path d="M1 8h18M6 1v4M14 1v4"/>
-          </svg>
-        </span>
-        <span class="nav-label">Appointments</span>
-      </a>
+      {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' %}
+        <a href="{% url 'reception_dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'reception_dashboard' %}active{% endif %}">
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+              <rect width="18" height="18" rx="4" fill="currentColor"/>
+              <path d="M9 4v10M4 9h10" stroke="#fff" stroke-width="2"/>
+            </svg>
+          </span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+      {% else %}
+        <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+              <rect width="18" height="18" rx="4" fill="currentColor"/>
+              <path d="M9 4v10M4 9h10" stroke="#fff" stroke-width="2"/>
+            </svg>
+          </span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+        <a href="{% url 'patient_list' %}" class="nav-item {% if request.resolver_match.app_name == 'patients' %}active{% endif %}">
+          <span class="nav-icon">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <circle cx="8" cy="6" r="4"/><path d="M1 18c1-6 3.5-8 7-8s6 2 7 8M16 5a4 4 0 0 1 0 8"/>
+            </svg>
+          </span>
+          <span class="nav-label">Patients</span>
+        </a>
+        <a href="{% url 'appointment_list' %}" class="nav-item {% if request.resolver_match.app_name == 'appointments' %}active{% endif %}">
+          <span class="nav-icon">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+              <rect x="1" y="3" width="18" height="16" rx="3"/><path d="M1 8h18M6 1v4M14 1v4"/>
+            </svg>
+          </span>
+          <span class="nav-label">Appointments</span>
+        </a>
+      {% endif %}
     </nav>
 
-    <div class="side-cta">
-      <a href="{% url 'patient_create' %}" class="side-btn lime">+ New Patient</a>
-      <a href="{% url 'appointment_create' %}" class="side-btn ghost">+ Book</a>
-    </div>
-
-    <div class="side-status">
-      <div class="status-head">
-        <span class="status-check">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#202024" stroke-width="2"><path d="M2 7l3.5 3.5L12 3.5"/></svg>
-        </span>
-        <span class="status-title">Clinic status</span>
+    {% if request.session.designation != 'registration_desk' and request.resolver_match.url_name != 'reception_dashboard' and request.resolver_match.url_name != 'registration_desk' %}
+      <div class="side-cta">
+        <a href="{% url 'patient_create' %}" class="side-btn lime">+ New Patient</a>
+        <a href="{% url 'appointment_create' %}" class="side-btn ghost">+ Book</a>
       </div>
-      <p class="status-text">All systems operational</p>
-      <p class="status-sync"><span class="dot"></span> Admin console</p>
-      <a href="/admin/" class="status-admin">Open admin →</a>
-    </div>
+
+      <div class="side-status">
+        <div class="status-head">
+          <span class="status-check">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#202024" stroke-width="2"><path d="M2 7l3.5 3.5L12 3.5"/></svg>
+          </span>
+          <span class="status-title">Clinic status</span>
+        </div>
+        <p class="status-text">All systems operational</p>
+        <p class="status-sync"><span class="dot"></span> Admin console</p>
+        <a href="/admin/" class="status-admin">Open admin →</a>
+      </div>
+    {% else %}
+      <div class="side-status" style="margin-top:auto;">
+        <div class="status-head">
+          <span class="status-check">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#202024" stroke-width="2"><path d="M2 7l3.5 3.5L12 3.5"/></svg>
+          </span>
+          <span class="status-title">Registration Desk</span>
+        </div>
+        <p class="status-text">Counter Active</p>
+        <a href="{% url 'logout' %}" class="status-admin" style="color:#ff8e8e; margin-top:8px; display:inline-block;">Sign out →</a>
+      </div>
+    {% endif %}
   </aside>
 
   <!-- ============ MAIN ============ -->
@@ -85,8 +110,13 @@
           </svg>
         </div>
         <div class="doctor-text">
-          <span class="doctor-name">Cams HMS</span>
-          <span class="doctor-spec">Hospital Management</span>
+          {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' %}
+            <span class="doctor-name">Registration Desk</span>
+            <span class="doctor-spec">Reception Desk Portal</span>
+          {% else %}
+            <span class="doctor-name">Cams HMS</span>
+            <span class="doctor-spec">Hospital Management</span>
+          {% endif %}
         </div>
       </div>
 
@@ -98,8 +128,13 @@
       </div>
 
       <div class="topbar-right">
-        <a href="{% url 'patient_create' %}" class="topbar-btn solid">+ New Patient</a>
-        <a href="{% url 'appointment_create' %}" class="topbar-btn outline">+ Book</a>
+        {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' %}
+          <a href="{% url 'registration_desk' %}" class="topbar-btn solid">+ Patient Registration</a>
+          <a href="{% url 'logout' %}" class="topbar-btn outline">Sign Out</a>
+        {% else %}
+          <a href="{% url 'patient_create' %}" class="topbar-btn solid">+ New Patient</a>
+          <a href="{% url 'appointment_create' %}" class="topbar-btn outline">+ Book</a>
+        {% endif %}
       </div>
     </header>
 
@@ -116,5 +151,7 @@
   </div>
 
 </div>
+
+<script src="{% static 'js/refresh-logout.js' %}"></script>
 </body>
 </html>
