@@ -36,6 +36,18 @@
     {% endfor %}
   {% endif %}
 
+  {% if fee_configuration_missing %}
+    <div role="alert" style="margin-bottom:24px; border-radius:14px; padding:14px 20px; color:#92400e; background:#fef3c7; font-weight:650;">
+      Registration fees are not configured. An administrator must set a default fee or category fee before patients can be registered.
+    </div>
+  {% endif %}
+
+  {% if form.non_field_errors %}
+    <div role="alert" style="margin-bottom:24px; border-radius:14px; padding:14px 20px; color:#b91c1c; background:#fee2e2; font-weight:650;">
+      {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+    </div>
+  {% endif %}
+
   <form method="post" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
 
@@ -113,7 +125,7 @@
         </div>
 
         <div class="field">
-          <label for="id_last_name">Last Name *</label>
+          <label for="id_last_name">Last Name</label>
           {{ form.last_name }}
           {% for error in form.last_name.errors %}<small class="error" style="color:#d32f2f;">{{ error }}</small>{% endfor %}
         </div>
@@ -124,6 +136,26 @@
         </div>
 
         <div class="field">
+          <label for="id_age_years">Age — Years</label>
+          {{ form.age_years }}
+        </div>
+
+        <div class="field">
+          <label for="id_age_months">Months</label>
+          {{ form.age_months }}
+        </div>
+
+        <div class="field">
+          <label for="id_age_days">Days</label>
+          {{ form.age_days }}
+        </div>
+
+        <div class="field">
+          <label for="id_patient_category">Patient Category</label>
+          {{ form.patient_category }}
+        </div>
+
+        <div class="field">
           <label for="id_gender">Gender</label>
           {{ form.gender }}
         </div>
@@ -131,6 +163,11 @@
         <div class="field">
           <label for="id_marital_status">Marital Status</label>
           {{ form.marital_status }}
+        </div>
+
+        <div class="field">
+          <label for="id_centre">Centre</label>
+          {{ form.centre }}
         </div>
       </div>
     </div>
@@ -144,8 +181,9 @@
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px;">
         <div class="field">
-          <label for="id_phone">Phone Number</label>
+          <label for="id_phone">Phone Number *</label>
           {{ form.phone }}
+          {% for error in form.phone.errors %}<small class="error" style="color:#d32f2f;">{{ error }}</small>{% endfor %}
         </div>
 
         <div class="field">
@@ -159,11 +197,6 @@
         </div>
 
         <div class="field">
-          <label for="id_place_panch">Place / Panchayat</label>
-          {{ form.place_panch }}
-        </div>
-
-        <div class="field">
           <label for="id_aadhar_no">Aadhar Card No.</label>
           {{ form.aadhar_no }}
         </div>
@@ -171,6 +204,16 @@
         <div class="field">
           <label for="id_abha_no">ABHA Number</label>
           {{ form.abha_no }}
+        </div>
+
+        <div class="field">
+          <label for="id_nationality">Nationality</label>
+          {{ form.nationality }}
+        </div>
+
+        <div class="field">
+          <label for="id_pin_code">PIN Code</label>
+          {{ form.pin_code }}
         </div>
       </div>
     </div>
@@ -182,19 +225,7 @@
         <h2 style="font-size:17px; font-weight:750; color:var(--ink); margin:0;">Address & Demographics</h2>
       </div>
 
-      <div style="margin-bottom:18px;">
-        <div class="field">
-          <label for="id_address">Residential Address</label>
-          {{ form.address }}
-        </div>
-      </div>
-
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:20px;">
-        <div class="field">
-          <label for="id_nationality">Nationality</label>
-          {{ form.nationality }}
-        </div>
-
         <div class="field">
           <label for="id_state">State</label>
           {{ form.state }}
@@ -206,23 +237,28 @@
         </div>
 
         <div class="field">
-          <label for="id_pin_code">PIN Code</label>
-          {{ form.pin_code }}
-        </div>
-
-        <div class="field">
-          <label for="id_zone">Zone</label>
-          {{ form.zone }}
-        </div>
-
-        <div class="field">
           <label for="id_block">Block</label>
           {{ form.block }}
         </div>
 
         <div class="field">
+          <label for="id_village">Village</label>
+          {{ form.village }}
+        </div>
+
+        <div class="field">
           <label for="id_religion">Religion</label>
           {{ form.religion }}
+        </div>
+
+        <div class="field" style="grid-column:1/-1;">
+          <label for="id_address">Residential Address</label>
+          {{ form.address }}
+        </div>
+
+        <div class="field">
+          <label for="id_zone">Zone</label>
+          {{ form.zone }}
         </div>
       </div>
     </div>
@@ -256,11 +292,6 @@
         </div>
 
         <div class="field">
-          <label for="id_patient_category">Category</label>
-          {{ form.patient_category }}
-        </div>
-
-        <div class="field">
           <label for="id_billing_type">Billing Type</label>
           {{ form.billing_type }}
         </div>
@@ -270,10 +301,6 @@
           {{ form.reference_no }}
         </div>
 
-        <div class="field">
-          <label for="id_valid_upto">Valid Upto</label>
-          {{ form.valid_upto }}
-        </div>
       </div>
 
       <div style="display:flex; align-items:center; gap:10px; margin-top:8px; background:var(--lav-soft); padding:14px 20px; border-radius:12px;">
@@ -348,9 +375,61 @@
   </div>
 </div>
 
+{{ category_fees|json_script:"category-fees-data" }}
+{{ default_registration_fee|json_script:"default-registration-fee-data" }}
 <script>
 let cameraStream = null;
 let capturedDataUrl = null;
+
+const dobField = document.getElementById('id_date_of_birth');
+const ageFields = ['id_age_years', 'id_age_months', 'id_age_days'].map(id => document.getElementById(id));
+function updateAgeFromDob() {
+  if (!dobField.value) {
+    ageFields.forEach(field => field.readOnly = false);
+    return;
+  }
+  const birth = new Date(dobField.value + 'T00:00:00');
+  const today = new Date();
+  let years = today.getFullYear() - birth.getFullYear();
+  let months = today.getMonth() - birth.getMonth();
+  let days = today.getDate() - birth.getDate();
+  if (days < 0) {
+    months--;
+    const previousMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    days += previousMonth.getDate();
+  }
+  if (months < 0) { years--; months += 12; }
+  [years, months, days].forEach((value, index) => {
+    ageFields[index].value = value;
+    ageFields[index].readOnly = true;
+  });
+}
+dobField.addEventListener('change', updateAgeFromDob);
+if (dobField.value) updateAgeFromDob();
+
+ageFields.forEach(field => field.addEventListener('input', () => {
+  if (dobField.value || ageFields.some(item => item.value === '')) return;
+  const [years, months, days] = ageFields.map(item => Number(item.value || 0));
+  const today = new Date();
+  const monthIndex = today.getFullYear() * 12 + today.getMonth() - years * 12 - months;
+  const year = Math.floor(monthIndex / 12);
+  const month = monthIndex % 12;
+  const birth = new Date(year, month, Math.min(today.getDate(), new Date(year, month + 1, 0).getDate()));
+  birth.setDate(birth.getDate() - days);
+  dobField.value = birth.toISOString().slice(0, 10);
+}));
+
+const categoryFees = JSON.parse(document.getElementById('category-fees-data').textContent);
+const defaultRegistrationFee = JSON.parse(document.getElementById('default-registration-fee-data').textContent);
+const categoryField = document.getElementById('id_patient_category');
+const registrationFeeField = document.getElementById('id_reg_fee');
+function updateRegistrationFee() {
+  const categoryFee = categoryFees[categoryField.value];
+  const fee = categoryFee !== null && categoryFee !== undefined ? categoryFee : defaultRegistrationFee;
+  registrationFeeField.value = fee === null ? '' : Number(fee).toFixed(2);
+}
+categoryField.addEventListener('change', updateRegistrationFee);
+updateRegistrationFee();
 
 function handleFileUpload(input) {
   if (input.files && input.files[0]) {

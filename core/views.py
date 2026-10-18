@@ -3,10 +3,11 @@ from datetime import date, timedelta
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Count
 from django.db.models.functions import TruncDate
 from django.http import FileResponse, HttpResponseForbidden
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 
@@ -27,7 +28,7 @@ def home(request):
     return redirect("login")
 
 from appointments.models import Appointment, Doctor
-from patients.models import Patient
+from patients.models import Patient, PatientBill
 
 
 # ── Login / logout ────────────────────────────────────────────────────────────
@@ -226,6 +227,234 @@ def _require_admin(request):
     return redirect("dashboard")
 
 
+def _require_registration_desk(request):
+    designation = (
+        getattr(getattr(request.user, "profile", None), "designation", None)
+        or request.session.get("designation")
+    )
+    if designation == UserProfile.Designation.REGISTRATION_DESK:
+        return None
+    messages.warning(request, "This console is available to Registration Desk staff only.")
+    if designation == UserProfile.Designation.ADMIN:
+        return redirect("admin_dashboard")
+    return redirect("dashboard")
+
+
+@login_required(login_url="login")
+def bill_command_center(request):
+    """Find a patient and show the billing amounts currently stored on their record."""
+    denied = _require_registration_desk(request)
+    if denied:
+        return denied
+
+    from django.db.models import Q
+
+    query = request.GET.get("q", "").strip()
+    pending_bills = PatientBill.objects.filter(
+        status=PatientBill.Status.PENDING,
+    ).select_related("patient", "created_by")
+    if query:
+        pending_bills = pending_bills.filter(
+            Q(patient__first_name__icontains=query)
+            | Q(patient__second_name__icontains=query)
+            | Q(patient__last_name__icontains=query)
+            | Q(patient__mr_number__icontains=query)
+            | Q(patient__phone__icontains=query)
+            | Q(description__icontains=query)
+        )
+    pending_bills = pending_bills.order_by("created_at")[:100]
+    paid_bills = PatientBill.objects.filter(
+        status=PatientBill.Status.PAID,
+    ).select_related("patient", "created_by")
+    if query:
+        paid_bills = paid_bills.filter(
+            Q(patient__first_name__icontains=query)
+            | Q(patient__second_name__icontains=query)
+            | Q(patient__last_name__icontains=query)
+            | Q(patient__mr_number__icontains=query)
+            | Q(patient__phone__icontains=query)
+            | Q(description__icontains=query)
+        )
+    paid_bills = paid_bills.order_by("-paid_at", "-created_at")[:100]
+    patients = Patient.objects.none()
+    selected_patient = None
+    if query:
+        patients = Patient.objects.filter(
+            Q(first_name__icontains=query)
+            | Q(second_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(mr_number__icontains=query)
+            | Q(phone__icontains=query)
+        ).order_by("first_name", "last_name")[:50]
+    patient_id = request.GET.get("patient", "").strip()
+    if patient_id.isdigit():
+        selected_patient = Patient.objects.filter(pk=int(patient_id)).first()
+    from decimal import Decimal
+    selected_patient_net = Decimal("0")
+    if selected_patient:
+        gross = (selected_patient.reg_fee or Decimal("0")) + (selected_patient.con_fee or Decimal("0"))
+        selected_patient_net = max(gross - (selected_patient.discount or Decimal("0")), Decimal("0"))
+
+    selected_bills = []
+    selected_paid_total = Decimal("0")
+    selected_pending_total = Decimal("0")
+    if selected_patient:
+        selected_bills = list(
+            selected_patient.bills.select_related("created_by").order_by("-created_at")
+        )
+        for row in selected_bills:
+            if row.status == PatientBill.Status.PAID:
+                selected_paid_total += row.amount_due
+            else:
+                selected_pending_total += row.amount_due
+
+    return render(request, "core/bill_command_center.html", {
+        "query": query,
+        "pending_bills": pending_bills,
+        "paid_bills": paid_bills,
+        "patients": patients,
+        "selected_patient": selected_patient,
+        "selected_patient_net": selected_patient_net,
+        "selected_bills": selected_bills,
+        "selected_bill_count": len(selected_bills),
+        "selected_paid_total": selected_paid_total,
+        "selected_pending_total": selected_pending_total,
+        "user": request.user,
+    })
+
+
+@login_required(login_url="login")
+def billing_console_placeholder(request, console_name, title):
+    """Show a shell for billing consoles whose workflow will be defined later."""
+    denied = _require_registration_desk(request)
+    if denied:
+        return denied
+    return render(request, "core/billing_console_placeholder.html", {
+        "console_name": console_name,
+        "title": title,
+        "user": request.user,
+    })
+
+
+@login_required(login_url="login")
+def patient_bill_slip(request, bill_id):
+    """Display a printable pending-payment slip for one patient bill."""
+    denied = _require_registration_desk(request)
+    if denied:
+        return denied
+    bill = get_object_or_404(PatientBill.objects.select_related("patient", "created_by"), pk=bill_id)
+    return render(request, "core/patient_bill_slip.html", {
+        "bill": bill,
+        "user": request.user,
+    })
+
+
+@login_required(login_url="login")
+def bill_set_status(request, bill_id):
+    """Mark a bill as paid or move it back to pending from the payment slip."""
+    denied = _require_registration_desk(request)
+    if denied:
+        return denied
+
+    bill = get_object_or_404(PatientBill, pk=bill_id)
+    from django.utils import timezone
+
+    next_status = request.POST.get("status", "").strip()
+    if next_status == PatientBill.Status.PAID:
+        bill.status = PatientBill.Status.PAID
+        bill.paid_at = timezone.now()
+        bill.save(update_fields=["status", "paid_at"])
+        messages.success(
+            request,
+            f"{bill.bill_number} marked as PAID. Amount received ₹{bill.amount_due}.",
+        )
+    elif next_status == PatientBill.Status.PENDING:
+        bill.status = PatientBill.Status.PENDING
+        bill.paid_at = None
+        bill.save(update_fields=["status", "paid_at"])
+        messages.warning(
+            request,
+            f"{bill.bill_number} moved back to PENDING payment.",
+        )
+    return redirect("patient_bill_slip", bill_id=bill.pk)
+
+
+def _bill_as_whatsapp_text(bill):
+    """Format a patient bill as an appealing WhatsApp text message."""
+    import re
+
+    from django.utils import timezone
+
+    patient = bill.patient
+    age = f"{patient.age} years" if patient.age else "—"
+    gender = patient.get_gender_display() or "—"
+    created = timezone.localtime(bill.created_at).strftime("%d %b %Y, %I:%M %p")
+
+    lines = [
+        "*CAMS Hospital*",
+        "",
+        f"*Payment Slip {bill.bill_number}*",
+        f"Date: {created}",
+        "",
+        f"*Patient:* {patient.full_name}",
+        f"MR Number: {patient.mr_number or patient.pk}",
+        f"Age & Gender: {age} · {gender}",
+        f"Phone: {patient.phone or '—'}",
+        "",
+        f"*Payment details — {bill.get_source_display()}*",
+        bill.description,
+        "",
+    ]
+    if bill.source == PatientBill.Source.REGISTRATION:
+        lines += [
+            f"Registration fee: ₹{patient.reg_fee or 0:,.2f}",
+            f"Consultation fee: ₹{patient.con_fee or 0:,.2f}",
+            f"Discount: − ₹{bill.discount:,.2f}",
+        ]
+    lines += [
+        f"Amount: ₹{bill.amount:,.2f}",
+    ]
+    if bill.status == PatientBill.Status.PAID:
+        lines.append(f"*Amount paid: ₹{bill.amount_due:,.2f}*")
+        lines += ["", "Status: Thank you — this payment has been received."]
+    else:
+        lines.append(f"*Amount due: ₹{bill.amount_due:,.2f}*")
+        lines += ["", "Status: PENDING PAYMENT"]
+    lines += [
+        "",
+        "Thank you for choosing Cams Hospital.",
+    ]
+    return "\n".join(lines)
+
+
+@login_required(login_url="login")
+def bill_whatsapp(request, bill_id):
+    """Open WhatsApp with this bill composed as text for the patient."""
+    import re
+
+    denied = _require_registration_desk(request)
+    if denied:
+        return denied
+
+    from urllib.parse import quote
+
+    bill = get_object_or_404(
+        PatientBill.objects.select_related("patient", "created_by"), pk=bill_id
+    )
+
+    # Stored phone is normalized to '+91XXXXXXXXXX' by the registration form,
+    # so stripping non-digits leaves the country-code format wa.me expects.
+    digits = re.sub(r"\D", "", bill.patient.phone or "")
+    if not digits:
+        messages.error(
+            request,
+            "This patient has no phone number saved. Add one via Edit Full Details, then send the bill.",
+        )
+        return redirect("patient_bill_slip", bill_id=bill.pk)
+
+    return redirect(f"https://wa.me/{digits}?text={quote(_bill_as_whatsapp_text(bill))}")
+
+
 @login_required(login_url="login")
 def admin_settings(request):
     """Admin-only settings landing page."""
@@ -297,18 +526,11 @@ def reception_dashboard(request):
     today = date.today()
     todays_patients = Patient.objects.filter(created_at__date=today).order_by("-created_at")
     recent_patients = Patient.objects.order_by("-created_at")[:8]
-    todays_appointments = (
-        Appointment.objects.filter(date=today)
-        .select_related("patient", "doctor")
-        .order_by("start_time")
-    )
-
     return render(request, "core/reception_dashboard.html", {
         "today": today,
         "total_patients": Patient.objects.count(),
         "today_count": todays_patients.count(),
         "todays_patients": todays_patients,
-        "todays_appointments": todays_appointments,
         "recent_patients": recent_patients,
         "user": request.user,
     })
@@ -332,36 +554,48 @@ def registration_desk(request):
         from patients.forms import PatientRegistrationForm
         form = PatientRegistrationForm(request.POST, request.FILES)
         if form.is_valid():
-            patient = form.save(commit=False)
-            patient.mr_number = str(next_mr)
+            with transaction.atomic():
+                last_locked = Patient.objects.select_for_update().order_by("-id").first()
+                current_mr = (int(last_locked.mr_number) + 1) if (last_locked and last_locked.mr_number and last_locked.mr_number.isdigit()) else 100001
+                patient = form.save(commit=False)
+                patient.mr_number = str(current_mr)
 
-            # If photo was captured directly via webcam
-            photo_data = request.POST.get("photo_data", "").strip()
-            if photo_data and photo_data.startswith("data:image"):
-                import base64
-                from django.core.files.base import ContentFile
-                try:
-                    format_header, imgstr = photo_data.split(";base64,")
-                    ext = "jpg"
-                    if "png" in format_header:
-                        ext = "png"
-                    elif "webp" in format_header:
-                        ext = "webp"
-                    clean_name = patient.first_name.lower().replace(" ", "_") or "patient"
-                    filename = f"patient_{next_mr}_{clean_name}.{ext}"
-                    patient.photo.save(filename, ContentFile(base64.b64decode(imgstr)), save=False)
-                except Exception:
-                    pass
+                # If photo was captured directly via webcam
+                photo_data = request.POST.get("photo_data", "").strip()
+                if photo_data and photo_data.startswith("data:image"):
+                    import base64
+                    from django.core.files.base import ContentFile
+                    try:
+                        format_header, imgstr = photo_data.split(";base64,")
+                        ext = "jpg"
+                        if "png" in format_header:
+                            ext = "png"
+                        elif "webp" in format_header:
+                            ext = "webp"
+                        clean_name = patient.first_name.lower().replace(" ", "_") or "patient"
+                        filename = f"patient_{current_mr}_{clean_name}.{ext}"
+                        patient.photo.save(filename, ContentFile(base64.b64decode(imgstr)), save=False)
+                    except Exception:
+                        pass
 
-            patient.save()
+                patient.save()
+                registration_total = (patient.reg_fee or Decimal("0")) + (patient.con_fee or Decimal("0"))
+                registration_discount = min(patient.discount or Decimal("0"), registration_total)
+                if registration_total - registration_discount > 0:
+                    PatientBill.objects.create(
+                        patient=patient,
+                        source=PatientBill.Source.REGISTRATION,
+                        description="Patient registration & consultation fee",
+                        amount=registration_total,
+                        discount=registration_discount,
+                        created_by=request.user,
+                    )
             return redirect("patient_print_card", patient_id=patient.pk)
     else:
         from patients.forms import PatientRegistrationForm
         form = PatientRegistrationForm(initial={
             "nationality": "India",
-            "reg_fee": 50,
-            "con_fee": 0,
-            "discount": 0,
+            "state": "Bihar",
             "patient_category": "GENERAL",
             "billing_type": "Individual",
             "payment_type": "cash",
@@ -377,6 +611,124 @@ def registration_desk(request):
         "today": today,
         "recent_registered": recent_registered,
         "last_registered": recent_registered[0] if recent_registered else None,
+        "user": request.user,
+        "fee_configuration_missing": form.default_fee is None and not any(value is not None for value in form.category_fees.values()),
+        "category_fees": form.category_fees,
+        "default_registration_fee": form.default_fee,
+        "default_consultation_fee": form.default_consultation_fee,
+        "default_discount": form.default_discount,
+    })
+
+
+@login_required(login_url="login")
+def emergency_registration(request):
+    """Fast emergency intake counter.
+
+    Registers a patient with only the essentials (name, age, sex, MR number),
+    flags the record as an emergency, and raises a PENDING registration-fee bill
+    so the payment is collected later from the Bill Command Center. The remaining
+    registration details are completed later by editing the record from History.
+    """
+    from decimal import Decimal
+
+    from django.utils import timezone
+
+    from patients.forms import EmergencyRegistrationForm
+    from patients.models import RegistrationFeeSettings
+
+    user_desig = getattr(getattr(request.user, "profile", None), "designation", None) or request.session.get("designation")
+    if user_desig in ["doctor", "nurse"] and not request.user.is_superuser:
+        messages.warning(request, "Access restricted: Emergency registration is for Registration Desk staff only.")
+        return redirect("dashboard")
+
+    def _next_mr():
+        last = Patient.objects.order_by("-id").first()
+        if last and last.mr_number and last.mr_number.isdigit():
+            return int(last.mr_number) + 1
+        return 100001
+
+    next_mr = _next_mr()
+    default_fee = (
+        RegistrationFeeSettings.objects.order_by("pk")
+        .values_list("default_registration_fee", flat=True)
+        .first()
+    )
+    default_consultation_fee = (
+        RegistrationFeeSettings.objects.order_by("pk")
+        .values_list("default_consultation_fee", flat=True)
+        .first()
+    )
+    default_discount = (
+        RegistrationFeeSettings.objects.order_by("pk")
+        .values_list("default_discount", flat=True)
+        .first()
+    )
+
+    if request.method == "POST":
+        form = EmergencyRegistrationForm(request.POST, next_mr=next_mr)
+        if form.is_valid():
+            data = form.cleaned_data
+            reg_fee = default_fee or Decimal("0")
+            con_fee = default_consultation_fee or Decimal("0")
+            discount = default_discount or Decimal("0")
+            bill_total = reg_fee + con_fee
+            bill_discount = min(discount, bill_total)
+            with transaction.atomic():
+                last_locked = Patient.objects.select_for_update().order_by("-id").first()
+                current_mr = (
+                    int(last_locked.mr_number) + 1
+                    if (last_locked and last_locked.mr_number and last_locked.mr_number.isdigit())
+                    else 100001
+                )
+                parts = data["name"].split(maxsplit=1)
+                patient = Patient(
+                    first_name=parts[0],
+                    last_name=parts[1] if len(parts) > 1 else "",
+                    gender=data["gender"],
+                    date_of_birth=data.get("date_of_birth"),
+                    mr_number=data["mr_number"] or str(current_mr),
+                    is_emergency=True,
+                    nationality="India",
+                    patient_category="GENERAL",
+                    billing_type="Individual",
+                    payment_type=Patient.PaymentType.PENDING,
+                    reg_fee=reg_fee,
+                    con_fee=con_fee,
+                    discount=discount,
+                )
+                patient.save()
+                # Payment is intentionally left pending and surfaces in the
+                # Bill Command Center for collection later.
+                bill = PatientBill.objects.create(
+                    patient=patient,
+                    source=PatientBill.Source.REGISTRATION,
+                    description="Emergency registration fee — payment pending",
+                    amount=bill_total,
+                    discount=bill_discount,
+                    status=PatientBill.Status.PENDING,
+                    created_by=request.user,
+                )
+            messages.success(
+                request,
+                f"Emergency patient {patient.full_name} registered (MR #{patient.mr_number}). "
+                f"Pending bill {bill.bill_number} for ₹{bill.amount_due:,.2f} "
+                f"(₹{reg_fee} registration + ₹{con_fee} consultation − ₹{bill_discount} discount) created — "
+                "collect later in the Bill Command Center. Complete the remaining details from History.",
+            )
+            return redirect("emergency_registration")
+    else:
+        form = EmergencyRegistrationForm(next_mr=next_mr)
+
+    recent_emergency = Patient.objects.filter(is_emergency=True).order_by("-created_at")[:6]
+    return render(request, "core/emergency_registration.html", {
+        "form": form,
+        "next_mr": next_mr,
+        "today": timezone.localdate(),
+        "recent_emergency": recent_emergency,
+        "fee_configuration_missing": default_fee is None,
+        "default_registration_fee": default_fee,
+        "default_consultation_fee": default_consultation_fee,
+        "default_discount": default_discount,
         "user": request.user,
     })
 
@@ -420,7 +772,12 @@ def history(request):
     from django.db.models import Q
     from django.urls import reverse
 
-    item_type = request.GET.get("type", "all")
+    is_registration_desk = (
+        getattr(getattr(request.user, "profile", None), "designation", None)
+        or request.session.get("designation")
+    ) == UserProfile.Designation.REGISTRATION_DESK
+
+    item_type = "patients" if is_registration_desk else request.GET.get("type", "all")
     if item_type not in ("all", "patients", "appointments"):
         item_type = "all"
     query = request.GET.get("q", "").strip()
@@ -434,7 +791,7 @@ def history(request):
             selected_date = None
 
     include_patients = item_type in ("all", "patients")
-    include_appointments = item_type in ("all", "appointments")
+    include_appointments = not is_registration_desk and item_type in ("all", "appointments")
 
     rows = []
 
@@ -461,8 +818,10 @@ def history(request):
                 "detail": patient.phone or "—",
                 "status": None,
                 "status_lower": "",
+                "is_emergency": patient.is_emergency,
                 "view_url": reverse("patient_detail", args=[patient.pk]),
                 "edit_url": reverse("patient_edit", args=[patient.pk]),
+                "delete_url": reverse("patient_delete", args=[patient.pk]),
             })
 
     if include_appointments:
@@ -510,5 +869,6 @@ def history(request):
         "selected_date": selected_date,
         "date_str": date_str,
         "status_choices": Appointment.Status.choices,
+        "is_registration_desk": is_registration_desk,
         "user": request.user,
     })

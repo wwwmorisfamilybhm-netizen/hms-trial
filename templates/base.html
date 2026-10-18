@@ -15,7 +15,7 @@
 
   <!-- ============ SIDEBAR ============ -->
   <aside class="sidebar">
-    <a class="brand" href="{% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' %}{% url 'reception_dashboard' %}{% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}{% url 'admin_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
+    <a class="brand" href="{% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}{% url 'reception_dashboard' %}{% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}{% url 'admin_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
       <span class="brand-mark">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M3 10l9-7 5 4-4 4z" fill="#d6f25f"/>
@@ -29,7 +29,15 @@
     </a>
 
     <nav class="side-nav">
-      {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' %}
+      {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}
+        <a href="{% url 'emergency_registration' %}" class="nav-item emergency {% if request.resolver_match.url_name == 'emergency_registration' %}active{% endif %}">
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5"/><circle cx="12" cy="17.2" r="1.1" fill="currentColor" stroke="none"/>
+            </svg>
+          </span>
+          <span class="nav-label">Emergency Registration</span>
+        </a>
         <a href="{% url 'reception_dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'reception_dashboard' %}active{% endif %}">
           <span class="nav-icon">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
@@ -47,14 +55,6 @@
           </span>
           <span class="nav-label">Patient Registration</span>
         </a>
-        <a href="{% url 'appointment_list' %}" class="nav-item {% if request.resolver_match.app_name == 'appointments' %}active{% endif %}">
-          <span class="nav-icon">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-              <rect x="1" y="3" width="18" height="16" rx="3"/><path d="M1 8h18M6 1v4M14 1v4"/>
-            </svg>
-          </span>
-          <span class="nav-label">Appointment</span>
-        </a>
         <a href="{% url 'history' %}" class="nav-item {% if request.resolver_match.url_name == 'history' %}active{% endif %}">
           <span class="nav-icon">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
@@ -62,6 +62,26 @@
             </svg>
           </span>
           <span class="nav-label">History</span>
+        </a>
+        <a href="{% url 'bill_command_center' %}" class="nav-item {% if request.resolver_match.url_name == 'bill_command_center' %}active{% endif %}">
+          <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="2" y="2" width="16" height="16" rx="3"/><path d="M6 6h8M6 10h5M6 14h3"/><circle cx="15" cy="14" r="2" fill="currentColor"/></svg></span>
+          <span class="nav-label">Bill Command Center</span>
+        </a>
+        <a href="{% url 'pharmacy_billing' %}" class="nav-item {% if request.resolver_match.url_name == 'pharmacy_billing' %}active{% endif %}">
+          <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M7 3h6v14H7zM4 6h3M13 14h3M10 7v6M7 10h6"/></svg></span>
+          <span class="nav-label">Pharmacy Billing</span>
+        </a>
+        <a href="{% url 'lab_billing' %}" class="nav-item {% if request.resolver_match.url_name == 'lab_billing' %}active{% endif %}">
+          <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M7 2h6M9 2v6l-5 8a1 1 0 0 0 1 2h10a1 1 0 0 0 1-2l-5-8V2M6 13h8"/></svg></span>
+          <span class="nav-label">Lab Billing</span>
+        </a>
+        <a href="{% url 'general_billing' %}" class="nav-item {% if request.resolver_match.url_name == 'general_billing' %}active{% endif %}">
+          <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M6 6h8M6 10h8M6 14h5"/></svg></span>
+          <span class="nav-label">General Billing</span>
+        </a>
+        <a href="{% url 'ip_billing' %}" class="nav-item {% if request.resolver_match.url_name == 'ip_billing' %}active{% endif %}">
+          <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 17h16M4 17V7l6-4 6 4v10M7 11h6M10 8v6"/><path d="M7 17v-3h6v3"/></svg></span>
+          <span class="nav-label">IP Billing</span>
         </a>
       {% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}
         <a href="{% url 'admin_dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">
@@ -117,7 +137,7 @@
       {% endif %}
     </nav>
 
-    {% if request.session.designation != 'registration_desk' and request.resolver_match.url_name != 'reception_dashboard' and request.resolver_match.url_name != 'registration_desk' %}
+    {% if request.session.designation != 'registration_desk' and request.resolver_match.url_name != 'reception_dashboard' and request.resolver_match.url_name != 'registration_desk' and request.resolver_match.url_name != 'emergency_registration' %}
       <div class="side-cta">
         <a href="{% url 'patient_create' %}" class="side-btn lime">+ New Patient</a>
         <a href="{% url 'appointment_create' %}" class="side-btn ghost">+ Book</a>
@@ -159,7 +179,7 @@
           </svg>
         </div>
         <div class="doctor-text">
-          {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' %}
+          {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}
             <span class="doctor-name">Registration Desk</span>
             <span class="doctor-spec">Reception Desk Portal</span>
           {% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}
@@ -176,13 +196,12 @@
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#55555c" stroke-width="1.8" aria-hidden="true">
           <circle cx="7.5" cy="7.5" r="6.5"/><path d="M12.5 12.5L17 17"/>
         </svg>
-        <input type="search" placeholder="Search patients, appointments…" aria-label="Search">
+        <input type="search" placeholder="{% if request.session.designation == 'registration_desk' %}Search patients…{% else %}Search patients, appointments…{% endif %}" aria-label="Search">
       </div>
 
       <div class="topbar-right">
-        {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' %}
+        {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}
           <a href="{% url 'registration_desk' %}" class="topbar-btn solid">+ Patient Registration</a>
-          <a href="{% url 'appointment_create' %}" class="topbar-btn outline">+ New Appointment</a>
           <a href="{% url 'logout' %}" class="topbar-btn outline">Sign Out</a>
         {% else %}
           <a href="{% url 'patient_create' %}" class="topbar-btn solid">+ New Patient</a>

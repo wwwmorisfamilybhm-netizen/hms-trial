@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — Cams HMS{% endblock %}
+
+{% block heading %}
+  <div class="page-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+    <div>
+      <h1>{{ title }}</h1>
+      <p class="page-sub">Billing console</p>
+    </div>
+    <span class="badge" style="background:var(--lime); color:var(--ink); padding:8px 16px; font-weight:800;">REGISTRATION DESK</span>
+  </div>
+{% endblock %}
+
+{% block content %}
+<section class="card" style="border-radius:22px; padding:32px; max-width:760px;">
+  <p style="font-size:11px; letter-spacing:1px; font-weight:800; color:var(--muted); margin:0 0 7px;">{{ console_name|upper }} BILLING</p>
+  <h2 style="font-size:20px; margin:0 0 10px;">Setup pending</h2>
+  <p style="color:var(--muted); line-height:1.6; margin:0 0 20px;">This console is ready for its workflow. Add the billing steps and fields when you provide the requirements.</p>
+  <a href="{% url 'bill_command_center' %}" class="btn btn-outline">← Back to Bill Command Center</a>
+</section>
+{% endblock %}

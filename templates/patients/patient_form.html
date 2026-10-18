@@ -12,6 +12,7 @@
     <div class="form-actions">
       <button type="submit" class="btn">Save</button>
       <a href="{% url 'patient_list' %}" class="btn btn-plain">Cancel</a>
+      {% if patient %}<a href="{% url 'patient_delete' patient.pk %}" class="btn btn-plain" style="color:#b91c1c; font-weight:700;">Delete this patient…</a>{% endif %}
     </div>
   </form>
 </section>

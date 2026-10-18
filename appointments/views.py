@@ -11,6 +11,13 @@ from .models import Appointment
 @login_required(login_url="login")
 def appointment_list(request):
     """Appointments for a chosen date (defaults to today)."""
+    designation = (
+        getattr(getattr(request.user, "profile", None), "designation", None)
+        or request.session.get("designation")
+    )
+    if designation == "registration_desk":
+        return redirect("reception_dashboard")
+
     date_str = request.GET.get("date", "")
     try:
         selected = (
@@ -30,6 +37,10 @@ def appointment_list(request):
         "prev_date": selected - timedelta(days=1),
         "next_date": selected + timedelta(days=1),
         "is_today": selected == date.today(),
+        "can_manage_appointments": (
+            (getattr(getattr(request.user, "profile", None), "designation", None)
+             or request.session.get("designation")) != "registration_desk"
+        ),
     }
     return render(request, "appointments/appointment_list.html", context)
 
@@ -37,6 +48,13 @@ def appointment_list(request):
 @login_required(login_url="login")
 def appointment_create(request):
     """Book a new appointment."""
+    designation = (
+        getattr(getattr(request.user, "profile", None), "designation", None)
+        or request.session.get("designation")
+    )
+    if designation == "registration_desk":
+        return redirect("reception_dashboard")
+
     initial = {}
     if request.GET.get("patient"):
         initial["patient"] = request.GET["patient"]
@@ -64,6 +82,13 @@ def appointment_create(request):
 @login_required(login_url="login")
 def appointment_edit(request, pk):
     """Edit an existing appointment (re-uses the booking form)."""
+    designation = (
+        getattr(getattr(request.user, "profile", None), "designation", None)
+        or request.session.get("designation")
+    )
+    if designation == "registration_desk":
+        return redirect("reception_dashboard")
+
     appointment = get_object_or_404(
         Appointment.objects.select_related("patient", "doctor"), pk=pk
     )

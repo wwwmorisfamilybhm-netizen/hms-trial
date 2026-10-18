@@ -57,7 +57,7 @@ a:hover { text-decoration: underline; }
 .brand-name { font-size: 20px; font-weight: 700; color: #fff; }
 .brand-sub { font-size: 9px; letter-spacing: 1.4px; color: #9d9da3; margin-top: 2px; }
 
-.side-nav { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.side-nav { display: flex; flex: 1; flex-direction: column; gap: 6px; margin-top: 10px; min-height: 0; overflow-y: auto; }
 
 .nav-item {
   display: flex;
@@ -73,6 +73,10 @@ a:hover { text-decoration: underline; }
 .nav-item:hover { background: #2d2d32; text-decoration: none; }
 .nav-item.active { background: #fff; color: var(--ink); font-weight: 700; }
 .nav-item.active .nav-icon { color: var(--ink); }
+.nav-item.emergency { background: var(--red); color: #fff; font-weight: 700; box-shadow: 0 6px 16px rgba(185, 28, 28, 0.35); }
+.nav-item.emergency:hover { background: #a11a1a; text-decoration: none; }
+.nav-item.emergency.active { background: #fff; color: var(--red); box-shadow: none; }
+.nav-item.emergency.active .nav-icon { color: var(--red); }
 .nav-icon { display: grid; place-items: center; width: 22px; height: 22px; color: #e9e9ec; }
 .nav-label { flex: 1; }
 

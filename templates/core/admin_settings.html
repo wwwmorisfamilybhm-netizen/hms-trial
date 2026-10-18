@@ -35,6 +35,17 @@
   <span class="option-arrow" aria-hidden="true">→</span>
 </a>
 
+<a class="card settings-option" href="{% url 'admin:app_list' app_label='patients' %}">
+  <span class="option-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v14H4zM8 9h8M8 13h5M8 17h8"/><circle cx="18" cy="15" r="3" fill="white"/></svg>
+  </span>
+  <span class="option-copy">
+    <strong>Patient Registration Setup</strong>
+    <span>Configure the default registration fee, patient categories, states, and religions. Deactivate options to stop new use while keeping existing patient records intact.</span>
+  </span>
+  <span class="option-arrow" aria-hidden="true">→</span>
+</a>
+
 <style>
   .settings-overview { display:flex; align-items:center; gap:18px; padding:24px; border-radius:20px; margin-bottom:18px; }
   .settings-overview-icon,.option-icon { display:grid; place-items:center; flex:0 0 auto; border-radius:17px; }

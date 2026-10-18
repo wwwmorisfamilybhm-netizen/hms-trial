@@ -46,8 +46,16 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         <span>Print Card</span>
       </a>
-      <a class="btn" href="{% url 'appointment_create' %}?patient={{ patient.pk }}" style="background:var(--lime); color:var(--ink); font-weight:750; border-radius:12px; padding:10px 18px; font-size:13px;">
+      <a class="btn" href="{% url 'patient_edit' patient.pk %}" style="background:var(--lav); color:var(--ink); font-weight:800; border-radius:12px; padding:10px 18px; font-size:13px; display:inline-flex; align-items:center; gap:8px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+        <span>Edit Full Details</span>
+      </a>
+      {% if can_view_appointments %}<a class="btn" href="{% url 'appointment_create' %}?patient={{ patient.pk }}" style="background:var(--lime); color:var(--ink); font-weight:750; border-radius:12px; padding:10px 18px; font-size:13px;">
         + Book Appointment
+      </a>{% endif %}
+      <a class="btn" href="{% url 'patient_delete' patient.pk %}" style="background:#fee2e2; color:#b91c1c; font-weight:800; border-radius:12px; padding:10px 18px; font-size:13px; display:inline-flex; align-items:center; gap:8px;" title="Delete patient record (requires your login password)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+        <span>Delete Record</span>
       </a>
       <a class="btn btn-outline" href="{% url 'patient_list' %}" style="padding:10px 18px; border-radius:12px; font-size:13px;">
         ← Back to Patients
@@ -57,7 +65,7 @@
 {% endblock %}
 
 {% block content %}
-<div style="display:grid; grid-template-columns:1.4fr 1fr; gap:24px; align-items:start;">
+<div style="display:grid; grid-template-columns:{% if can_view_appointments %}1.4fr 1fr{% else %}1fr{% endif %}; gap:24px; align-items:start;">
 
   <!-- ── LEFT COLUMN: COMPLETE REGISTRATION RECORD ── -->
   <div style="display:flex; flex-direction:column; gap:24px;">
@@ -83,6 +91,9 @@
 
           <dt style="color:var(--muted); font-weight:600;">Full Legal Name</dt>
           <dd style="font-weight:700; margin:0;">{{ patient.first_name }} {% if patient.second_name %}{{ patient.second_name }} {% endif %}{{ patient.last_name }}</dd>
+
+          <dt style="color:var(--muted); font-weight:600;">Centre</dt>
+          <dd style="font-weight:700; margin:0;">{{ patient.centre|default:"—" }}</dd>
 
           <dt style="color:var(--muted); font-weight:600;">Date of Birth</dt>
           <dd style="margin:0;">
@@ -215,9 +226,27 @@
         </dl>
       </div>
     </section>
+
+    {% if can_push_bill %}
+      <section class="card" style="border-radius:24px; padding:28px 32px; box-shadow:0 6px 30px rgba(0,0,0,0.06);">
+        <h2 style="font-size:18px; font-weight:800; margin:0 0 6px;">Send a charge to Bill Command Center</h2>
+        <p style="font-size:13px; color:var(--muted); margin:0 0 18px;">This creates a pending payment for the Registration Desk to collect.</p>
+        <form method="post" action="{% url 'patient_push_bill' patient.pk %}" style="display:grid; gap:14px;">
+          {% csrf_token %}
+          {% for field in bill_form %}
+            <label for="{{ field.id_for_label }}" style="display:grid; gap:6px; font-size:13px; font-weight:700;">
+              {{ field.label }}
+              {{ field }}
+              {% if field.errors %}<span style="color:#b91c1c; font-weight:500;">{{ field.errors|join:", " }}</span>{% endif %}
+            </label>
+          {% endfor %}
+          <button type="submit" class="btn" style="justify-self:start; padding:11px 18px;">Add pending payment</button>
+        </form>
+      </section>
+    {% endif %}
   </div>
 
-  <!-- ── RIGHT COLUMN: VISIT / CONSULTATION HISTORY ── -->
+  {% if can_view_appointments %}<!-- ── RIGHT COLUMN: VISIT / CONSULTATION HISTORY ── -->
   <div style="display:flex; flex-direction:column; gap:24px;">
 
     <!-- Visit History Card -->
@@ -281,7 +310,7 @@
       </div>
     </div>
 
-  </div>
+  </div>{% endif %}
 
 </div>
 {% endblock %}

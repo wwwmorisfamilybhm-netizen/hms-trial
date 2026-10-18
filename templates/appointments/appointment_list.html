@@ -5,7 +5,7 @@
 {% block heading %}
   <div class="page-header">
     <h1>Appointments</h1>
-    <a href="{% url 'appointment_create' %}" class="btn">+ Book appointment</a>
+    {% if can_manage_appointments %}<a href="{% url 'appointment_create' %}" class="btn">+ Book appointment</a>{% endif %}
   </div>
 {% endblock %}
 
@@ -40,7 +40,7 @@
       </tbody>
     </table>
   {% else %}
-    <p class="empty">No appointments on this date. <a href="{% url 'appointment_create' %}">Book one →</a></p>
+    <p class="empty">No appointments on this date.{% if can_manage_appointments %} <a href="{% url 'appointment_create' %}">Book one →</a>{% endif %}</p>
   {% endif %}
 </section>
 {% endblock %}
