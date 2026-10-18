@@ -59,22 +59,25 @@ a:hover { text-decoration: underline; }
 
 .side-nav { display: flex; flex: 1; flex-direction: column; gap: 6px; margin-top: 10px; min-height: 0; overflow-y: auto; }
 
-/* Custom scrollbar for sidebar - dark theme with lime accent */
-.side-nav::-webkit-scrollbar { width: 6px; }
+/* Custom scrollbar for sidebar - subtle, blends with dark theme */
+.side-nav::-webkit-scrollbar { width: 5px; }
 .side-nav::-webkit-scrollbar-track { background: transparent; }
 .side-nav::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--lime), var(--lav-deep));
+  background: #3d3d45;
   border-radius: 3px;
   border: 1px solid #2d2d32;
   min-height: 40px;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, background 0.15s ease;
 }
 .side-nav::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #e8f87a, var(--lav));
+  background: #4a4a56;
+  opacity: 1;
 }
 .side-nav::-webkit-scrollbar-corner { background: transparent; }
 
-/* Firefox */
-.side-nav { scrollbar-width: thin; scrollbar-color: var(--lime) transparent; }
+/* Firefox - subtle */
+.side-nav { scrollbar-width: thin; scrollbar-color: #3d3d45 transparent; }
 
 .nav-item {
   display: flex;
