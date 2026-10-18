@@ -5,7 +5,7 @@
 {% block heading %}
 <style>
   /* ── OPD dashboard skin ── aligned to the Cams HMS design language ── */
-  .container { max-width: 1320px; padding: 30px 36px 48px; }
+  .container { max-width: 1460px; padding: 30px 30px 48px; }
 
   .opd-head {
     display: flex; align-items: flex-end; justify-content: space-between;
@@ -96,15 +96,11 @@
   /* ── Queue table ── */
   .queue-card {
     background: var(--card); border-radius: var(--radius);
-    padding: 4px 0 0;
+    overflow: hidden; padding: 4px 0 0;
+    margin-left: -14px; margin-right: -14px;
   }
-  /* NOTE: no overflow:hidden on the card — it would break position:sticky
-     on the frozen columns. The scroll box clips with its own radius instead. */
-  .queue-scroll {
-    overflow-x: auto; overflow-y: hidden;
-    border-radius: 0 0 var(--radius) var(--radius);
-  }
-  .queue-card table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1400px; }
+  .queue-scroll { overflow-x: auto; }
+  .queue-card table { width: 100%; border-collapse: collapse; min-width: 1240px; }
   .queue-card th {
     padding: 14px 14px; text-align: left; white-space: nowrap;
     font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em;
@@ -113,37 +109,7 @@
   }
   .queue-card td { padding: 13px 14px; border-bottom: 1px solid #f0f0f2; vertical-align: middle; }
   .queue-card tbody tr:last-child td { border-bottom: none; }
-
-  /* ── Frozen columns: identity stays pinned left, Action stays pinned right ── */
-  .queue-card th.col-idx,  .queue-card td.col-idx  { position: sticky; left: 0;     width: 52px;  min-width: 52px;  z-index: 2; background: var(--card); }
-  .queue-card th.col-uhid, .queue-card td.col-uhid { position: sticky; left: 52px;  width: 122px; min-width: 122px; z-index: 2; background: var(--card); }
-  .queue-card th.col-name, .queue-card td.col-name { position: sticky; left: 174px; width: 188px; min-width: 188px; z-index: 2; background: var(--card); }
-  .queue-card th.col-action, .queue-card td.col-action {
-    position: sticky; right: 0; width: 196px; min-width: 196px; z-index: 2;
-    background: var(--card);
-  }
-
-  /* Header frozen cells sit above everything */
-  .queue-card th.col-idx, .queue-card th.col-uhid,
-  .queue-card th.col-name, .queue-card th.col-action { z-index: 4; background: #fafafb; }
-
-  /* Subtle edge shadows to read as "pinned" */
-  .queue-card td.col-name, .queue-card th.col-name {
-    box-shadow: 12px 0 14px -12px rgba(32, 32, 36, 0.16);
-    border-right: 1px solid #f0f0f2;
-  }
-  .queue-card td.col-action, .queue-card th.col-action {
-    box-shadow: -12px 0 14px -12px rgba(32, 32, 36, 0.16);
-    border-left: 1px solid #f0f0f2;
-  }
-
-  .queue-card tbody tr:hover td.col-idx,
-  .queue-card tbody tr:hover td.col-uhid,
-  .queue-card tbody tr:hover td.col-name,
-  .queue-card tbody tr:hover td.col-action { background: #fafafb; }
-
-  /* Empty state spans full width, no pinning */
-  .queue-card td[colspan] { position: static; box-shadow: none; background: transparent; }
+  .queue-card tbody tr:hover { background: #fafafb; }
 
   .q-uhid {
     font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -204,16 +170,51 @@
   .bill-pill.paid { background: var(--green-soft); color: #245e42; }
   .bill-pill.pending { background: var(--amber-soft); color: #89641b; }
 
-  .q-actions { display: flex; gap: 5px; }
-  .q-action {
-    display: inline-block; padding: 5px 11px; border-radius: 9px;
+  /* ── Row action: one elegant icon → floating action menu ── */
+  .q-menu-btn {
+    width: 32px; height: 32px; border-radius: 10px; cursor: pointer;
     border: 1px solid var(--line); background: var(--card); color: #56565c;
-    font-size: 11.5px; font-weight: 600; white-space: nowrap;
-    transition: background 0.15s ease;
+    display: grid; place-items: center; margin: 0 auto;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
-  .q-action:hover { background: #f5f5f6; color: var(--ink); text-decoration: none; }
-  .q-action.primary { background: var(--ink); border-color: var(--ink); color: #fff; }
-  .q-action.primary:hover { background: #3a3a40; color: #fff; }
+  .q-menu-btn:hover { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .q-menu-btn.is-open { background: var(--ink); border-color: var(--ink); color: var(--lav); }
+  .q-menu-btn svg { width: 16px; height: 16px; }
+
+  .q-menu-pop {
+    position: fixed; z-index: 60; width: 226px;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 16px; padding: 8px;
+    box-shadow: 0 18px 40px -12px rgba(32, 32, 36, 0.26), 0 2px 6px rgba(32, 32, 36, 0.06);
+    opacity: 0; visibility: hidden; transform: translateY(-6px) scale(0.98);
+    transform-origin: top right;
+    transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
+  }
+  .q-menu-pop.is-open { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+  .q-menu-pop.up { transform-origin: bottom right; }
+
+  .q-menu-head {
+    margin: 2px 6px 8px; padding-bottom: 8px;
+    border-bottom: 1px solid #f0f0f2;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.9px;
+    text-transform: uppercase; color: #a3a3aa;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .q-menu-item {
+    display: flex; align-items: center; gap: 11px;
+    padding: 8px 9px; border-radius: 11px; color: var(--ink);
+    transition: background 0.14s ease;
+  }
+  .q-menu-item:hover { background: #f5f4fb; text-decoration: none; }
+  .q-mi-ic { width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; display: grid; place-items: center; }
+  .q-mi-ic svg { width: 15px; height: 15px; }
+  .q-mi-ic.ink { background: var(--ink); color: var(--lime); }
+  .q-mi-ic.lav { background: var(--lav-soft); color: #665b9d; }
+  .q-mi-ic.green { background: var(--green-soft); color: #245e42; }
+  .q-mi-txt { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+  .q-mi-txt strong { font-size: 13px; font-weight: 650; }
+  .q-mi-txt small { font-size: 10.5px; color: var(--muted); }
 
   .q-empty { text-align: center; padding: 54px 20px; color: var(--muted); }
 
@@ -331,9 +332,9 @@
     <table>
       <thead>
         <tr>
-          <th class="col-idx">#</th>
-          <th class="col-uhid">UHID</th>
-          <th class="col-name">Patient Name</th>
+          <th>#</th>
+          <th>UHID</th>
+          <th>Patient Name</th>
           <th>Age / Sex</th>
           <th>Arrival</th>
           <th>Current Location / Status</th>
@@ -342,15 +343,15 @@
           <th>Alerts</th>
           <th>Billing</th>
           <th>Last Update</th>
-          <th class="col-action">Action</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody>
         {% for patient in queue_patients %}
         <tr>
-          <td class="q-sub col-idx">{{ forloop.counter }}</td>
-          <td class="q-uhid col-uhid">{{ patient.uhid }}</td>
-          <td class="q-name col-name"><a href="{% url 'patient_detail' patient.pk %}">{{ patient.full_name }}</a></td>
+          <td class="q-sub">{{ forloop.counter }}</td>
+          <td class="q-uhid">{{ patient.uhid }}</td>
+          <td class="q-name"><a href="{% url 'patient_detail' patient.pk %}">{{ patient.full_name }}</a></td>
           <td class="q-sub">{{ patient.age|default:"—" }} / {{ patient.gender|default:"—" }}</td>
           <td class="q-time">{{ patient.created_at|time:"h:i A" }}</td>
           <td>
@@ -414,12 +415,18 @@
             {% endwith %}
           </td>
           <td class="q-sub">{{ patient.updated_at|time:"h:i A" }} · Registration</td>
-          <td class="col-action">
-            <div class="q-actions">
-              <a class="q-action primary" href="{% url 'patient_detail' patient.pk %}">Assess</a>
-              <a class="q-action" href="{% url 'patient_detail' patient.pk %}">Track</a>
-              <a class="q-action" href="{% url 'patient_detail' patient.pk %}">View</a>
-            </div>
+          <td>
+            <button type="button" class="q-menu-btn"
+                    data-name="{{ patient.full_name }}"
+                    data-assess="{% url 'patient_detail' patient.pk %}"
+                    data-track="{% url 'patient_detail' patient.pk %}"
+                    data-view="{% url 'patient_detail' patient.pk %}"
+                    aria-haspopup="menu" aria-expanded="false"
+                    aria-label="Actions for {{ patient.full_name }}">
+              <svg viewBox="0 0 18 18" fill="currentColor" aria-hidden="true">
+                <circle cx="9" cy="3.4" r="1.6"/><circle cx="9" cy="9" r="1.6"/><circle cx="9" cy="14.6" r="1.6"/>
+              </svg>
+            </button>
           </td>
         </tr>
         {% empty %}
@@ -444,5 +451,100 @@
   <div class="legend-item"><span class="legend-dot red"></span> Urgent / Alert</div>
   <div class="legend-item"><span class="legend-dot dark"></span> Cancelled</div>
 </div>
+
+<!-- Floating row-action menu — lives outside the scroll box so it is never clipped -->
+<div class="q-menu-pop" id="qMenuPop" role="menu" aria-hidden="true">
+  <p class="q-menu-head" id="qMenuHead">Patient</p>
+
+  <a class="q-menu-item" data-role="assess" href="#" role="menuitem">
+    <span class="q-mi-ic ink" aria-hidden="true">
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 3.6h12.4v8.8H8l-3.4 2.9v-2.9H2.8z"/><path d="M6 6.6h6M6 9.2h4"/></svg>
+    </span>
+    <span class="q-mi-txt"><strong>Assess</strong><small>Start the consultation</small></span>
+  </a>
+
+  <a class="q-menu-item" data-role="track" href="#" role="menuitem">
+    <span class="q-mi-ic lav" aria-hidden="true">
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 12.6h3l2.1-6.4 3 8.2 2-4.6h3.1"/></svg>
+    </span>
+    <span class="q-mi-txt"><strong>Track</strong><small>Follow the patient journey</small></span>
+  </a>
+
+  <a class="q-menu-item" data-role="view" href="#" role="menuitem">
+    <span class="q-mi-ic green" aria-hidden="true">
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 9S4.6 4.4 9 4.4 16.2 9 16.2 9 13.4 13.6 9 13.6 1.8 9 1.8 9Z"/><circle cx="9" cy="9" r="2.1"/></svg>
+    </span>
+    <span class="q-mi-txt"><strong>View</strong><small>Open the full record</small></span>
+  </a>
+</div>
+
+<script>
+  (function () {
+    var pop = document.getElementById("qMenuPop");
+    if (!pop) return;
+    var head = document.getElementById("qMenuHead");
+    var current = null;
+
+    function close() {
+      if (!current) return;
+      pop.classList.remove("is-open");
+      pop.setAttribute("aria-hidden", "true");
+      current.classList.remove("is-open");
+      current.setAttribute("aria-expanded", "false");
+      current = null;
+    }
+
+    function open(btn) {
+      head.textContent = btn.getAttribute("data-name") || "Patient";
+      pop.querySelector('[data-role="assess"]').setAttribute("href", btn.getAttribute("data-assess"));
+      pop.querySelector('[data-role="track"]').setAttribute("href", btn.getAttribute("data-track"));
+      pop.querySelector('[data-role="view"]').setAttribute("href", btn.getAttribute("data-view"));
+
+      pop.classList.add("is-open");
+      pop.setAttribute("aria-hidden", "false");
+      btn.classList.add("is-open");
+      btn.setAttribute("aria-expanded", "true");
+
+      var r = btn.getBoundingClientRect();
+      var pw = pop.offsetWidth, ph = pop.offsetHeight;
+
+      // Right-align under the button, kept inside the viewport.
+      var left = r.right - pw;
+      if (left < 8) left = 8;
+      if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+
+      // Flip above the button when there is no room below.
+      var top = r.bottom + 8, up = false;
+      if (top + ph > window.innerHeight - 8) {
+        top = r.top - ph - 8;
+        up = true;
+        if (top < 8) top = 8;
+      }
+      pop.classList.toggle("up", up);
+      pop.style.left = left + "px";
+      pop.style.top = top + "px";
+
+      current = btn;
+    }
+
+    document.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest(".q-menu-btn") : null;
+      if (btn) {
+        e.preventDefault();
+        if (btn === current) { close(); return; }
+        close();
+        open(btn);
+        return;
+      }
+      if (!e.target.closest || !e.target.closest(".q-menu-pop")) close();
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") close();
+    });
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+  })();
+</script>
 
 {% endblock %}
