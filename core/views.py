@@ -1,8 +1,13 @@
-from datetime import date
+from datetime import date, timedelta
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count
+from django.db.models.functions import TruncDate
+from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, render
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import ensure_csrf_cookie
 
 
 from .models import UserProfile
@@ -14,6 +19,8 @@ def home(request):
         user_desig = getattr(getattr(request.user, "profile", None), "designation", None) or request.session.get("designation")
         if user_desig == "registration_desk":
             return redirect("reception_dashboard")
+        if user_desig == UserProfile.Designation.ADMIN:
+            return redirect("admin_dashboard")
         return redirect("dashboard")
     return redirect("login")
 
@@ -27,14 +34,16 @@ DESIGNATION_CHOICES = [
     ("registration_desk", "Registration Desk"),
     ("doctor", "Doctor"),
     ("nurse", "Nurse"),
+    ("admin", "Admin"),
 ]
 
 
+@never_cache
+@ensure_csrf_cookie
 def login_view(request):
     """Custom login page with designation selector and server-side role validation."""
-    # Clear any existing session so every visit to login starts fresh
     if request.user.is_authenticated:
-        logout(request)
+        return redirect("home")
 
     error = None
     if request.method == "POST":
@@ -56,28 +65,30 @@ def login_view(request):
                 },
             )
 
-            # Restrict login if chosen designation does not match user's allocated designation
-            if not user.is_superuser and profile.designation != UserProfile.Designation.ADMIN:
-                if profile.designation != designation:
-                    allowed_label = dict(UserProfile.Designation.choices).get(
-                        profile.designation, profile.designation
-                    )
-                    chosen_label = dict(DESIGNATION_CHOICES).get(designation, designation)
-                    error = (
-                        f"Access denied: User '{user.username}' is allocated to '{allowed_label}' only. "
-                        f"You cannot log in as '{chosen_label}'."
-                    )
-                    return render(request, "core/login.html", {
-                        "error": error,
-                        "designation_choices": DESIGNATION_CHOICES,
-                    })
+            # The selected role must match the role assigned to the account.
+            # Superuser status alone must not let an account switch into Admin.
+            effective_designation = profile.designation
+            if profile.designation != designation:
+                allowed_label = dict(UserProfile.Designation.choices).get(
+                    profile.designation, profile.designation
+                )
+                chosen_label = dict(UserProfile.Designation.choices).get(designation, designation)
+                error = (
+                    f"Access denied: User '{user.username}' is allocated to '{allowed_label}' only. "
+                    f"You cannot log in as '{chosen_label}'."
+                )
+                return render(request, "core/login.html", {
+                    "error": error,
+                    "designation_choices": DESIGNATION_CHOICES,
+                })
 
             login(request, user)
-            effective_designation = designation if user.is_superuser else profile.designation
             request.session["designation"] = effective_designation
 
             if effective_designation == "registration_desk":
                 return redirect("reception_dashboard")
+            if effective_designation == UserProfile.Designation.ADMIN:
+                return redirect("admin_dashboard")
             else:
                 return redirect("dashboard")
         else:
@@ -95,13 +106,24 @@ def logout_view(request):
     return redirect("login")
 
 
+def csrf_failure(request, reason=""):
+    """Show a recoverable message instead of Django's technical CSRF page."""
+    if request.path == "/login/":
+        return render(request, "core/login.html", {
+            "error": "Your sign-in form expired. Please try again.",
+            "designation_choices": DESIGNATION_CHOICES,
+        }, status=400)
+    return HttpResponseForbidden("Your form security check expired. Refresh the page and try again.")
+
+
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 
 @login_required(login_url="login")
 def dashboard(request):
     """Doctor / Clinic overview dashboard."""
-    # Block Registration Desk users from accessing doctor or nurse dashboard
     user_desig = getattr(getattr(request.user, "profile", None), "designation", None) or request.session.get("designation")
+    if user_desig == UserProfile.Designation.ADMIN:
+        return redirect("admin_dashboard")
     if user_desig == "registration_desk" and not request.user.is_superuser:
         from django.contrib import messages
         messages.warning(request, "Access restricted: Registration Desk users only have access to the Registration Desk portal.")
@@ -123,6 +145,72 @@ def dashboard(request):
         "recent_patients": Patient.objects.order_by("-created_at")[:5],
     }
     return render(request, "core/dashboard.html", context)
+
+
+@login_required(login_url="login")
+def admin_dashboard(request):
+    """Hospital-wide patient load dashboard for administrators."""
+    profile = getattr(request.user, "profile", None)
+    user_desig = getattr(profile, "designation", None)
+    if user_desig != UserProfile.Designation.ADMIN:
+        from django.contrib import messages
+        messages.warning(request, "Access restricted: Hospital administrators only.")
+        if user_desig == UserProfile.Designation.REGISTRATION_DESK:
+            return redirect("reception_dashboard")
+        return redirect("dashboard")
+
+    today = date.today()
+    week_start = today - timedelta(days=6)
+    daily_totals = {
+        row["registration_day"]: row["total"]
+        for row in Patient.objects.filter(
+            created_at__date__gte=week_start,
+            created_at__date__lte=today,
+        ).annotate(registration_day=TruncDate("created_at"))
+        .values("registration_day")
+        .annotate(total=Count("id"))
+    }
+    daily_load = [
+        {
+            "label": (week_start + timedelta(days=offset)).strftime("%a"),
+            "date": week_start + timedelta(days=offset),
+            "total": daily_totals.get(week_start + timedelta(days=offset), 0),
+        }
+        for offset in range(7)
+    ]
+    max_daily_load = max((item["total"] for item in daily_load), default=0)
+    for item in daily_load:
+        item["height"] = max(5, round(item["total"] * 100 / max_daily_load)) if max_daily_load else 5
+
+    specialty_names = dict(Doctor.SPECIALTIES)
+    department_load = [
+        {
+            "name": specialty_names.get(row["doctor__specialty"], "Other / Unspecified"),
+            "total": row["patient_total"],
+        }
+        for row in Appointment.objects.filter(date=today)
+        .exclude(status__in=[Appointment.Status.CANCELLED, Appointment.Status.NO_SHOW])
+        .values("doctor__specialty")
+        .annotate(patient_total=Count("patient", distinct=True))
+        .order_by("-patient_total", "doctor__specialty")
+    ]
+    max_department_load = max((item["total"] for item in department_load), default=0)
+    for item in department_load:
+        item["width"] = round(item["total"] * 100 / max_department_load) if max_department_load else 0
+
+    return render(request, "core/admin_dashboard.html", {
+        "today": today,
+        "total_patients": Patient.objects.count(),
+        "today_count": Patient.objects.filter(created_at__date=today).count(),
+        "today_appointments": Appointment.objects.filter(date=today).exclude(
+            status__in=[Appointment.Status.CANCELLED, Appointment.Status.NO_SHOW]
+        ).count(),
+        "department_count": len(department_load),
+        "daily_load": daily_load,
+        "department_load": department_load,
+        "recent_patients": Patient.objects.order_by("-created_at")[:6],
+        "user": request.user,
+    })
 
 
 # ── Registration Desk ─────────────────────────────────────────────────────────
