@@ -872,3 +872,48 @@ def history(request):
         "is_registration_desk": is_registration_desk,
         "user": request.user,
     })
+
+
+# ── Doctor portal placeholders ────────────────────────────────────────────────
+
+DOCTOR_PAGES = {
+    "initial_assessment": "Initial Assessment",
+    "patient_queue": "Patient Queue",
+    "doctor_consultation": "Doctor Consultation",
+    "service_queues": "Service Queues",
+    "procedures": "Procedures",
+    "pharmacy": "Pharmacy",
+    "doctor_appointments": "Appointments",
+    "reports": "Reports",
+    "master_data": "Master Data",
+    "audit_trail": "Audit Trail",
+    "doctor_settings": "Settings",
+}
+
+
+@login_required(login_url="login")
+def doctor_placeholder(request, page):
+    """Empty placeholder page for a doctor-portal section.
+
+    Content for each section will be filled in by later prompts. For now this
+    renders a clean "coming soon" shell so the navigation and routing work.
+    """
+    if page not in DOCTOR_PAGES:
+        from django.http import Http404
+        raise Http404
+
+    user_desig = (
+        getattr(getattr(request.user, "profile", None), "designation", None)
+        or request.session.get("designation")
+    )
+    if user_desig not in (UserProfile.Designation.DOCTOR, UserProfile.Designation.ADMIN) and not request.user.is_superuser:
+        messages.warning(request, "Access restricted: Doctor portal only.")
+        if user_desig == UserProfile.Designation.REGISTRATION_DESK:
+            return redirect("reception_dashboard")
+        return redirect("dashboard")
+
+    return render(request, "core/doctor_placeholder.html", {
+        "title": DOCTOR_PAGES[page],
+        "page": page,
+        "user": request.user,
+    })

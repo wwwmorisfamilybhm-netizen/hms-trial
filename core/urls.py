@@ -24,4 +24,16 @@ urlpatterns = [
     path("admin-settings/export/", views.admin_backup_export, name="admin_backup_export"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("history/", views.history, name="history"),
+    # ── Doctor portal (placeholder pages — content to be filled later) ──
+    path("doctor/initial-assessment/", views.doctor_placeholder, {"page": "initial_assessment"}, name="initial_assessment"),
+    path("doctor/patient-queue/", views.doctor_placeholder, {"page": "patient_queue"}, name="patient_queue"),
+    path("doctor/consultation/", views.doctor_placeholder, {"page": "doctor_consultation"}, name="doctor_consultation"),
+    path("doctor/service-queues/", views.doctor_placeholder, {"page": "service_queues"}, name="service_queues"),
+    path("doctor/procedures/", views.doctor_placeholder, {"page": "procedures"}, name="procedures"),
+    path("doctor/pharmacy/", views.doctor_placeholder, {"page": "pharmacy"}, name="pharmacy"),
+    path("doctor/appointments/", views.doctor_placeholder, {"page": "doctor_appointments"}, name="doctor_appointments"),
+    path("doctor/reports/", views.doctor_placeholder, {"page": "reports"}, name="reports"),
+    path("doctor/master-data/", views.doctor_placeholder, {"page": "master_data"}, name="master_data"),
+    path("doctor/audit-trail/", views.doctor_placeholder, {"page": "audit_trail"}, name="audit_trail"),
+    path("doctor/settings/", views.doctor_placeholder, {"page": "doctor_settings"}, name="doctor_settings"),
 ]
