@@ -146,6 +146,26 @@ def dashboard(request):
             date__gte=today, status=Appointment.Status.SCHEDULED
         ).count(),
         "recent_patients": Patient.objects.order_by("-created_at")[:5],
+        # Patients registered at the registration desk, newest first.
+        # These are the only rows shown in the doctor queue table.
+        "queue_patients": (
+            Patient.objects.all()
+            .prefetch_related("bills")
+            .order_by("-created_at")[:50]
+        ),
+        # KPI strip — derived from real registered data.
+        "kpi_total_today": Patient.objects.filter(created_at__date=today).count(),
+        "kpi_in_pool": Patient.objects.filter(created_at__date=today, is_emergency=False).count(),
+        "kpi_with_doctors": (
+            Appointment.objects.filter(date=today, status=Appointment.Status.SCHEDULED).count()
+        ),
+        "kpi_investigations": 0,
+        "kpi_procedures": 0,
+        "kpi_pharmacy": 0,
+        "kpi_review_required": Patient.objects.filter(is_emergency=True).count(),
+        "kpi_completed": (
+            Appointment.objects.filter(date=today, status=Appointment.Status.COMPLETED).count()
+        ),
     }
     return render(request, "core/dashboard.html", context)
 

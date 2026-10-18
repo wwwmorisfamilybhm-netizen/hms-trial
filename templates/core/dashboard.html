@@ -115,35 +115,35 @@
   <div class="kpi-strip">
     <div class="kpi-card">
       <div class="kpi-icon blue"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-      <div><div class="kpi-value">124</div><div class="kpi-label">Total Patients Today</div></div>
+      <div><div class="kpi-value">{{ kpi_total_today }}</div><div class="kpi-label">Total Patients Today</div></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon slate"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
-      <div><div class="kpi-value">38</div><div class="kpi-label">In Central Pool</div></div>
+      <div><div class="kpi-value">{{ kpi_in_pool }}</div><div class="kpi-label">In Central Pool</div></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon teal"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
-      <div><div class="kpi-value">14</div><div class="kpi-label">With Doctors</div></div>
+      <div><div class="kpi-value">{{ kpi_with_doctors }}</div><div class="kpi-label">With Doctors</div></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon purple"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg></div>
-      <div><div class="kpi-value">22</div><div class="kpi-label">Investigations</div></div>
+      <div><div class="kpi-value">{{ kpi_investigations }}</div><div class="kpi-label">Investigations</div></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon rose"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/><line x1="6" y1="17" x2="18" y2="17"/></svg></div>
-      <div><div class="kpi-value">9</div><div class="kpi-label">Procedures</div></div>
+      <div><div class="kpi-value">{{ kpi_procedures }}</div><div class="kpi-label">Procedures</div></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon amber"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></div>
-      <div><div class="kpi-value">31</div><div class="kpi-label">Pharmacy</div></div>
+      <div><div class="kpi-value">{{ kpi_pharmacy }}</div><div class="kpi-label">Pharmacy</div></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon indigo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></div>
-      <div><div class="kpi-value">7</div><div class="kpi-label">Review Required</div></div>
+      <div><div class="kpi-value">{{ kpi_review_required }}</div><div class="kpi-label">Review Required</div></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-icon green"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div>
-      <div><div class="kpi-value">43</div><div class="kpi-label">Completed</div></div>
+      <div><div class="kpi-value">{{ kpi_completed }}</div><div class="kpi-label">Completed</div></div>
     </div>
   </div>
 
@@ -188,127 +188,50 @@
         </tr>
       </thead>
       <tbody>
-        <!-- Row 1 -->
+        {% for patient in queue_patients %}
         <tr>
-          <td>1</td>
-          <td class="uhid">UHID000123</td>
-          <td class="patient-name">Ramesh Kumar</td>
-          <td class="age-sex">45 / M</td>
-          <td class="arrival">08:12 AM</td>
-          <td>
-            <div class="status-cell">
-              <span class="status-badge blue"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> In Consultation</span>
-              <span class="status-sub">Room 3 · Dr. Sharma</span>
-            </div>
+          <td>{{ forloop.counter }}</td>
+          <td class="uhid">{{ patient.uhid }}</td>
+          <td class="patient-name">
+            <a href="{% url 'patient_detail' patient.pk %}">{{ patient.full_name }}</a>
+            {% if patient.is_emergency %}<span class="alert-badge" style="margin-left:6px;">Emergency</span>{% endif %}
           </td>
-          <td><div class="doc-name">Dr. Sharma</div><div class="doc-spec">General Medicine</div></td>
-          <td><span class="service-tag">Lab (1)</span><span class="service-tag">X-Ray (1)</span></td>
-          <td><span class="alert-badge">High BP</span></td>
-          <td><span class="bill-paid">Paid</span></td>
-          <td class="last-update">09:45 AM · Nurse</td>
-          <td class="action-btns"><button class="action-btn primary">Assess</button><button class="action-btn">Route</button><button class="action-btn">Track</button><button class="action-btn">View</button></td>
-        </tr>
-        <!-- Row 2 -->
-        <tr>
-          <td>2</td>
-          <td class="uhid">UHID000124</td>
-          <td class="patient-name">Priya Sharma</td>
-          <td class="age-sex">32 / F</td>
-          <td class="arrival">08:35 AM</td>
+          <td class="age-sex">{{ patient.age|default:"—" }} / {{ patient.gender|default:"—" }}</td>
+          <td class="arrival">{{ patient.created_at|time:"h:i A" }}</td>
           <td>
             <div class="status-cell">
-              <span class="status-badge purple"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> Lab - Waiting</span>
-              <span class="status-sub">Lab Counter · Sample drawn</span>
-            </div>
-          </td>
-          <td><div class="doc-name">Dr. Patel</div><div class="doc-spec">Cardiology</div></td>
-          <td><span class="service-tag">ECG (1)</span></td>
-          <td>—</td>
-          <td><span class="bill-pending">Pending</span></td>
-          <td class="last-update">09:12 AM · Lab Tech</td>
-          <td class="action-btns"><button class="action-btn">Assess</button><button class="action-btn primary">Route</button><button class="action-btn">Track</button><button class="action-btn">View</button></td>
-        </tr>
-        <!-- Row 3 -->
-        <tr>
-          <td>3</td>
-          <td class="uhid">UHID000125</td>
-          <td class="patient-name">Anil Verma</td>
-          <td class="age-sex">58 / M</td>
-          <td class="arrival">09:02 AM</td>
-          <td>
-            <div class="status-cell">
-              <span class="status-badge orange"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> Awaiting Payment</span>
-              <span class="status-sub">Billing Counter</span>
-            </div>
-          </td>
-          <td><div class="doc-name">Dr. Reddy</div><div class="doc-spec">Orthopedics</div></td>
-          <td><span class="service-tag">X-Ray (2)</span><span class="service-tag">Physio (1)</span></td>
-          <td><span class="alert-badge">Allergy</span></td>
-          <td><span class="bill-pending">Pending</span></td>
-          <td class="last-update">09:30 AM · Reception</td>
-          <td class="action-btns"><button class="action-btn">Assess</button><button class="action-btn">Route</button><button class="action-btn">Track</button><button class="action-btn primary">View</button></td>
-        </tr>
-        <!-- Row 4 -->
-        <tr>
-          <td>4</td>
-          <td class="uhid">UHID000126</td>
-          <td class="patient-name">Sunita Devi</td>
-          <td class="age-sex">27 / F</td>
-          <td class="arrival">09:15 AM</td>
-          <td>
-            <div class="status-cell">
-              <span class="status-badge red"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> Procedure in Progress</span>
-              <span class="status-sub">Procedure Room 2</span>
-            </div>
-          </td>
-          <td><div class="doc-name">Dr. Mehta</div><div class="doc-spec">Surgery</div></td>
-          <td><span class="service-tag">Minor Surgery (1)</span></td>
-          <td>—</td>
-          <td><span class="bill-approved">Approved</span></td>
-          <td class="last-update">09:50 AM · Nurse</td>
-          <td class="action-btns"><button class="action-btn">Assess</button><button class="action-btn">Route</button><button class="action-btn primary">Track</button><button class="action-btn">View</button></td>
-        </tr>
-        <!-- Row 5 -->
-        <tr>
-          <td>5</td>
-          <td class="uhid">UHID000127</td>
-          <td class="patient-name">Mohammed Ali</td>
-          <td class="age-sex">61 / M</td>
-          <td class="arrival">09:40 AM</td>
-          <td>
-            <div class="status-cell">
-              <span class="status-badge green"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> Completed</span>
-              <span class="status-sub">Discharged · Pharmacy done</span>
-            </div>
-          </td>
-          <td><div class="doc-name">Dr. Sharma</div><div class="doc-spec">General Medicine</div></td>
-          <td><span class="service-tag">Pharmacy (1)</span></td>
-          <td>—</td>
-          <td><span class="bill-paid">Paid</span></td>
-          <td class="last-update">10:05 AM · Pharmacist</td>
-          <td class="action-btns"><button class="action-btn">Assess</button><button class="action-btn">Route</button><button class="action-btn">Track</button><button class="action-btn primary">View</button></td>
-        </tr>
-        <!-- Row 6 -->
-        <tr>
-          <td>6</td>
-          <td class="uhid">UHID000128</td>
-          <td class="patient-name">Lakshmi Nair</td>
-          <td class="age-sex">39 / F</td>
-          <td class="arrival">10:00 AM</td>
-          <td>
-            <div class="status-cell">
+              {% if patient.is_emergency %}
+              <span class="status-badge red"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> Emergency</span>
+              <span class="status-sub">Emergency Counter</span>
+              {% else %}
               <span class="status-badge slate"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg> Waiting / In Queue</span>
               <span class="status-sub">OPD Waiting Area</span>
+              {% endif %}
             </div>
           </td>
-          <td><div class="doc-name">Dr. Patel</div><div class="doc-spec">Cardiology</div></td>
-          <td><span class="service-tag">ECG (1)</span><span class="service-tag">Echo (1)</span></td>
-          <td><span class="alert-badge">High BP</span></td>
-          <td><span class="bill-pending">Pending</span></td>
-          <td class="last-update">10:02 AM · Reception</td>
-          <td class="action-btns"><button class="action-btn primary">Assess</button><button class="action-btn">Route</button><button class="action-btn">Track</button><button class="action-btn">View</button></td>
+          <td><div class="doc-name muted">Unassigned</div><div class="doc-spec">—</div></td>
+          <td><span class="muted">—</span></td>
+          <td>{% if patient.allergies %}<span class="alert-badge">Allergy</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>
+            {% with bill=patient.bills.first %}
+              {% if bill %}{% if bill.status == "paid" %}<span class="bill-paid">Paid</span>{% else %}<span class="bill-pending">Pending</span>{% endif %}
+              {% else %}<span class="muted">—</span>{% endif %}
+            {% endwith %}
+          </td>
+          <td class="last-update">{{ patient.updated_at|time:"h:i A" }} · Registration</td>
+          <td class="action-btns">
+            <a class="action-btn primary" href="{% url 'patient_detail' patient.pk %}">Assess</a>
+            <a class="action-btn" href="{% url 'patient_detail' patient.pk %}">Track</a>
+            <a class="action-btn" href="{% url 'patient_detail' patient.pk %}">View</a>
+          </td>
         </tr>
-      </tbody>
+        {% empty %}
+        <tr>
+          <td colspan="12" style="text-align:center; padding:40px 12px; color:#94a3b8;">
+            No patients registered yet. Patients registered at the Registration Desk will appear here.
+          </td>
+        </tr>
+        {% endfor %}
     </table>
   </div>
 

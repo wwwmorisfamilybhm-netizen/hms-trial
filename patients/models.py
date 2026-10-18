@@ -122,6 +122,13 @@ class Patient(models.Model):
         return f"{self.first_name} {self.last_name}".strip()
 
     @property
+    def uhid(self):
+        """Unique hospital patient ID — prefers the registered MR number."""
+        if self.mr_number:
+            return self.mr_number
+        return f"UHID{self.pk:06d}" if self.pk else "UHID—"
+
+    @property
     def age(self):
         """Age in years, or None if date of birth is missing."""
         if not self.date_of_birth:
