@@ -485,6 +485,120 @@ def admin_settings(request):
     return render(request, "core/admin_settings.html")
 
 
+# ── Doctor / staff management (admin console) ────────────────────────────────
+
+@login_required(login_url="login")
+def admin_doctors(request):
+    """List all staff accounts, with inline create for a new doctor."""
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    from django.contrib.auth.models import User
+
+    from .forms import StaffAccountForm
+
+    if request.method == "POST":
+        form = StaffAccountForm(request.POST, request.FILES)
+        if form.is_valid():
+            user = form.save()
+            messages.success(
+                request,
+                f"Doctor account created for {user.get_full_name() or user.username}.",
+            )
+            return redirect("admin_doctors")
+    else:
+        form = StaffAccountForm()
+
+    staff_qs = (
+        User.objects.select_related("profile")
+        .order_by("first_name", "username")
+    )
+
+    designation_filter = request.GET.get("designation", "").strip()
+    if designation_filter:
+        staff_qs = staff_qs.filter(profile__designation=designation_filter)
+
+    search = request.GET.get("q", "").strip()
+    if search:
+        from django.db.models import Q
+
+        staff_qs = staff_qs.filter(
+            Q(username__icontains=search)
+            | Q(first_name__icontains=search)
+            | Q(last_name__icontains=search)
+        )
+
+    staff_list = [
+        {
+            "user": user,
+            "profile": getattr(user, "profile", None),
+            "photo": getattr(getattr(user, "profile", None), "photo", None),
+            "initials": ((user.first_name or user.username)[:1] + (user.last_name[:1] if user.last_name else "")).upper(),
+            "designation_label": (
+                user.profile.get_designation_display()
+                if hasattr(user, "profile")
+                else "—"
+            ),
+            "designation": (
+                user.profile.designation if hasattr(user, "profile") else ""
+            ),
+        }
+        for user in staff_qs
+    ]
+
+    counts = {
+        "all": User.objects.count(),
+        "doctor": User.objects.filter(profile__designation=UserProfile.Designation.DOCTOR).count(),
+        "nurse": User.objects.filter(profile__designation=UserProfile.Designation.NURSE).count(),
+        "registration_desk": User.objects.filter(
+            profile__designation=UserProfile.Designation.REGISTRATION_DESK
+        ).count(),
+        "admin": User.objects.filter(profile__designation=UserProfile.Designation.ADMIN).count(),
+    }
+
+    return render(request, "core/admin_doctors.html", {
+        "form": form,
+        "staff_list": staff_list,
+        "counts": counts,
+        "designation_filter": designation_filter,
+        "search": search,
+        "designations": UserProfile.Designation.choices,
+    })
+
+
+@login_required(login_url="login")
+def admin_doctor_edit(request, pk):
+    """Edit a staff account: photo, name, designation, and password."""
+    from django.contrib.auth.models import User
+
+    from .forms import StaffAccountForm
+
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    user = get_object_or_404(User, pk=pk)
+
+    if request.method == "POST":
+        form = StaffAccountForm(request.POST, request.FILES, instance=user)
+        if form.is_valid():
+            updated = form.save()
+            messages.success(
+                request,
+                f"Updated {updated.get_full_name() or updated.username}.",
+            )
+            return redirect("admin_doctors")
+    else:
+        form = StaffAccountForm(instance=user)
+
+    return render(request, "core/admin_doctor_edit.html", {
+        "form": form,
+        "staff_user": user,
+        "profile": getattr(user, "profile", None),
+    })
+
+
 @login_required(login_url="login")
 def admin_backup_import(request):
     """Detailed backup and import page for administrators."""

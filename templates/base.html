@@ -290,7 +290,11 @@
         <div class="user-menu">
           <button type="button" class="user-trigger" id="userTrigger" aria-haspopup="true" aria-expanded="false">
             <span class="user-avatar">
-              <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="7" r="3.4"/><path d="M17 16.5a7 7 0 0 0-14 0"/></svg>
+              {% if request.user.profile.photo %}
+                <img src="{{ request.user.profile.photo.url }}" alt="">
+              {% else %}
+                <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="7" r="3.4"/><path d="M17 16.5a7 7 0 0 0-14 0"/></svg>
+              {% endif %}
             </span>
             <span class="user-meta">
               <span class="user-name">{{ request.user.get_full_name|default:request.user.username }}</span>
@@ -302,7 +306,11 @@
           <div class="user-panel" id="userPanel" role="menu" aria-labelledby="userTrigger" hidden>
             <div class="user-panel-head">
               <span class="user-panel-avatar">
-                {{ request.user.get_full_name|default:request.user.username|slice:":1"|upper }}
+                {% if request.user.profile.photo %}
+                  <img src="{{ request.user.profile.photo.url }}" alt="">
+                {% else %}
+                  {{ request.user.get_full_name|default:request.user.username|slice:":1"|upper }}
+                {% endif %}
               </span>
               <span class="user-panel-id">
                 <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>

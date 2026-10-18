@@ -33,6 +33,13 @@ class UserProfile(models.Model):
         verbose_name="Notes / Shift Info",
         help_text="Optional counter name, shift timing, or department notes.",
     )
+    photo = models.ImageField(
+        upload_to="staff_photos/",
+        blank=True,
+        null=True,
+        verbose_name="Profile Photo",
+        help_text="Staff portrait shown in the topbar profile menu.",
+    )
 
     class Meta:
         verbose_name = "User Designation Allocation"
