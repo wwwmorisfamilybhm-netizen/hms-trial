@@ -286,22 +286,42 @@
         </div>
       </div>
 
-      <div class="search">
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#55555c" stroke-width="1.8" aria-hidden="true">
-          <circle cx="7.5" cy="7.5" r="6.5"/><path d="M12.5 12.5L17 17"/>
-        </svg>
-        <input type="search" placeholder="{% if request.session.designation == 'registration_desk' %}Search patients…{% else %}Search patients, appointments…{% endif %}" aria-label="Search">
-      </div>
-
       <div class="topbar-right">
-        {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}
-          <a href="{% url 'registration_desk' %}" class="topbar-btn solid">+ Patient Registration</a>
-          <a href="{% url 'logout' %}" class="topbar-btn outline">Sign Out</a>
-        {% else %}
-          <a href="{% url 'patient_create' %}" class="topbar-btn solid">+ New Patient</a>
-          <a href="{% url 'appointment_create' %}" class="topbar-btn outline">+ Book</a>
-          <a href="{% url 'logout' %}" class="topbar-btn outline">Sign Out</a>
-        {% endif %}
+        <div class="user-menu">
+          <button type="button" class="user-trigger" id="userTrigger" aria-haspopup="true" aria-expanded="false">
+            <span class="user-avatar">
+              <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="7" r="3.4"/><path d="M17 16.5a7 7 0 0 0-14 0"/></svg>
+            </span>
+            <span class="user-meta">
+              <span class="user-name">{{ request.user.get_full_name|default:request.user.username }}</span>
+              <span class="user-role">{{ request.user.profile.designation|default:"Staff"|title }}</span>
+            </span>
+            <svg class="user-caret" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg>
+          </button>
+
+          <div class="user-panel" id="userPanel" role="menu" aria-labelledby="userTrigger" hidden>
+            <div class="user-panel-head">
+              <span class="user-panel-avatar">
+                {{ request.user.get_full_name|default:request.user.username|slice:":1"|upper }}
+              </span>
+              <span class="user-panel-id">
+                <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+                <small>{{ request.user.profile.designation|default:"Staff"|title }}</small>
+              </span>
+            </div>
+            <div class="user-panel-sep"></div>
+            {% if request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}
+            <a class="user-panel-item" href="/admin/" role="menuitem">
+              <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="6" height="6" rx="1.6"/><rect x="10" y="2" width="6" height="4.6" rx="1.6"/><rect x="10" y="8.6" width="6" height="7.4" rx="1.6"/><rect x="2" y="10" width="6" height="6" rx="1.6"/></svg>
+              Admin console
+            </a>
+            {% endif %}
+            <a class="user-panel-item danger" href="{% url 'logout' %}" role="menuitem">
+              <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 15.5H4a1.5 1.5 0 0 1-1.5-1.5V4A1.5 1.5 0 0 1 4 2.5h7.5"/><path d="M14 6l3 3-3 3M17 9H8"/></svg>
+              Sign out
+            </a>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -320,5 +340,42 @@
 </div>
 
 <script src="{% static 'js/refresh-logout.js' %}"></script>
+<script>
+  (function () {
+    var trigger = document.getElementById("userTrigger");
+    var panel = document.getElementById("userPanel");
+    if (!trigger || !panel) return;
+
+    function open() {
+      panel.hidden = false;
+      trigger.setAttribute("aria-expanded", "true");
+    }
+    function close() {
+      panel.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+    }
+    function toggle() { panel.hidden ? open() : close(); }
+
+    trigger.addEventListener("click", function (e) {
+      e.stopPropagation();
+      toggle();
+    });
+
+    // Close when clicking outside
+    document.addEventListener("click", function (e) {
+      if (!panel.hidden && !panel.contains(e.target)) close();
+    });
+
+    // Close on Escape
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !panel.hidden) { close(); trigger.focus(); }
+    });
+
+    // Close when tabbing out
+    document.addEventListener("focusin", function (e) {
+      if (!panel.hidden && !panel.contains(e.target) && e.target !== trigger) close();
+    });
+  })();
+</script>
 </body>
 </html>
