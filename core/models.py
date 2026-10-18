@@ -14,6 +14,20 @@ class UserProfile(models.Model):
         NURSE = "nurse", "Nurse"
         ADMIN = "admin", "Hospital Administrator"
 
+    SPECIALTIES = [
+        ("GEN", "General Medicine"),
+        ("CAR", "Cardiology"),
+        ("DER", "Dermatology"),
+        ("PED", "Pediatrics"),
+        ("ORT", "Orthopedics"),
+        ("GYN", "Gynecology"),
+        ("NEU", "Neurology"),
+        ("ENT", "ENT"),
+        ("OPT", "Ophthalmology"),
+        ("PSY", "Psychiatry"),
+        ("", "Not Specified"),
+    ]
+
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
@@ -32,6 +46,14 @@ class UserProfile(models.Model):
         blank=True,
         verbose_name="Notes / Shift Info",
         help_text="Optional counter name, shift timing, or department notes.",
+    )
+    specialty = models.CharField(
+        max_length=3,
+        choices=SPECIALTIES,
+        blank=True,
+        default="",
+        verbose_name="Specialty",
+        help_text="Clinical specialty shown under the staff member's name.",
     )
     photo = models.ImageField(
         upload_to="staff_photos/",

@@ -110,6 +110,15 @@ class Patient(models.Model):
         help_text="Registered through the fast emergency intake counter; remaining details to be completed later.",
     )
     photo = models.FileField(upload_to="patient_photos/", blank=True, null=True, verbose_name="Patient Photo")
+    assigned_doctor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_patients",
+        verbose_name="Assigned Doctor",
+        help_text="Doctor account (created in Admin Console → Doctor Management) looking after this patient.",
+    )
 
     class Meta:
         ordering = ["-created_at"]

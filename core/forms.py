@@ -19,6 +19,12 @@ class StaffAccountForm(forms.ModelForm):
         choices=UserProfile.Designation.choices,
         label="Designation",
     )
+    specialty = forms.ChoiceField(
+        choices=UserProfile.SPECIALTIES,
+        required=False,
+        label="Specialty",
+        help_text="Shown under the doctor's name — e.g. Orthopedics, Cardiology.",
+    )
     password = forms.CharField(
         widget=forms.PasswordInput(render_value=False),
         label="Password",
@@ -42,16 +48,17 @@ class StaffAccountForm(forms.ModelForm):
 
         if self.editing:
             self.fields["username"].help_text = "Leave unchanged to keep the current username."
-            # Designation / photo come from the related UserProfile.
+            # Designation / photo / specialty come from the related UserProfile.
             profile = getattr(self.instance, "profile", None)
             if profile:
                 self.fields["designation"].initial = profile.designation
+                self.fields["specialty"].initial = profile.specialty
                 self.fields["photo"].initial = profile.photo
 
         # Order the visible fields sensibly.
         self.order_fields([
             "photo", "first_name", "last_name", "username",
-            "email", "designation", "password",
+            "email", "designation", "specialty", "password",
         ])
 
     def clean_username(self):
@@ -84,6 +91,12 @@ class StaffAccountForm(forms.ModelForm):
             user.save()
             profile, _ = UserProfile.objects.get_or_create(user=user)
             profile.designation = self.cleaned_data["designation"]
+            # Specialty only applies to doctors; clear it for other designations.
+            profile.specialty = (
+                self.cleaned_data.get("specialty", "")
+                if profile.designation == UserProfile.Designation.DOCTOR
+                else ""
+            )
             photo = self.cleaned_data.get("photo")
             if photo:
                 profile.photo = photo

@@ -298,7 +298,10 @@
             </span>
             <span class="user-meta">
               <span class="user-name">{{ request.user.get_full_name|default:request.user.username }}</span>
-              <span class="user-role">{{ request.user.profile.designation|default:"Staff"|title }}</span>
+              <span class="user-role">
+                {% if request.user.profile.specialty %}{{ request.user.profile.get_specialty_display }}
+                {% else %}{{ request.user.profile.designation|default:"Staff"|title }}{% endif %}
+              </span>
             </span>
             <svg class="user-caret" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg>
           </button>
@@ -314,7 +317,10 @@
               </span>
               <span class="user-panel-id">
                 <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
-                <small>{{ request.user.profile.designation|default:"Staff"|title }}</small>
+                <small>
+                  {% if request.user.profile.specialty %}{{ request.user.profile.get_specialty_display }}
+                  {% else %}{{ request.user.profile.designation|default:"Staff"|title }}{% endif %}
+                </small>
               </span>
             </div>
             <div class="user-panel-sep"></div>

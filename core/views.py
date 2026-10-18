@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
@@ -150,15 +150,16 @@ def dashboard(request):
         # These are the only rows shown in the doctor queue table.
         "queue_patients": (
             Patient.objects.all()
+            .select_related("assigned_doctor", "assigned_doctor__profile")
             .prefetch_related("bills")
             .order_by("-created_at")[:50]
         ),
         # KPI strip — derived from real registered data.
         "kpi_total_today": Patient.objects.filter(created_at__date=today).count(),
         "kpi_in_pool": Patient.objects.filter(created_at__date=today, is_emergency=False).count(),
-        "kpi_with_doctors": (
-            Appointment.objects.filter(date=today, status=Appointment.Status.SCHEDULED).count()
-        ),
+        "kpi_with_doctors": Patient.objects.filter(
+            assigned_doctor__isnull=False
+        ).count(),
         "kpi_investigations": 0,
         "kpi_procedures": 0,
         "kpi_pharmacy": 0,
@@ -166,8 +167,55 @@ def dashboard(request):
         "kpi_completed": (
             Appointment.objects.filter(date=today, status=Appointment.Status.COMPLETED).count()
         ),
+    # Doctor accounts available in the "With Doctors" filter dropdown.
+        "doctor_accounts": (
+            get_user_model()
+            .objects.filter(profile__designation=UserProfile.Designation.DOCTOR)
+            .order_by("first_name", "username")
+        ),
     }
     return render(request, "core/dashboard.html", context)
+
+
+@login_required(login_url="login")
+def assign_doctor(request, patient_id):
+    """Assign (or clear) the doctor account looking after a patient."""
+    patient = get_object_or_404(Patient, pk=patient_id)
+
+    designation = (
+        getattr(getattr(request.user, "profile", None), "designation", None)
+        or request.session.get("designation")
+    )
+    if designation not in (UserProfile.Designation.DOCTOR, UserProfile.Designation.ADMIN) \
+            and not request.user.is_superuser:
+        messages.warning(request, "Access restricted: only doctors can assign a patient.")
+        return redirect("dashboard")
+
+    if request.method != "POST":
+        return redirect("dashboard")
+
+    doctor_id = request.POST.get("doctor_id", "").strip()
+    if not doctor_id:
+        patient.assigned_doctor = None
+        patient.save(update_fields=["assigned_doctor"])
+        messages.success(
+            request, f"{patient.full_name} is now unassigned."
+        )
+        return redirect("dashboard")
+
+    doctor = get_object_or_404(
+        get_user_model(),
+        pk=doctor_id,
+        profile__designation=UserProfile.Designation.DOCTOR,
+    )
+    patient.assigned_doctor = doctor
+    patient.save(update_fields=["assigned_doctor"])
+    specialty = doctor.profile.get_specialty_display() if doctor.profile.specialty else "General Medicine"
+    messages.success(
+        request,
+        f"{patient.full_name} assigned to {doctor.get_full_name() or doctor.username} — {specialty}.",
+    )
+    return redirect("dashboard")
 
 
 @login_required(login_url="login")
@@ -539,6 +587,11 @@ def admin_doctors(request):
                 user.profile.get_designation_display()
                 if hasattr(user, "profile")
                 else "—"
+            ),
+            "specialty_label": (
+                user.profile.get_specialty_display()
+                if hasattr(user, "profile") and user.profile.specialty
+                else ""
             ),
             "designation": (
                 user.profile.designation if hasattr(user, "profile") else ""

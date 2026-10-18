@@ -25,6 +25,7 @@ urlpatterns = [
     path("admin-settings/backup-import/", views.admin_backup_import, name="admin_backup_import"),
     path("admin-settings/export/", views.admin_backup_export, name="admin_backup_export"),
     path("dashboard/", views.dashboard, name="dashboard"),
+    path("dashboard/patient/<int:patient_id>/assign-doctor/", views.assign_doctor, name="assign_doctor"),
     path("history/", views.history, name="history"),
     # ── Doctor portal (placeholder pages — content to be filled later) ──
     path("doctor/initial-assessment/", views.doctor_placeholder, {"page": "initial_assessment"}, name="initial_assessment"),

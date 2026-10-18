@@ -111,7 +111,9 @@
   </span>
   <div>
     <h1>{{ staff_user.get_full_name|default:staff_user.username }}</h1>
-    <p>@{{ staff_user.username }}{% if staff_user.email %} · {{ staff_user.email }}{% endif %}</p>
+    <p>
+      {% if profile.specialty %}{{ profile.get_specialty_display }} · {% endif %}@{{ staff_user.username }}
+    </p>
     <span class="ed-chip">{{ profile.get_designation_display|default:"No designation" }}</span>
   </div>
 </div>
@@ -169,8 +171,8 @@
 
     <div class="ed-grid">
       {% for field in form %}
-        {% if field.name == "designation" or field.name == "password" %}
-          <div class="ed-field">
+        {% if field.name == "designation" or field.name == "specialty" or field.name == "password" %}
+          <div class="ed-field"{% if field.name == "specialty" %} id="edSpecialtyField" style="display:none;"{% endif %}>
             <label for="{{ field.id_for_label }}">{{ field.label }}</label>
             {{ field }}
             {% if field.help_text %}<span class="help">{{ field.help_text }}</span>{% endif %}
@@ -204,6 +206,18 @@
       };
       reader.readAsDataURL(file);
     });
+  })();
+
+  // Show the Specialty field only when the designation is Doctor.
+  (function () {
+    var desig = document.getElementById("id_designation");
+    var wrap = document.getElementById("edSpecialtyField");
+    if (!desig || !wrap) return;
+    function sync() {
+      wrap.style.display = desig.value === "doctor" ? "block" : "none";
+    }
+    desig.addEventListener("change", sync);
+    sync();
   })();
 </script>
 {% endblock %}

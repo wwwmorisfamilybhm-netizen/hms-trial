@@ -211,7 +211,8 @@
 
       {% for field in form %}
         {% if field.name != "photo" %}
-          <div class="dm-field{% if field.errors %} has-error{% endif %}">
+          <div class="dm-field{% if field.errors %} has-error{% endif %}"
+               {% if field.name == "specialty" %}id="dmSpecialtyField" style="display:none;"{% endif %}>
             <label for="{{ field.id_for_label }}">{{ field.label }}</label>
             {{ field }}
             {% if field.help_text %}<span class="help">{{ field.help_text }}</span>{% endif %}
@@ -260,7 +261,9 @@
         </span>
         <span class="dm-info">
           <span class="dm-name">{{ row.user.get_full_name|default:row.user.username }}</span>
-          <span class="dm-meta">@{{ row.user.username }}{% if row.user.email %} · {{ row.user.email }}{% endif %}</span>
+          <span class="dm-meta">
+            {% if row.specialty_label %}{{ row.specialty_label }} · {% endif %}@{{ row.user.username }}
+          </span>
         </span>
         <span class="dm-badge {{ row.designation }}">{{ row.designation_label }}</span>
         <a class="dm-edit" href="{% url 'admin_doctor_edit' row.user.pk %}">
@@ -289,6 +292,18 @@
       };
       reader.readAsDataURL(file);
     });
+  })();
+
+  // Show the Specialty field only when the designation is Doctor.
+  (function () {
+    var desig = document.getElementById("id_designation");
+    var wrap = document.getElementById("dmSpecialtyField");
+    if (!desig || !wrap) return;
+    function sync() {
+      wrap.style.display = desig.value === "doctor" ? "block" : "none";
+    }
+    desig.addEventListener("change", sync);
+    sync();
   })();
 </script>
 {% endblock %}
