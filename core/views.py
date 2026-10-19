@@ -1137,13 +1137,18 @@ def _openai_compatible_draft(vitals, complaints, allergies, patient_name):
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         "temperature": 0.3,
     }).encode("utf-8")
+    url = base + "/chat/completions"
     req = _urllib_request.Request(
-        base + "/chat/completions", data=body,
+        url, data=body,
         headers={"Content-Type": "application/json", "Authorization": "Bearer " + key},
         method="POST",
     )
-    with _urllib_request.urlopen(req, timeout=30) as resp:
-        data = _json.loads(resp.read().decode("utf-8"))
+    try:
+        with _urllib_request.urlopen(req, timeout=30) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+    except _urllib_error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")[:200]
+        raise RuntimeError("HTTP %s from %s — %s" % (exc.code, url, detail)) from exc
     content = data["choices"][0]["message"]["content"]
     parsed = _extract_json_text(content)
     return {
@@ -1176,8 +1181,12 @@ def _gemini_draft(vitals, complaints, allergies, patient_name):
         "generationConfig": {"temperature": 0.3},
     }).encode("utf-8")
     req = _urllib_request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
-    with _urllib_request.urlopen(req, timeout=30) as resp:
-        data = _json.loads(resp.read().decode("utf-8"))
+    try:
+        with _urllib_request.urlopen(req, timeout=30) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+    except _urllib_error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")[:200]
+        raise RuntimeError("HTTP %s from %s — %s" % (exc.code, url.split("?")[0], detail)) from exc
     content = data["candidates"][0]["content"]["parts"][0]["text"]
     parsed = _extract_json_text(content)
     return {
