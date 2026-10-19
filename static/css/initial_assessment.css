@@ -140,9 +140,8 @@ body {
 
 .card {
   background: var(--ia-card);
-  border: 1px solid var(--ia-border);
+  border: none;
   border-radius: var(--ia-radius);
-  box-shadow: var(--ia-shadow);
 }
 
 .ws-grid {
@@ -159,9 +158,8 @@ body {
   grid-template-columns: 1fr minmax(300px, 360px);
   gap: 0;
   background: var(--ia-card);
-  border: 1px solid var(--ia-border);
+  border: none;
   border-radius: var(--ia-radius);
-  box-shadow: var(--ia-shadow);
   overflow: hidden;
 }
 .banner-main { padding: 20px 24px; }
@@ -192,7 +190,7 @@ body {
   font-weight: 600;
 }
 .chip-uhid { background: var(--ia-primary-soft); color: var(--ia-primary-strong); border: 1px solid var(--ia-primary-border); font-variant-numeric: tabular-nums; }
-.chip-token { background: #f1f5f9; color: var(--ia-ink-soft); border: 1px solid var(--ia-border); font-variant-numeric: tabular-nums; }
+.chip-token { background: #f5f5f6; color: var(--ia-ink-soft); border: 1px solid var(--ia-border); font-variant-numeric: tabular-nums; }
 .chip-urgent { background: var(--ia-danger-soft); color: var(--ia-danger-strong); border: 1px solid var(--ia-danger-border); }
 .chip-ai { background: var(--ia-ai-soft); color: var(--ia-ai-strong); border: 1px solid var(--ia-ai-border); }
 
@@ -217,14 +215,14 @@ body {
 .critical-head svg { width: 16px; height: 16px; }
 .critical-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
 .critical-list li { font-size: 12.5px; color: var(--ia-danger-strong); line-height: 1.45; }
-.critical-list li strong { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #b45309; margin-bottom: 1px; }
+.critical-list li strong { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ia-danger-strong); margin-bottom: 1px; }
 
 /* ───────────────── Tabs ───────────────── */
 .tabs {
   display: flex;
   gap: 4px;
   padding: 6px;
-  background: #f1f5f9;
+  background: #f5f5f6;
   border-radius: 12px;
   margin: -4px -4px 20px;
   flex-wrap: wrap;
@@ -528,7 +526,7 @@ body {
 .ai-title h3 { margin: 0; font-size: 14.5px; font-weight: 750; letter-spacing: -0.2px; }
 .ai-sub { font-size: 11.5px; color: var(--ia-muted); }
 
-.ai-tabs { display: flex; gap: 4px; background: #f1f5f9; border-radius: 10px; padding: 4px; margin-bottom: 12px; }
+.ai-tabs { display: flex; gap: 4px; background: #f5f5f6; border-radius: 10px; padding: 4px; margin-bottom: 12px; }
 .ai-tab {
   flex: 1;
   border: none;
@@ -604,8 +602,8 @@ body {
   line-height: 1.45;
 }
 .alert-card svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
-.alert-card.red { background: var(--ia-danger-soft); border: 1px solid var(--ia-danger-border); color: var(--ia-danger-strong); }
-.alert-card.amber { background: var(--ia-amber-soft); border: 1px solid var(--ia-amber-border); color: #92400e; }
+.alert-card.red { background: var(--ia-danger-soft); color: var(--ia-danger-strong); }
+.alert-card.amber { background: var(--ia-amber-soft); color: #92400e; }
 .alert-card .alert-body b { display: block; font-weight: 700; }
 .alert-card .alert-body span { opacity: 0.9; }
 
@@ -736,7 +734,7 @@ body {
   transition: background 0.14s ease, border-color 0.14s ease;
   white-space: nowrap;
 }
-.pill-btn:hover { background: #fde68a; border-color: #e8d5a3; }
+.pill-btn:hover { background: var(--ia-amber-border); border-color: var(--ia-amber-border); }
 .pill-badge {
   display: inline-grid;
   place-items: center;
