@@ -244,15 +244,118 @@
     $(".med-name", rows[rows.length - 1]).focus();
   });
 
-  /* ───────────────────── Social history "Others" ───────────────────── */
-  var othersCheck = $("#socialOthersCheck");
-  var othersInput = $("#socialOthers");
-  if (othersCheck) {
-    othersCheck.addEventListener("change", function () {
-      othersInput.disabled = !othersCheck.checked;
-      if (othersCheck.checked) othersInput.focus();
+  /* ───────────────────── Chronic conditions "Others" (add many) ───────────────────── */
+  var condOthersCheck = $("#condOthersCheck");
+  var otherConditionsPanel = $("#otherConditionsPanel");
+  var otherConditionInput = $("#otherConditionInput");
+  var otherConditionsList = $("#otherConditionsList");
+  function toggleOtherConditionsPanel() {
+    if (!otherConditionsPanel) return;
+    otherConditionsPanel.style.display = (condOthersCheck && condOthersCheck.checked) ? "" : "none";
+  }
+  if (condOthersCheck) {
+    condOthersCheck.addEventListener("change", toggleOtherConditionsPanel);
+  }
+  function addOtherCondition(name) {
+    name = (name || "").trim();
+    if (!name) return;
+    if (!otherConditionsList) return;
+    var row = document.createElement("label");
+    row.className = "condition";
+    row.innerHTML = '<input type="checkbox" class="cond-check" checked><span></span><input type="text" class="cond-duration" placeholder="since"><button type="button" class="icon-btn" style="margin-left:6px;" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button>';
+    row.querySelector("span").textContent = name;
+    var removeBtn = row.querySelector("button");
+    removeBtn.addEventListener("click", function () { row.remove(); });
+    otherConditionsList.appendChild(row);
+  }
+  var addOtherConditionBtn = $("#addOtherCondition");
+  if (addOtherConditionBtn) {
+    addOtherConditionBtn.addEventListener("click", function () {
+      addOtherCondition(otherConditionInput.value);
+      otherConditionInput.value = "";
+      otherConditionInput.focus();
     });
   }
+  if (otherConditionInput) {
+    otherConditionInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { addOtherCondition(otherConditionInput.value); otherConditionInput.value = ""; }
+    });
+  }
+
+  /* ───────────────────── Social history "Others" (popup add many) ───────────────────── */
+  var socialOthersCheck = $("#socialOthersCheck");
+  var socialOthersModal = $("#socialOthersModal");
+  var socialOthersInput = $("#socialOthersInput");
+  var socialOthersModalTags = $("#socialOthersModalTags");
+  var socialOthersTags = $("#socialOthersTags");
+  var socialOthersItems = [];
+
+  function renderSocialOthersTags() {
+    if (socialOthersTags) {
+      socialOthersTags.innerHTML = socialOthersItems.map(function (t) {
+        return '<span class="tag tag-danger" style="background:var(--ia-primary-soft);color:var(--ia-primary-strong);border-color:var(--ia-primary-border);">' + t +
+          '<button type="button" class="tag-x" data-item="' + t + '" aria-label="Remove ' + t + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>';
+      }).join("");
+      $$("#socialOthersTags .tag-x").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          socialOthersItems = socialOthersItems.filter(function (x) { return x !== btn.dataset.item; });
+          renderSocialOthersTags();
+        });
+      });
+    }
+    if (socialOthersModalTags) {
+      socialOthersModalTags.innerHTML = socialOthersItems.map(function (t) {
+        return '<span class="tag tag-danger" style="background:var(--ia-primary-soft);color:var(--ia-primary-strong);border-color:var(--ia-primary-border);">' + t + '</span>';
+      }).join("");
+    }
+  }
+
+  function openSocialOthers() { if (socialOthersModal) socialOthersModal.hidden = false; if (socialOthersInput) socialOthersInput.focus(); }
+  function closeSocialOthers() { if (socialOthersModal) socialOthersModal.hidden = true; }
+
+  function addSocialOther(name) {
+    name = (name || "").trim();
+    if (!name || socialOthersItems.indexOf(name) !== -1) return;
+    socialOthersItems.push(name);
+    renderSocialOthersTags();
+  }
+
+  if (socialOthersCheck) {
+    socialOthersCheck.addEventListener("change", function () {
+      if (socialOthersCheck.checked) {
+        openSocialOthers();
+      } else {
+        socialOthersItems = [];
+        renderSocialOthersTags();
+      }
+    });
+  }
+  var socialOthersClose = $("#socialOthersClose");
+  if (socialOthersClose) socialOthersClose.addEventListener("click", closeSocialOthers);
+  var socialOthersDone = $("#socialOthersDone");
+  if (socialOthersDone) socialOthersDone.addEventListener("click", closeSocialOthers);
+  if (socialOthersModal) socialOthersModal.addEventListener("click", function (e) { if (e.target === socialOthersModal) closeSocialOthers(); });
+  if (socialOthersInput) {
+    socialOthersInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { addSocialOther(socialOthersInput.value); socialOthersInput.value = ""; }
+    });
+  }
+  var socialOthersAdd = $("#socialOthersAdd");
+  if (socialOthersAdd) {
+    socialOthersAdd.addEventListener("click", function () {
+      addSocialOther(socialOthersInput.value);
+      socialOthersInput.value = "";
+      socialOthersInput.focus();
+    });
+  }
+  $$("#socialOthersModal .pick").forEach(function (pick) {
+    pick.addEventListener("click", function () { if (socialOthersInput) socialOthersInput.value = pick.dataset.pick; });
+  });
+  // Add button inside modal (reuse Enter; also add on a dedicated button if present)
+  // Allow adding via a button with id socialOthersAdd if added later
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && socialOthersModal && !socialOthersModal.hidden) closeSocialOthers();
+  });
 
   /* ───────────────────── Assessment summary (live) ───────────────────── */
   function refreshSummary() {
@@ -415,6 +518,12 @@
 
   $("#aiAccept").addEventListener("click", function () {
     MedGemmaAssistant.onAcceptDraft();
+  });
+
+  /* ───────────────────── Save assessment ───────────────────── */
+  var saveBtn = $("#btnSaveAssessment");
+  if (saveBtn) saveBtn.addEventListener("click", function () {
+    showToast("Assessment saved.");
   });
 
   /* ───────────────────── Next action buttons ───────────────────── */

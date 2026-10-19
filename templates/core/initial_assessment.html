@@ -4,10 +4,13 @@
 {% block title %}Initial Assessment (OPD) — Cams HMS{% endblock %}
 
 {% block heading %}
-<div class="page-head" style="margin-bottom:16px;">
+<div class="page-head" style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
   <div>
     <h1>Initial Assessment <span style="color:var(--muted); font-weight:600;">(OPD)</span></h1>
     <p class="page-sub">Select a patient, then record vitals, chief complaints, and clinical history before doctor consultation.</p>
+  </div>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <button type="button" class="btn btn-outline" id="btnSaveAssessment">Save</button>
   </div>
 </div>
 {% endblock %}
@@ -229,7 +232,14 @@
             <label class="condition"><input type="checkbox" class="cond-check"><span>Coronary Artery Disease</span><input type="text" class="cond-duration" placeholder="since"></label>
             <label class="condition"><input type="checkbox" class="cond-check"><span>Chronic Kidney Disease</span><input type="text" class="cond-duration" placeholder="since"></label>
             <label class="condition"><input type="checkbox" class="cond-check"><span>Thyroid Disorder</span><input type="text" class="cond-duration" placeholder="since"></label>
-            <label class="condition"><input type="checkbox" class="cond-check"><span>Others</span><input type="text" class="cond-duration" placeholder="specify"></label>
+            <label class="condition"><input type="checkbox" class="cond-check" id="condOthersCheck"><span>Others</span><input type="text" class="cond-duration" placeholder="specify"></label>
+          </div>
+          <div id="otherConditionsPanel" style="display:none; margin-top:10px;">
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+              <input type="text" id="otherConditionInput" placeholder="Type a condition and press Add" style="flex:1;">
+              <button type="button" class="btn btn-small" id="addOtherCondition">Add</button>
+            </div>
+            <div id="otherConditionsList" class="conditions-grid"></div>
           </div>
         </div>
         <div class="subgroup">
@@ -265,9 +275,8 @@
             <label class="social"><input type="checkbox" class="social-check"><span>Smoking</span></label>
             <label class="social"><input type="checkbox" class="social-check"><span>Alcohol</span></label>
             <label class="social"><input type="checkbox" class="social-check"><span>Tobacco</span></label>
-            <label class="social social-others"><input type="checkbox" class="social-check" id="socialOthersCheck"><span>Others</span>
-              <input type="text" id="socialOthers" placeholder="specify" class="social-other-input" disabled>
-            </label>
+            <label class="social social-others"><input type="checkbox" class="social-check" id="socialOthersCheck"><span>Others</span></label>
+            <div id="socialOthersTags" class="tag-row" style="margin-top:8px; width:100%;"></div>
           </div>
         </div>
       </div>
@@ -415,6 +424,35 @@
           Cancel Visit
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Social history "Others" popup ── -->
+<div class="modal-backdrop" id="socialOthersModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="socialOthersTitle">
+    <div class="modal-head">
+      <h3 id="socialOthersTitle">Add Social History (Others)</h3>
+      <button type="button" class="icon-btn" id="socialOthersClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:15px;height:15px;"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <label class="mini block-mini">Item
+        <input type="text" id="socialOthersInput" placeholder="e.g. Substance use, Occupational exposure…">
+      </label>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button type="button" class="btn btn-small" id="socialOthersAdd" style="margin-left:auto;">Add</button>
+      </div>
+      <div class="quick-picks" style="margin-top:10px;">
+        <span class="pick" data-pick="Substance use">Substance use</span>
+        <span class="pick" data-pick="Occupational exposure">Occupational exposure</span>
+        <span class="pick" data-pick="Travel history">Travel history</span>
+      </div>
+      <div class="tag-row" id="socialOthersModalTags" style="margin-top:12px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-outline" id="socialOthersDone">Done</button>
     </div>
   </div>
 </div>
