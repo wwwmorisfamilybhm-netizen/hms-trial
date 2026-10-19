@@ -779,8 +779,6 @@ def registration_desk(request):
         include_appointments=not is_registration_desk,
     )
 
-    last = Patient.objects.order_by("-id").first()
-    next_mr = (int(last.mr_number) + 1) if (last and last.mr_number and last.mr_number.isdigit()) else 100001
     recent_registered = Patient.objects.order_by("-created_at")[:5]
 
     return render(request, "core/registration_desk.html", {
@@ -793,9 +791,6 @@ def registration_desk(request):
         "status_choices": Appointment.Status.choices,
         "is_registration_desk": is_registration_desk,
         "can_register": can_register,
-        "next_mr": next_mr,
-        "today_count": Patient.objects.filter(created_at__date=date.today()).count(),
-        "total_patients": Patient.objects.count(),
         "recent_registered": recent_registered,
         "last_registered": recent_registered[0] if recent_registered else None,
         "user": request.user,

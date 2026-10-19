@@ -31,11 +31,9 @@
           PRIMARY DESK ACTION
         </span>
         <h2>Register a New Patient</h2>
-        <p>Open the comprehensive registration form to enter personal, contact, address, and billing details, and automatically issue a unique Medical Record (MR) Number.</p>
       {% else %}
         <span class="rd-primary-tag rd-primary-tag-lav">PATIENT REGISTER</span>
         <h2>Search &amp; Review Records</h2>
-        <p>Every patient registered at this counter with their MR number, contact details and quick edit / delete actions. New registrations are raised by the Registration Desk staff.</p>
       {% endif %}
     </div>
 
@@ -56,24 +54,6 @@
       {% endif %}
     </div>
   </div>
-
-  <aside class="rd-side">
-    <span class="rd-side-title">Counter at a glance</span>
-    <div class="rd-side-stats">
-      <div class="rd-side-row">
-        <span class="rd-side-k">Next MR No</span>
-        <span class="rd-side-v">#{{ next_mr }}</span>
-      </div>
-      <div class="rd-side-row">
-        <span class="rd-side-k">Registered Today</span>
-        <span class="rd-side-v">{{ today_count }}</span>
-      </div>
-      <div class="rd-side-row">
-        <span class="rd-side-k">Total Patients</span>
-        <span class="rd-side-v">{{ total_patients }}</span>
-      </div>
-    </div>
-  </aside>
 </section>
 
 <!-- ═══════════ 2. SEARCH BAR ═══════════ -->
