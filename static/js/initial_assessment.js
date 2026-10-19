@@ -93,7 +93,8 @@
     var alerts = [];
 
     // Verified patient allergies → red
-    (ALLERGIES.length ? ALLERGIES : ["Penicillin"]).forEach(function (a) {
+    (ALLERGIES || []).forEach(function (a) {
+      if (!a) return;
       alerts.push({ level: "red", title: a + " allergy", text: "Confirmed in patient record — verify before prescribing." });
     });
 
