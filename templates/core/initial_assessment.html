@@ -10,8 +10,8 @@
     <p class="page-sub">Select a patient, then record vitals, chief complaints, and clinical history before doctor consultation.</p>
   </div>
   <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <button type="button" class="btn btn-outline" id="btnSaveAssessment">Save</button>
     <button type="button" class="btn btn-edit" id="btnEditAssessment">Edit</button>
-    <button type="button" class="btn btn-save" id="btnSaveAssessment">Save</button>
   </div>
 </div>
 {% endblock %}
@@ -20,18 +20,6 @@
 <link rel="stylesheet" href="{% static 'css/initial_assessment.css' %}">
 
 {% if selected_patient %}
-<!-- ═══════════ Floating icon pills (right of sidebar) ═══════════ -->
-<div class="float-pills" aria-label="Quick actions">
-  <button type="button" class="float-pill" id="openAlertsPill" title="Active Clinical Alerts" aria-haspopup="dialog">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5"/><circle cx="12" cy="17.2" r="1.1" fill="currentColor" stroke="none"/></svg>
-    <span class="float-pill-badge" id="pillAlertCount">0</span>
-  </button>
-  <button type="button" class="float-pill float-pill-actions" id="openActionsPill" title="Next Actions" aria-haspopup="dialog">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-  </button>
-</div>
-{% endif %}
-
 <!-- ═══════════ Patient selector ═══════════ -->
 <section class="card ia-picker">
   <div class="ia-picker-head">
@@ -141,8 +129,8 @@
       {% csrf_token %}
 
       <div class="tabs" role="tablist">
-        <button type="button" class="tab active" data-tab="vitals" role="tab" aria-selected="true">Vitals &amp; Measurements</button>
-        <button type="button" class="tab" data-tab="complaints" role="tab" aria-selected="false">Chief Complaints &amp; History</button>
+        <button type="button" class="tab active" data-tab="vitals" role="tab" aria-selected="true">Vitals & Measurements</button>
+        <button type="button" class="tab" data-tab="complaints" role="tab" aria-selected="false">Chief Complaints & History</button>
         <button type="button" class="tab" data-tab="history" role="tab" aria-selected="false">Past History</button>
         <button type="button" class="tab" data-tab="exam" role="tab" aria-selected="false">Examination (if any)</button>
         <button type="button" class="tab" data-tab="summary" role="tab" aria-selected="false">Assessment Summary</button>
@@ -150,7 +138,7 @@
 
       <!-- Tab 1 · Vitals -->
       <div class="panel active" data-panel="vitals">
-        <div class="panel-head"><h3>Vital Signs &amp; Measurements</h3><span class="panel-hint">Enter current readings — BMI is calculated automatically.</span></div>
+        <div class="panel-head"><h3>Vital Signs & Measurements</h3><span class="panel-hint">Enter current readings — BMI is calculated automatically.</span></div>
         <div class="vitals-grid">
           <label class="vital"><span class="vital-label">Temperature</span><span class="vital-input"><input id="temp" type="number" step="0.1" placeholder="°C"><em>°C</em></span></label>
           <label class="vital"><span class="vital-label">Pulse</span><span class="vital-input"><input id="pulse" type="number" placeholder="/min"><em>/min</em></span></label>
@@ -167,29 +155,9 @@
           <label class="vital"><span class="vital-label">SpO₂</span><span class="vital-input"><input id="spo2" type="number" placeholder="%"><em>%</em></span></label>
           <label class="vital"><span class="vital-label">Height</span><span class="vital-input"><input id="height" type="number" placeholder="cm"><em>cm</em></span></label>
           <label class="vital"><span class="vital-label">Weight</span><span class="vital-input"><input id="weight" type="number" placeholder="kg"><em>kg</em></span></label>
-          <div class="vital">
-            <span class="vital-label">BMI <span class="auto-tag">Auto</span></span>
-            <span class="vital-input"><input id="bmi" type="text" placeholder="—" readonly tabindex="-1"><em>kg/m²</em></span>
-          </div>
-          <label class="vital"><span class="vital-label">Random Blood Sugar</span><span class="vital-input"><input id="rbs" type="number" placeholder="mg/dL"><em>mg/dL</em></span></label>
-          <div class="vital">
-            <span class="vital-label">Pain Score</span>
-            <span class="vital-input">
-              <select id="pain">
-                <option value="0">0 — No pain</option>
-                <option value="1">1 — Mild</option>
-                <option value="2">2 — Mild</option>
-                <option value="3">3 — Mild</option>
-                <option value="4">4 — Moderate</option>
-                <option value="5">5 — Moderate</option>
-                <option value="6">6 — Moderate</option>
-                <option value="7">7 — Severe</option>
-                <option value="8">8 — Severe</option>
-                <option value="9">9 — Severe</option>
-                <option value="10">10 — Worst possible</option>
-              </select>
-            </span>
-          </div>
+          <div class="vital"><span class="vital-label">BMI <span class="auto-tag">Auto</span></span><span class="vital-input"><input id="bmi" type="text" placeholder="—" readonly tabindex="-1"><em>kg/m²</em></span></div>
+          <label class="vital"><span class="vital-label">Random Blood Sugar</span><span class="vital-input"><input id="rbs" type="number" placeholder="mg/dL"><em>mg/dL</em></span></div>
+          <div class="vital"><span class="vital-label">Pain Score</span><span class="vital-input"><select id="pain"><option value="0">0 — No pain</option><option value="1">1 — Mild</option><option value="2">2 — Mild</option><option value="3">3 — Mild</option><option value="4">4 — Moderate</option><option value="5">5 — Moderate</option><option value="6" selected>6 — Moderate</option><option value="7">7 — Severe</option><option value="8">8 — Severe</option><option value="9">9 — Severe</option><option value="10">10 — Worst possible</option></select></span></div>
         </div>
       </div>
 
@@ -203,7 +171,7 @@
               <label class="mini">Duration
                 <select class="complaint-duration">
                   <option>Few hours</option><option>1 day</option><option>2 days</option><option selected>3 days</option>
-                  <option>1 week</option><option>2 weeks</option><option>1 month</option><option>&gt; 1 month</option>
+                  <option>1 week</option><option>2 weeks</option><option>1 month</option><option>> 1 month</option>
                 </select>
               </label>
               <button type="button" class="icon-btn complaint-remove" aria-label="Remove complaint">
@@ -223,46 +191,46 @@
 
       <!-- Tab 3 · Past History -->
       <div class="panel" data-panel="history" hidden>
-        <div class="panel-head"><h3>Medical History &amp; Allergies</h3></div>
+        <div class="panel-head"><h3>Medical History & Allergies</h3></div>
         <div class="subgroup">
           <span class="subgroup-title">Chronic conditions</span>
           <div class="conditions-grid">
             <div class="condition">
               <label class="cond-head"><input type="checkbox" class="cond-check"><span>Type 2 Diabetes Mellitus</span></label>
-              <div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 6 yrs"></div>
+              <div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 6 yrs"></div>
             </div>
             <div class="condition">
               <label class="cond-head"><input type="checkbox" class="cond-check"><span>Hypertension</span></label>
-              <div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 4 yrs"></div>
+              <div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 4 yrs"></div>
             </div>
             <div class="condition">
               <label class="cond-head"><input type="checkbox" class="cond-check"><span>Asthma / COPD</span></label>
-              <div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 2 yrs"></div>
+              <div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 2 yrs"></div>
             </div>
             <div class="condition">
               <label class="cond-head"><input type="checkbox" class="cond-check"><span>Coronary Artery Disease</span></label>
-              <div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 3 yrs"></div>
+              <div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 3 yrs"></div>
             </div>
             <div class="condition">
               <label class="cond-head"><input type="checkbox" class="cond-check"><span>Chronic Kidney Disease</span></label>
-              <div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 1 yr"></div>
+              <div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 1 yr"></div>
             </div>
             <div class="condition">
               <label class="cond-head"><input type="checkbox" class="cond-check"><span>Thyroid Disorder</span></label>
-              <div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 5 yrs"></div>
+              <div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 5 yrs"></div>
             </div>
             <div class="condition">
               <label class="cond-head"><input type="checkbox" class="cond-check" id="condOthersCheck"><span>Others</span></label>
-              <div class="cond-since"><span class="cond-since-label">Specify</span><input type="text" class="cond-duration" placeholder="condition name"></div>
+              <div class="cond-input-wrap cond-input-wrap-others"><span class="cond-prefix">Specify</span><input type="text" class="cond-duration" placeholder="condition name"></div>
             </div>
           </div>
-          <div id="otherConditionsPanel" style="display:none; margin-top:10px;">
-            <div style="display:flex; gap:8px; margin-bottom:8px;">
-              <input type="text" id="otherConditionInput" placeholder="Type a condition and press Add" style="flex:1;">
-              <button type="button" class="btn btn-small" id="addOtherCondition">Add</button>
-            </div>
-            <div id="otherConditionsList" class="conditions-grid"></div>
+        </div>
+        <div id="otherConditionsPanel" style="display:none; margin-top:14px;">
+          <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <input type="text" id="otherConditionInput" placeholder="Type a condition and press Add" style="flex:1;">
+            <button type="button" class="btn btn-small" id="addOtherCondition">Add</button>
           </div>
+          <div id="otherConditionsList" class="conditions-grid"></div>
         </div>
         <div class="subgroup">
           <span class="subgroup-title">Allergies</span>
@@ -279,7 +247,7 @@
           </button>
         </div>
         <div class="divider"></div>
-        <div class="panel-head"><h3>Current Medications &amp; Social History</h3></div>
+        <div class="panel-head"><h3>Current Medications & Social History</h3></div>
         <div class="subgroup">
           <span class="subgroup-title">Current medications</span>
           <table class="med-table">
@@ -340,7 +308,7 @@
       <div class="ai-head">
         <div class="ai-title">
           <span class="ai-spark"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.7 4.6L18 8l-4.3 1.4L12 14l-1.7-4.6L6 8l4.3-1.4L12 2zM19 13l.9 2.4L22 16l-2.1.6L19 19l-.9-2.4L16 16l2.1-.6L19 13zM5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14z"/></svg></span>
-          <div><h3>AI Summary</h3><span class="ai-sub">Synthesised from recorded vitals &amp; complaints</span></div>
+          <div><h3>AI Summary</h3><span class="ai-sub">Synthesised from recorded vitals & complaints</span></div>
         </div>
         <span class="chip chip-ai">AI Draft</span>
       </div>
@@ -363,75 +331,24 @@
       </p>
     </section>
 
-  </aside>
-</div>
-{% endif %}
-
-<!-- ── Add Allergy modal ── -->
-<div class="modal-backdrop" id="allergyModal" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="allergyModalTitle">
-    <div class="modal-head">
-      <h3 id="allergyModalTitle">Add Allergy</h3>
-      <button type="button" class="icon-btn" id="allergyCancel" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:15px;height:15px;"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="modal-body">
-      <label class="mini block-mini">Allergen
-        <input type="text" id="allergyInput" placeholder="e.g. Aspirin, Latex, Shellfish…">
-      </label>
-      <div class="quick-picks" id="allergyQuickPicks">
-        <span class="pick" data-pick="Aspirin">Aspirin</span>
-        <span class="pick" data-pick="Iodine Contrast">Iodine Contrast</span>
-        <span class="pick" data-pick="Latex">Latex</span>
-        <span class="pick" data-pick="Shellfish">Shellfish</span>
-        <span class="pick" data-pick="NSAIDs">NSAIDs</span>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button type="button" class="btn btn-outline" id="allergyDismiss">Cancel</button>
-      <button type="button" class="btn" id="allergyConfirm">Add Allergy</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── Alerts popup ── -->
-<div class="modal-backdrop" id="alertsModal" hidden>
-  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="alertsTitle">
-    <div class="modal-head">
-      <h3 id="alertsTitle">Active Clinical Alerts</h3>
-      <button type="button" class="icon-btn" id="alertsClose" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:15px;height:15px;"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div class="section-title" style="margin-bottom:10px;">
-        <h3 style="font-size:14px;">Out-of-range vitals &amp; verified allergies</h3>
+    <section class="card">
+      <div class="section-title">
+        <h3>Active Clinical Alerts</h3>
         <span class="alert-count" id="alertCount">0</span>
       </div>
       <div class="alerts" id="alertsList"></div>
-    </div>
-  </div>
-</div>
+    </section>
 
-<!-- ── Actions popup ── -->
-<div class="modal-backdrop" id="actionsModal" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="actionsTitle">
-    <div class="modal-head">
-      <h3 id="actionsTitle">Next Actions</h3>
-      <button type="button" class="icon-btn" id="actionsClose" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:15px;height:15px;"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="modal-body">
+    <section class="card">
+      <h3 class="section-title-plain">Next Actions</h3>
       <button type="button" class="cta" id="btnSendToQueue">
         Send to Doctor Queue
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:18px;height:18px;"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </button>
-      <div class="action-grid" style="margin-top:12px;">
+      <div class="action-grid">
         <button type="button" class="action-btn" id="btnSavePool">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
-          Save &amp; Keep in Pool
+          Save & Keep in Pool
         </button>
         <button type="button" class="action-btn danger" id="btnUrgent">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5"/><circle cx="12" cy="17.2" r="1.1" fill="currentColor" stroke="none"/></svg>
@@ -446,13 +363,14 @@
           Cancel Visit
         </button>
       </div>
-    </div>
-  </div>
+    </section>
+  </aside>
 </div>
+{% endif %}
 
 <!-- ── Social history "Others" popup ── -->
 <div class="modal-backdrop" id="socialOthersModal" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="socialOthersTitle">
+  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="socialOthersTitle">
     <div class="modal-head">
       <h3 id="socialOthersTitle">Add Social History (Others)</h3>
       <button type="button" class="icon-btn" id="socialOthersClose" aria-label="Close">
@@ -464,7 +382,7 @@
         <input type="text" id="socialOthersInput" placeholder="e.g. Substance use, Occupational exposure…">
       </label>
       <div style="display:flex; gap:8px; margin-top:8px;">
-        <button type="button" class="btn btn-small" id="socialOthersAdd" style="margin-left:auto;">Add</button>
+        <button type="button" class="btn btn-small" id="socialOthersAdd">Add</button>
       </div>
       <div class="quick-picks" style="margin-top:10px;">
         <span class="pick" data-pick="Substance use">Substance use</span>
@@ -472,9 +390,9 @@
         <span class="pick" data-pick="Travel history">Travel history</span>
       </div>
       <div class="tag-row" id="socialOthersModalTags" style="margin-top:12px;"></div>
-    </div>
-    <div class="modal-foot">
-      <button type="button" class="btn btn-outline" id="socialOthersDone">Done</button>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-outline" id="socialOthersDone">Done</button>
+      </div>
     </div>
   </div>
 </div>
@@ -489,11 +407,11 @@
       <label class="mini">Duration
         <select class="complaint-duration">
           <option>Few hours</option><option>1 day</option><option>2 days</option><option>3 days</option>
-          <option>1 week</option><option>2 weeks</option><option>1 month</option><option>&gt; 1 month</option>
+          <option>1 week</option><option>2 weeks</option><option>1 month</option><option>> 1 month</option>
         </select>
       </label>
       <button type="button" class="icon-btn complaint-remove" aria-label="Remove complaint">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:15px;height:15px;"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
     </div>
   </div>
@@ -504,7 +422,7 @@
     <td><input type="text" placeholder="Medicine name" class="med-name"></td>
     <td><input type="text" placeholder="Dose" class="med-dose"></td>
     <td><input type="text" placeholder="Frequency" class="med-freq"></td>
-    <td class="td-x"><button type="button" class="icon-btn row-del" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:15px;height:15px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button></td>
+    <td class="td-x"><button type="button" class="icon-btn row-del" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></td>
   </tr>
 </template>
 

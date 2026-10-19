@@ -267,8 +267,8 @@
     if (!otherConditionsList) return;
     var row = document.createElement("div");
     row.className = "condition";
-    row.innerHTML = '<label class="cond-head"><input type="checkbox" class="cond-check" checked><span></span></label><div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 1 yr"><button type="button" class="icon-btn" style="margin-left:6px;" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>';
-    row.querySelector("span").textContent = name;
+    row.innerHTML = '<label class="cond-head"><input type="checkbox" class="cond-check" checked><span></span></label><div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 1 yr"></div><button type="button" class="icon-btn" style="margin-left:6px; flex-shrink:0;" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button>';
+    row.querySelector(".cond-head span").textContent = name;
     var removeBtn = row.querySelector("button");
     removeBtn.addEventListener("click", function () { row.remove(); });
     otherConditionsList.appendChild(row);
@@ -286,6 +286,32 @@
       if (e.key === "Enter") { addOtherCondition(otherConditionInput.value); otherConditionInput.value = ""; }
     });
   }
+
+  // Auto-check condition checkbox when user types in duration
+  document.addEventListener("input", function (e) {
+    if (e.target && e.target.classList.contains("cond-duration")) {
+      var val = e.target.value.trim();
+      var card = e.target.closest(".condition");
+      if (card) {
+        var cb = card.querySelector(".cond-check");
+        if (cb && val.length > 0 && !cb.checked) {
+          cb.checked = true;
+          card.classList.add("is-checked");
+        }
+      }
+    }
+  });
+
+  // Toggle card active visual state when checkbox changes
+  document.addEventListener("change", function (e) {
+    if (e.target && e.target.classList.contains("cond-check")) {
+      var card = e.target.closest(".condition");
+      if (card) {
+        if (e.target.checked) card.classList.add("is-checked");
+        else card.classList.remove("is-checked");
+      }
+    }
+  });
 
   /* ───────────────────── Social history "Others" (popup add many) ───────────────────── */
   var socialOthersCheck = $("#socialOthersCheck");
@@ -545,7 +571,7 @@
     var conditions = [];
     $$(".condition").forEach(function (row) {
       var cb = row.querySelector(".cond-check");
-      var span = row.querySelector("span");
+      var span = row.querySelector(".cond-head span") || row.querySelector("span");
       var dur = row.querySelector(".cond-duration");
       if (cb && cb.checked) {
         conditions.push({ name: span ? span.textContent.trim() : "", duration: dur ? dur.value.trim() : "", checked: true });
@@ -555,7 +581,7 @@
     if (otherConditionsList) {
       $$("#otherConditionsList .condition").forEach(function (row) {
         var cb = row.querySelector(".cond-check");
-        var span = row.querySelector("span");
+        var span = row.querySelector(".cond-head span") || row.querySelector("span");
         var dur = row.querySelector(".cond-duration");
         if (cb && cb.checked) {
           conditions.push({ name: span ? span.textContent.trim() : "", duration: dur ? dur.value.trim() : "", checked: true });
@@ -673,7 +699,7 @@
         if (!c || !c.name) return;
         var matched = false;
         $$(".condition").forEach(function (row) {
-          var span = row.querySelector("span");
+          var span = row.querySelector(".cond-head span") || row.querySelector("span");
           if (span && span.textContent.trim() === c.name.trim()) {
             matched = true;
             var cb = row.querySelector(".cond-check"); if (cb) cb.checked = !!c.checked;
@@ -684,8 +710,8 @@
           // add as other condition row
           var row = document.createElement("div");
           row.className = "condition";
-          row.innerHTML = '<label class="cond-head"><input type="checkbox" class="cond-check" checked><span></span></label><div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 1 yr"><button type="button" class="icon-btn" style="margin-left:6px;" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>';
-          row.querySelector("span").textContent = c.name;
+          row.innerHTML = '<label class="cond-head"><input type="checkbox" class="cond-check" checked><span></span></label><div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 1 yr"></div><button type="button" class="icon-btn" style="margin-left:6px; flex-shrink:0;" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button>';
+          row.querySelector(".cond-head span").textContent = c.name;
           var cb = row.querySelector(".cond-check"); if (cb) cb.checked = !!c.checked;
           var dur = row.querySelector(".cond-duration"); if (dur && c.duration) dur.value = c.duration;
           var removeBtn = row.querySelector("button");
