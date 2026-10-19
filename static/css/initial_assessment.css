@@ -367,8 +367,24 @@ body {
 }
 .condition input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--ia-primary); cursor: pointer; }
 .condition span { flex: 1; font-size: 13px; font-weight: 500; color: var(--ia-ink-soft); }
-.condition .cond-duration { width: 92px; border: none; border-bottom: 1px dashed var(--ia-border-strong); background: transparent; font: inherit; font-size: 12.5px; color: var(--ia-muted); padding: 2px 0; }
-.condition .cond-duration:focus { outline: none; border-bottom-color: var(--ia-primary); }
+.condition .cond-duration {
+  width: 108px;
+  border: 1px solid var(--ia-border);
+  border-radius: 8px;
+  background: #fbfdff;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ia-ink-soft);
+  padding: 6px 10px;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+.condition .cond-duration::placeholder { color: var(--ia-faint); font-style: italic; }
+.condition .cond-duration:focus {
+  outline: none;
+  border-color: var(--ia-primary);
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--ia-primary-soft);
+}
 
 .tag-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .tag {
