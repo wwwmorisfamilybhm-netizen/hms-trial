@@ -4,413 +4,566 @@
 {% block title %}Initial Assessment (OPD) — Cams HMS{% endblock %}
 
 {% block heading %}
-<div class="page-head" style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+<div class="page-head">
   <div>
-    <h1>Initial Assessment <span style="color:var(--muted); font-weight:600;">(OPD)</span></h1>
-    <p class="page-sub">Select a patient, then record vitals, chief complaints, and clinical history before doctor consultation.</p>
+    <h1>Initial Assessment <span class="ia-title-sub">(OPD)</span></h1>
+    <p class="page-sub">Search a patient on the right, then record vitals, chief complaints and clinical history before the doctor consultation.</p>
   </div>
-  <div style="display:flex; gap:10px; flex-wrap:wrap;">
-    <button type="button" class="btn btn-outline" id="btnSaveAssessment">Save</button>
-    <button type="button" class="btn btn-edit" id="btnEditAssessment">Edit</button>
+  {% if selected_patient %}
+  <div class="ia-head-actions">
+    <button type="button" class="btn btn-save" id="btnSaveAssessment" title="Save the assessment">Save</button>
+    <button type="button" class="btn btn-edit" id="btnEditAssessment" title="Unlock the form to make changes">Edit</button>
   </div>
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/initial_assessment.css' %}">
 
-{% if selected_patient %}
-<!-- ═══════════ Patient selector ═══════════ -->
-<section class="card ia-picker">
-  <div class="ia-picker-head">
-    <div>
-      <h3 style="margin:0; font-size:15px; font-weight:700;">Select Patient</h3>
-      <span style="font-size:12.5px; color:var(--muted);">Search by name, UHID or phone, or pick from the list below.</span>
-    </div>
-    {% if selected_patient %}
-    <a href="{% url 'initial_assessment' %}" class="btn btn-outline btn-small">Change patient</a>
-    {% endif %}
-  </div>
+<div class="ia-layout">
 
-  <form method="get" action="{% url 'initial_assessment' %}" class="ia-search">
-    <input type="text" name="q" value="{{ query }}" placeholder="Search patient by name, UHID or phone…" {% if selected_patient %}disabled{% endif %}>
-    {% if selected_patient %}<input type="hidden" name="patient" value="{{ selected_patient.pk }}">{% endif %}
-    <button type="submit" class="btn btn-small" {% if selected_patient %}disabled{% endif %}>Search</button>
-  </form>
+  <!-- ══════════════════════════════════════════════════════════════
+       LEFT — assessment workspace
+       ══════════════════════════════════════════════════════════════ -->
+  <div class="ia-main">
 
-  {% if not selected_patient %}
-  <div class="ia-patient-list">
-    {% if patients %}
-    <table>
-      <thead>
-        <tr><th>Name</th><th>UHID</th><th>Age / Gender</th><th>Phone</th><th></th></tr>
-      </thead>
-      <tbody>
-        {% for p in patients %}
-        <tr>
-          <td class="cell-strong">{{ p.full_name }}</td>
-          <td style="font-variant-numeric:tabular-nums;">{{ p.uhid }}</td>
-          <td>{{ p.age|default:"—" }} yrs · {{ p.get_gender_display|default:"—" }}</td>
-          <td>{{ p.phone|default:"—" }}</td>
-          <td style="text-align:right;">
-            <a href="{% url 'initial_assessment' %}?patient={{ p.pk }}" class="btn btn-small">Start Assessment →</a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="empty">No patients found{% if query %} for "{{ query }}"{% endif %}.</p>
-    {% endif %}
-  </div>
-  {% else %}
-  <div class="ia-selected-chip">
-    <span class="avatar lav" style="width:34px;height:34px;font-size:13px;font-weight:700;">{{ patient_ctx.initials }}</span>
-    <div>
-      <strong>{{ patient_ctx.name }}</strong>
-      <span style="color:var(--muted); font-size:12.5px;">UHID {{ patient_ctx.uhid }} · {{ patient_ctx.visit_token }} · {{ patient_ctx.age }} yrs · {{ patient_ctx.gender }}</span>
-    </div>
-    <a href="{% url 'initial_assessment' %}" class="btn btn-outline btn-small" style="margin-left:auto;">Change</a>
-  </div>
-  {% endif %}
-</section>
+    {% if selected_patient and patient_ctx %}
 
-{% if selected_patient and patient_ctx %}
-<!-- ═══════════ Patient banner ═══════════ -->
-<section class="banner">
-  <div class="banner-main">
-    <div class="banner-top">
-      <div class="banner-avatar">{{ patient_ctx.initials }}</div>
-      <div class="banner-identity">
-        <h2>{{ patient_ctx.name }}</h2>
-        <div class="banner-badges">
-          <span class="chip chip-uhid">UHID&nbsp;·&nbsp;{{ patient_ctx.uhid }}</span>
-          <span class="chip chip-token">{{ patient_ctx.visit_token }}</span>
-          {% if patient_ctx.is_emergency %}<span class="chip chip-urgent">Emergency</span>{% endif %}
-        </div>
-      </div>
-    </div>
-    <div class="banner-columns">
-      <div class="banner-col">
-        <span class="banner-label">Demographics</span>
-        <div class="banner-facts">
-          <div class="fact"><span class="fact-k">Age / Gender</span><span class="fact-v">{{ patient_ctx.age }} yrs · {{ patient_ctx.gender }}</span></div>
-          <div class="fact"><span class="fact-k">Phone</span><span class="fact-v">{{ patient_ctx.phone }}</span></div>
-          <div class="fact fact-wide"><span class="fact-k">Address</span><span class="fact-v">{{ patient_ctx.address }}</span></div>
-        </div>
-      </div>
-      <div class="banner-col">
-        <span class="banner-label">Visit Details</span>
-        <div class="banner-facts">
-          <div class="fact"><span class="fact-k">Visit Timestamp</span><span class="fact-v">{{ patient_ctx.visit_timestamp }}</span></div>
-          <div class="fact"><span class="fact-k">Department</span><span class="fact-v">{{ patient_ctx.department }}</span></div>
-          <div class="fact"><span class="fact-k">Visit Type</span><span class="fact-v">{{ patient_ctx.visit_type }}</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="banner-critical" role="note">
-    <div class="critical-head">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5"/><circle cx="12" cy="17.2" r="1.1" fill="currentColor" stroke="none"/></svg>
-      <span>Critical — known in record</span>
-    </div>
-    <ul class="critical-list">
-      <li><strong>Allergies</strong><span>{% if patient_ctx.allergies %}{% for a in patient_ctx.allergies %}{{ a }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}None recorded{% endif %}</span></li>
-      <li><strong>Chronic illness</strong><span>{% if patient_ctx.chronic_illnesses %}{% for c in patient_ctx.chronic_illnesses %}{{ c }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}None recorded{% endif %}</span></li>
-      <li><strong>Active medications</strong><span>{% if patient_ctx.active_medications %}{% for m in patient_ctx.active_medications %}{{ m }}{% if not forloop.last %}; {% endif %}{% endfor %}{% else %}None recorded{% endif %}</span></li>
-    </ul>
-  </div>
-</section>
-
-<!-- ═══════════ 2-column workspace ═══════════ -->
-<div class="ws-grid">
-  <section class="card ws-form">
-    <form id="assessmentForm" autocomplete="off">
-      {% csrf_token %}
-
-      <div class="tabs" role="tablist">
-        <button type="button" class="tab active" data-tab="vitals" role="tab" aria-selected="true">Vitals & Measurements</button>
-        <button type="button" class="tab" data-tab="complaints" role="tab" aria-selected="false">Chief Complaints & History</button>
-        <button type="button" class="tab" data-tab="history" role="tab" aria-selected="false">Past History</button>
-        <button type="button" class="tab" data-tab="exam" role="tab" aria-selected="false">Examination (if any)</button>
-        <button type="button" class="tab" data-tab="summary" role="tab" aria-selected="false">Assessment Summary</button>
-      </div>
-
-      <!-- Tab 1 · Vitals -->
-      <div class="panel active" data-panel="vitals">
-        <div class="panel-head"><h3>Vital Signs & Measurements</h3><span class="panel-hint">Enter current readings — BMI is calculated automatically.</span></div>
-        <div class="vitals-grid">
-          <label class="vital"><span class="vital-label">Temperature</span><span class="vital-input"><input id="temp" type="number" step="0.1" placeholder="°C"><em>°C</em></span></label>
-          <label class="vital"><span class="vital-label">Pulse</span><span class="vital-input"><input id="pulse" type="number" placeholder="/min"><em>/min</em></span></label>
-          <label class="vital"><span class="vital-label">Respiratory Rate</span><span class="vital-input"><input id="rr" type="number" placeholder="/min"><em>/min</em></span></label>
-          <div class="vital vital-bp">
-            <span class="vital-label">Blood Pressure</span>
-            <span class="vital-input vital-input-duo">
-              <input id="bpSys" type="number" placeholder="Sys" aria-label="Systolic">
-              <span class="bp-sep">/</span>
-              <input id="bpDia" type="number" placeholder="Dia" aria-label="Diastolic">
-              <em>mmHg</em>
-            </span>
+      <!-- ── Patient banner ── -->
+      <section class="ia-banner">
+        <div class="ia-banner-main">
+          <div class="ia-banner-top">
+            <span class="ia-avatar">{{ patient_ctx.initials }}</span>
+            <div class="ia-banner-identity">
+              <h2>{{ patient_ctx.name }}</h2>
+              <div class="ia-banner-badges">
+                <span class="ia-chip ia-chip-uhid">UHID&nbsp;·&nbsp;{{ patient_ctx.uhid }}</span>
+                <span class="ia-chip ia-chip-token">VST-{{ patient_ctx.visit_token }}</span>
+                {% if patient_ctx.is_emergency %}<span class="ia-chip ia-chip-urgent">Emergency</span>{% endif %}
+                {% if assessment.saved %}<span class="ia-chip ia-chip-saved">Assessment saved</span>{% endif %}
+              </div>
+            </div>
           </div>
-          <label class="vital"><span class="vital-label">SpO₂</span><span class="vital-input"><input id="spo2" type="number" placeholder="%"><em>%</em></span></label>
-          <label class="vital"><span class="vital-label">Height</span><span class="vital-input"><input id="height" type="number" placeholder="cm"><em>cm</em></span></label>
-          <label class="vital"><span class="vital-label">Weight</span><span class="vital-input"><input id="weight" type="number" placeholder="kg"><em>kg</em></span></label>
-          <div class="vital"><span class="vital-label">BMI <span class="auto-tag">Auto</span></span><span class="vital-input"><input id="bmi" type="text" placeholder="—" readonly tabindex="-1"><em>kg/m²</em></span></div>
-          <label class="vital"><span class="vital-label">Random Blood Sugar</span><span class="vital-input"><input id="rbs" type="number" placeholder="mg/dL"><em>mg/dL</em></span></div>
-          <div class="vital"><span class="vital-label">Pain Score</span><span class="vital-input"><select id="pain"><option value="0">0 — No pain</option><option value="1">1 — Mild</option><option value="2">2 — Mild</option><option value="3">3 — Mild</option><option value="4">4 — Moderate</option><option value="5">5 — Moderate</option><option value="6" selected>6 — Moderate</option><option value="7">7 — Severe</option><option value="8">8 — Severe</option><option value="9">9 — Severe</option><option value="10">10 — Worst possible</option></select></span></div>
-        </div>
-      </div>
 
-      <!-- Tab 2 · Complaints & HPI -->
-      <div class="panel" data-panel="complaints" hidden>
-        <div class="panel-head"><h3>Chief Complaints</h3><span class="panel-hint">Describe the presenting problem and its duration.</span></div>
-        <div id="complaintsWrap" class="stack">
-          <div class="complaint-row">
-            <textarea class="complaint-text" rows="2" placeholder="e.g. Fever with chills and body ache since yesterday"></textarea>
-            <div class="complaint-meta">
-              <label class="mini">Duration
-                <select class="complaint-duration">
-                  <option>Few hours</option><option>1 day</option><option>2 days</option><option selected>3 days</option>
-                  <option>1 week</option><option>2 weeks</option><option>1 month</option><option>> 1 month</option>
-                </select>
+          <div class="ia-banner-cols">
+            <div class="ia-banner-col">
+              <span class="ia-label">Demographics</span>
+              <div class="ia-facts">
+                <div class="ia-fact"><span class="ia-fact-k">Age / Gender</span><span class="ia-fact-v">{{ patient_ctx.age }} yrs · {{ patient_ctx.gender }}</span></div>
+                <div class="ia-fact"><span class="ia-fact-k">Phone</span><span class="ia-fact-v">{{ patient_ctx.phone }}</span></div>
+                <div class="ia-fact"><span class="ia-fact-k">Address</span><span class="ia-fact-v">{{ patient_ctx.address }}</span></div>
+              </div>
+            </div>
+            <div class="ia-banner-col">
+              <span class="ia-label">Visit Details</span>
+              <div class="ia-facts">
+                <div class="ia-fact"><span class="ia-fact-k">Visit Timestamp</span><span class="ia-fact-v">{{ patient_ctx.visit_timestamp }}</span></div>
+                <div class="ia-fact"><span class="ia-fact-k">Department</span><span class="ia-fact-v">{{ patient_ctx.department }}</span></div>
+                <div class="ia-fact"><span class="ia-fact-k">Visit Type</span><span class="ia-fact-v">{{ patient_ctx.visit_type }}</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ia-banner-critical">
+          <div class="ia-critical-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5"/><circle cx="12" cy="17.2" r="1.1" fill="currentColor" stroke="none"/></svg>
+            <span>Known in record</span>
+          </div>
+          <ul class="ia-critical-list">
+            <li><strong>Allergies</strong><span>{% if patient_ctx.allergies %}{{ patient_ctx.allergies|join:", " }}{% else %}None recorded{% endif %}</span></li>
+            <li><strong>Triage status</strong><span>{% if assessment.saved %}Assessment recorded{% else %}Awaiting assessment{% endif %}</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── Assessment form ── -->
+      <section class="ia-card ia-form-card">
+        <div class="ia-notice" id="iaLockedNotice" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <span>This assessment has already been saved and is read-only. Use <strong>Edit</strong> above to make changes.</span>
+        </div>
+
+        <form id="assessmentForm" autocomplete="off"
+              data-save-url="{% url 'save_initial_assessment' %}"
+              data-ai-url="{% url 'medgemma_draft' %}"
+              data-base-url="{% url 'initial_assessment' %}">
+          {% csrf_token %}
+          <input type="hidden" name="patient_id" id="patientIdInput" value="{{ selected_patient.pk }}">
+
+          <nav class="ia-tabs" role="tablist">
+            <button type="button" class="ia-tab active" data-tab="vitals" role="tab" aria-selected="true">Vitals &amp; Measurements</button>
+            <button type="button" class="ia-tab" data-tab="complaints" role="tab" aria-selected="false">Complaints &amp; History</button>
+            <button type="button" class="ia-tab" data-tab="history" role="tab" aria-selected="false">Past History</button>
+            <button type="button" class="ia-tab" data-tab="exam" role="tab" aria-selected="false">Examination</button>
+            <button type="button" class="ia-tab" data-tab="summary" role="tab" aria-selected="false">Assessment Summary</button>
+          </nav>
+
+          <!-- ── Tab 1 · Vitals ── -->
+          <div class="ia-panel active" data-panel="vitals">
+            <div class="ia-panel-head">
+              <h3>Vital Signs &amp; Measurements</h3>
+              <span class="ia-panel-hint">BMI is calculated automatically from height and weight.</span>
+            </div>
+            <div class="ia-vitals-grid">
+              <label class="ia-vital">
+                <span class="ia-vital-label">Temperature</span>
+                <span class="ia-vital-input"><input id="temp" type="number" step="0.1" value="{{ assessment.temperature }}" placeholder="—"><em>°C</em></span>
               </label>
-              <button type="button" class="icon-btn complaint-remove" aria-label="Remove complaint">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              <label class="ia-vital">
+                <span class="ia-vital-label">Pulse</span>
+                <span class="ia-vital-input"><input id="pulse" type="number" value="{{ assessment.pulse }}" placeholder="—"><em>/min</em></span>
+              </label>
+              <label class="ia-vital">
+                <span class="ia-vital-label">Respiratory Rate</span>
+                <span class="ia-vital-input"><input id="rr" type="number" value="{{ assessment.respiratory_rate }}" placeholder="—"><em>/min</em></span>
+              </label>
+              <div class="ia-vital ia-vital-bp">
+                <span class="ia-vital-label">Blood Pressure</span>
+                <span class="ia-vital-input ia-vital-duo">
+                  <input id="bpSys" type="number" value="{{ assessment.bp_systolic }}" placeholder="Sys" aria-label="Systolic">
+                  <span class="ia-bp-sep">/</span>
+                  <input id="bpDia" type="number" value="{{ assessment.bp_diastolic }}" placeholder="Dia" aria-label="Diastolic">
+                  <em>mmHg</em>
+                </span>
+              </div>
+              <label class="ia-vital">
+                <span class="ia-vital-label">SpO₂</span>
+                <span class="ia-vital-input"><input id="spo2" type="number" value="{{ assessment.spo2 }}" placeholder="—"><em>%</em></span>
+              </label>
+              <label class="ia-vital">
+                <span class="ia-vital-label">Height</span>
+                <span class="ia-vital-input"><input id="height" type="number" step="0.1" value="{{ assessment.height }}" placeholder="—"><em>cm</em></span>
+              </label>
+              <label class="ia-vital">
+                <span class="ia-vital-label">Weight</span>
+                <span class="ia-vital-input"><input id="weight" type="number" step="0.1" value="{{ assessment.weight }}" placeholder="—"><em>kg</em></span>
+              </label>
+              <div class="ia-vital">
+                <span class="ia-vital-label">BMI <span class="ia-auto-tag">Auto</span></span>
+                <span class="ia-vital-input"><input id="bmi" type="text" value="{{ assessment.bmi }}" placeholder="—" readonly tabindex="-1"><em>kg/m²</em></span>
+              </div>
+              <label class="ia-vital">
+                <span class="ia-vital-label">Random Blood Sugar</span>
+                <span class="ia-vital-input"><input id="rbs" type="number" value="{{ assessment.rbs }}" placeholder="—"><em>mg/dL</em></span>
+              </label>
+              <label class="ia-vital">
+                <span class="ia-vital-label">Pain Score</span>
+                <span class="ia-vital-input ia-vital-select">
+                  <select id="pain">
+                    <option value="">—</option>
+                    <option value="0" {% if assessment.pain_score == "0" %}selected{% endif %}>0 — No pain</option>
+                    <option value="1" {% if assessment.pain_score == "1" %}selected{% endif %}>1 — Mild</option>
+                    <option value="2" {% if assessment.pain_score == "2" %}selected{% endif %}>2 — Mild</option>
+                    <option value="3" {% if assessment.pain_score == "3" %}selected{% endif %}>3 — Moderate</option>
+                    <option value="4" {% if assessment.pain_score == "4" %}selected{% endif %}>4 — Moderate</option>
+                    <option value="5" {% if assessment.pain_score == "5" %}selected{% endif %}>5 — Moderate</option>
+                    <option value="6" {% if assessment.pain_score == "6" %}selected{% endif %}>6 — Severe</option>
+                    <option value="7" {% if assessment.pain_score == "7" %}selected{% endif %}>7 — Severe</option>
+                    <option value="8" {% if assessment.pain_score == "8" %}selected{% endif %}>8 — Severe</option>
+                    <option value="9" {% if assessment.pain_score == "9" %}selected{% endif %}>9 — Severe</option>
+                    <option value="10" {% if assessment.pain_score == "10" %}selected{% endif %}>10 — Worst possible</option>
+                  </select>
+                </span>
+              </label>
+            </div>
+            <div id="vitalsWarnings" class="ia-warning" hidden></div>
+          </div>
+
+          <!-- ── Tab 2 · Complaints & HPI ── -->
+          <div class="ia-panel" data-panel="complaints" hidden>
+            <div class="ia-panel-head">
+              <h3>Chief Complaints</h3>
+              <span class="ia-panel-hint">Describe the presenting problem and how long it has been there.</span>
+            </div>
+
+            <div id="complaintsContainer" class="ia-stack">
+              {% for complaint in assessment.complaints %}
+              <div class="ia-complaint-row">
+                <textarea class="ia-complaint-text" rows="2" placeholder="e.g. Fever with chills and body ache">{{ complaint.text }}</textarea>
+                <div class="ia-complaint-meta">
+                  <label class="ia-mini">Duration
+                    <select class="ia-complaint-duration">
+                      {% for duration in duration_options %}
+                      <option value="{{ duration }}" {% if complaint.duration == duration %}selected{% endif %}>{{ duration }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <button type="button" class="ia-icon-btn ia-complaint-remove" aria-label="Remove complaint">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                  </button>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+
+            <button type="button" class="ia-btn ia-btn-ghost ia-btn-sm" id="addComplaintBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              Add another complaint
+            </button>
+
+            <div class="ia-divider"></div>
+
+            <div class="ia-panel-head">
+              <h3>History of Present Illness (HPI)</h3>
+              <span class="ia-panel-hint">Onset, progression, aggravating and relieving factors, associated symptoms…</span>
+            </div>
+            <textarea id="hpi" class="ia-textarea" rows="4" placeholder="Describe the present illness in detail…">{{ assessment.hpi }}</textarea>
+          </div>
+
+          <!-- ── Tab 3 · Past history ── -->
+          <div class="ia-panel" data-panel="history" hidden>
+            <div class="ia-panel-head">
+              <h3>Relevant Past Medical History</h3>
+              <span class="ia-panel-hint">Tick the conditions that apply and note how long they have been present.</span>
+            </div>
+
+            <div class="ia-subgroup">
+              <span class="ia-subgroup-title">Chronic conditions</span>
+              <div class="ia-conditions-grid">
+                {% for condition in assessment.conditions %}
+                <div class="ia-condition {% if condition.checked %}is-checked{% endif %}" data-condition="{{ condition.key }}">
+                  <label class="ia-cond-head">
+                    <input type="checkbox" class="ia-cond-check" value="{{ condition.key }}" data-label="{{ condition.label }}" {% if condition.checked %}checked{% endif %}>
+                    <span>{{ condition.label }}</span>
+                  </label>
+                  <span class="ia-cond-since">
+                    <span class="ia-cond-prefix">Since</span>
+                    <input type="text" class="ia-cond-duration" value="{{ condition.since }}" placeholder="e.g. 6 yrs">
+                  </span>
+                </div>
+                {% endfor %}
+              </div>
+
+              <div class="ia-others">
+                <div class="ia-others-input">
+                  <input type="text" id="otherConditionInput" placeholder="e.g. Fibromyalgia, Rheumatoid Arthritis…">
+                  <button type="button" class="ia-btn ia-btn-sm" id="addOtherConditionBtn">Add</button>
+                </div>
+                <div id="otherConditionsList" class="ia-tag-row">
+                  {% for custom in assessment.custom_conditions %}
+                  <span class="ia-tag ia-tag-soft" data-custom-condition="{{ custom.name }}">
+                    {{ custom.name }}
+                    <button type="button" class="ia-tag-x" aria-label="Remove {{ custom.name }}">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    </button>
+                  </span>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <div class="ia-subgroup">
+              <span class="ia-subgroup-title">Allergies</span>
+              <div id="allergyTags" class="ia-tag-row">
+                {% for allergy in assessment.allergies %}
+                <span class="ia-tag ia-tag-danger" data-allergy="{{ allergy }}">
+                  {{ allergy }}
+                  <button type="button" class="ia-tag-x" aria-label="Remove {{ allergy }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                  </button>
+                </span>
+                {% endfor %}
+              </div>
+              <div class="ia-add-row">
+                <input type="text" id="allergyInput" placeholder="Add an allergy (e.g. Penicillin)">
+                <button type="button" class="ia-btn ia-btn-sm" id="addAllergyBtn">Add allergy</button>
+              </div>
+            </div>
+
+            <div class="ia-subgroup">
+              <span class="ia-subgroup-title">Current medications</span>
+              <table class="ia-med-table">
+                <thead>
+                  <tr><th>Medicine</th><th>Dose</th><th>Frequency</th><th class="ia-th-x"></th></tr>
+                </thead>
+                <tbody id="medTableBody">
+                  {% for med in assessment.medications %}
+                  <tr>
+                    <td><input type="text" class="ia-med-name" value="{{ med.name }}" placeholder="Medicine name"></td>
+                    <td><input type="text" class="ia-med-dose" value="{{ med.dose }}" placeholder="Dose"></td>
+                    <td><input type="text" class="ia-med-freq" value="{{ med.frequency }}" placeholder="OD / BD / TDS"></td>
+                    <td class="ia-td-x"><button type="button" class="ia-icon-btn ia-med-remove" aria-label="Remove medication"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <button type="button" class="ia-btn ia-btn-ghost ia-btn-sm" id="addMedicineBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                Add medicine
               </button>
             </div>
-          </div>
-        </div>
-        <button type="button" class="btn btn-outline btn-small" id="addComplaint">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px;"><path d="M12 5v14M5 12h14"/></svg>
-          Add Another Complaint
-        </button>
-        <div class="divider"></div>
-        <div class="panel-head"><h3>History of Present Illness (HPI)</h3><span class="panel-hint">Structured clinical narrative.</span></div>
-        <textarea id="hpi" rows="5" class="textarea" placeholder="Onset, progression, aggravating/relieving factors, associated symptoms…"></textarea>
-      </div>
 
-      <!-- Tab 3 · Past History -->
-      <div class="panel" data-panel="history" hidden>
-        <div class="panel-head"><h3>Medical History & Allergies</h3></div>
-        <div class="subgroup">
-          <span class="subgroup-title">Chronic conditions</span>
-          <div class="conditions-grid">
-            <div class="condition">
-              <label class="cond-head"><input type="checkbox" class="cond-check"><span>Type 2 Diabetes Mellitus</span></label>
-              <div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 6 yrs"></div>
+            <div class="ia-subgroup">
+              <span class="ia-subgroup-title">Social history</span>
+              <div class="ia-social-row">
+                <label class="ia-social"><input type="checkbox" class="ia-social-check" value="Smoking" {% if "Smoking" in assessment.social_history %}checked{% endif %}><span>Smoking</span></label>
+                <label class="ia-social"><input type="checkbox" class="ia-social-check" value="Alcohol" {% if "Alcohol" in assessment.social_history %}checked{% endif %}><span>Alcohol</span></label>
+                <label class="ia-social"><input type="checkbox" class="ia-social-check" value="Tobacco" {% if "Tobacco" in assessment.social_history %}checked{% endif %}><span>Tobacco</span></label>
+              </div>
+              <div class="ia-add-row">
+                <input type="text" id="socialOtherInput" placeholder="Other social history (e.g. Substance use, Travel history)">
+                <button type="button" class="ia-btn ia-btn-sm" id="addSocialOtherBtn">Add</button>
+              </div>
+              <div id="socialOtherTags" class="ia-tag-row">
+                {% for item in assessment.social_history %}
+                  {% if item != "Smoking" and item != "Alcohol" and item != "Tobacco" %}
+                  <span class="ia-tag ia-tag-soft" data-social-other="{{ item }}">
+                    {{ item }}
+                    <button type="button" class="ia-tag-x" aria-label="Remove {{ item }}">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    </button>
+                  </span>
+                  {% endif %}
+                {% endfor %}
+              </div>
             </div>
-            <div class="condition">
-              <label class="cond-head"><input type="checkbox" class="cond-check"><span>Hypertension</span></label>
-              <div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 4 yrs"></div>
-            </div>
-            <div class="condition">
-              <label class="cond-head"><input type="checkbox" class="cond-check"><span>Asthma / COPD</span></label>
-              <div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 2 yrs"></div>
-            </div>
-            <div class="condition">
-              <label class="cond-head"><input type="checkbox" class="cond-check"><span>Coronary Artery Disease</span></label>
-              <div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 3 yrs"></div>
-            </div>
-            <div class="condition">
-              <label class="cond-head"><input type="checkbox" class="cond-check"><span>Chronic Kidney Disease</span></label>
-              <div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 1 yr"></div>
-            </div>
-            <div class="condition">
-              <label class="cond-head"><input type="checkbox" class="cond-check"><span>Thyroid Disorder</span></label>
-              <div class="cond-input-wrap"><span class="cond-prefix">Since</span><input type="text" class="cond-duration" placeholder="e.g. 5 yrs"></div>
-            </div>
-            <div class="condition">
-              <label class="cond-head"><input type="checkbox" class="cond-check" id="condOthersCheck"><span>Others</span></label>
-              <div class="cond-input-wrap cond-input-wrap-others"><span class="cond-prefix">Specify</span><input type="text" class="cond-duration" placeholder="condition name"></div>
+
+            <div class="ia-subgroup">
+              <span class="ia-subgroup-title">Previous surgeries / hospitalisations</span>
+              <textarea id="surgeries" class="ia-textarea" rows="3" placeholder="List previous surgeries and hospitalisations…">{{ assessment.surgeries }}</textarea>
             </div>
           </div>
-        </div>
-        <div id="otherConditionsPanel" style="display:none; margin-top:14px;">
-          <div style="display:flex; gap:8px; margin-bottom:8px;">
-            <input type="text" id="otherConditionInput" placeholder="Type a condition and press Add" style="flex:1;">
-            <button type="button" class="btn btn-small" id="addOtherCondition">Add</button>
+
+          <!-- ── Tab 4 · Examination ── -->
+          <div class="ia-panel" data-panel="exam" hidden>
+            <div class="ia-panel-head">
+              <h3>Examination (if any)</h3>
+              <span class="ia-panel-hint">Record only what was actually examined at triage.</span>
+            </div>
+            <div class="ia-system-grid">
+              <label class="ia-system"><span>General</span><textarea id="examGeneral" rows="2" placeholder="Appearance, pallor, icterus, hydration…">{{ assessment.examination.general }}</textarea></label>
+              <label class="ia-system"><span>Cardiovascular (CVS)</span><textarea id="examCvs" rows="2" placeholder="e.g. S1 S2 normal, no murmurs">{{ assessment.examination.cvs }}</textarea></label>
+              <label class="ia-system"><span>Respiratory (RS)</span><textarea id="examResp" rows="2" placeholder="e.g. bilateral vesicular breath sounds">{{ assessment.examination.respiratory }}</textarea></label>
+              <label class="ia-system"><span>Abdomen (P/A)</span><textarea id="examAbd" rows="2" placeholder="e.g. soft, non-tender, bowel sounds normal">{{ assessment.examination.abdomen }}</textarea></label>
+              <label class="ia-system"><span>Central Nervous (CNS)</span><textarea id="examCns" rows="2" placeholder="e.g. conscious, oriented, no focal deficit">{{ assessment.examination.cns }}</textarea></label>
+            </div>
           </div>
-          <div id="otherConditionsList" class="conditions-grid"></div>
-        </div>
-        <div class="subgroup">
-          <span class="subgroup-title">Allergies</span>
-          <div class="tag-row" id="allergyTags">
-            {% for a in patient_ctx.allergies %}
-            <span class="tag tag-danger">{{ a }}<button type="button" class="tag-x" aria-label="Remove {{ a }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>
-            {% empty %}
-            <span style="color:var(--muted); font-size:13px;">No allergies recorded.</span>
-            {% endfor %}
+
+          <!-- ── Tab 5 · Assessment summary ── -->
+          <div class="ia-panel" data-panel="summary" hidden>
+            <div class="ia-panel-head">
+              <h3>Assessment Summary</h3>
+              <span class="ia-panel-hint">Review before sending the patient to the doctor queue.</span>
+            </div>
+
+            <div class="ia-summary-grid">
+              <div class="ia-summary-box"><span class="ia-summary-k">Vitals</span><span class="ia-summary-v" id="summaryVitals">—</span></div>
+              <div class="ia-summary-box"><span class="ia-summary-k">Chief complaint</span><span class="ia-summary-v" id="summaryComplaints">—</span></div>
+              <div class="ia-summary-box"><span class="ia-summary-k">Allergies</span><span class="ia-summary-v" id="summaryAllergies">—</span></div>
+              <div class="ia-summary-box"><span class="ia-summary-k">Medications</span><span class="ia-summary-v" id="summaryMedications">—</span></div>
+            </div>
+
+            <!-- AI clinical assistant -->
+            <div class="ia-ai-card">
+              <div class="ia-ai-head">
+                <div class="ia-ai-title">
+                  <span class="ia-ai-spark">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.7 4.6L18 8l-4.3 1.4L12 14l-1.7-4.6L6 8l4.3-1.4L12 2zM19 13l.9 2.4L22 16l-2.1.6L19 19l-.9-2.4L16 16l2.1-.6L19 13zM5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14z"/></svg>
+                  </span>
+                  <div>
+                    <h3>AI Clinical Assistant</h3>
+                    <span class="ia-ai-sub">Draft summary generated from the recorded vitals &amp; complaints</span>
+                  </div>
+                </div>
+                <span class="ia-chip ia-chip-ai">AI Draft</span>
+              </div>
+
+              <div class="ia-ai-tabs" role="tablist">
+                <button type="button" class="ia-ai-tab active" data-ai-tab="summary" role="tab" aria-selected="true">Summary</button>
+                <button type="button" class="ia-ai-tab" data-ai-tab="differential" role="tab" aria-selected="false">Differential</button>
+                <button type="button" class="ia-ai-tab" data-ai-tab="tests" role="tab" aria-selected="false">Suggested Tests</button>
+              </div>
+
+              <div class="ia-ai-content" id="aiContent">
+                <p class="ia-ai-empty">Click <strong>Regenerate draft</strong> to build an AI summary from the vitals and complaints recorded above.</p>
+              </div>
+
+              <div class="ia-ai-actions">
+                <button type="button" class="ia-btn ia-btn-ghost ia-btn-sm" id="aiGenerateBtn">
+                  <span class="ia-gen-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></span>
+                  Regenerate draft
+                </button>
+                <button type="button" class="ia-btn ia-btn-sm ia-btn-ai" id="aiAcceptBtn">Use in note</button>
+              </div>
+
+              <p class="ia-ai-disclaimer">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                This is an AI-generated draft. Please review, edit and approve before finalising the clinical note.
+              </p>
+            </div>
+
+            <div class="ia-subgroup">
+              <span class="ia-subgroup-title">Triage note</span>
+              <textarea id="clinicalNote" class="ia-textarea ia-textarea-lg" rows="5" placeholder="Enter the triage assessment, observations and handover instructions…">{{ assessment.summary_note }}</textarea>
+            </div>
           </div>
-          <button type="button" class="btn btn-outline btn-small" id="addAllergy">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px;"><path d="M12 5v14M5 12h14"/></svg>
-            Add Allergy
-          </button>
-        </div>
-        <div class="divider"></div>
-        <div class="panel-head"><h3>Current Medications & Social History</h3></div>
-        <div class="subgroup">
-          <span class="subgroup-title">Current medications</span>
-          <table class="med-table">
-            <thead><tr><th>Medicine Name</th><th>Dose</th><th>Frequency</th><th class="th-x"></th></tr></thead>
-            <tbody id="medTableBody"></tbody>
-          </table>
-          <button type="button" class="btn btn-outline btn-small" id="addMedicine">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px;"><path d="M12 5v14M5 12h14"/></svg>
-            Add Medicine
-          </button>
-        </div>
-        <div class="subgroup">
-          <span class="subgroup-title">Social history</span>
-          <div class="social-row">
-            <label class="social"><input type="checkbox" class="social-check"><span>Smoking</span></label>
-            <label class="social"><input type="checkbox" class="social-check"><span>Alcohol</span></label>
-            <label class="social"><input type="checkbox" class="social-check"><span>Tobacco</span></label>
-            <label class="social social-others"><input type="checkbox" class="social-check" id="socialOthersCheck"><span>Others</span></label>
-            <div id="socialOthersTags" class="tag-row" style="margin-top:8px; width:100%;"></div>
+        </form>
+
+        <!-- ── Action bar ── -->
+        <div class="ia-action-bar">
+          <div class="ia-action-left">
+            <button type="button" class="ia-btn ia-btn-primary" id="saveAssessmentBtn">Save &amp; pick next patient</button>
+            <button type="button" class="ia-btn ia-btn-ghost" id="markUrgentBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5"/><circle cx="12" cy="17.2" r="1.1" fill="currentColor" stroke="none"/></svg>
+              Mark as urgent
+            </button>
+          </div>
+          <div class="ia-action-right">
+            <button type="button" class="ia-btn ia-btn-ghost" id="saveDraftBtn">Save as draft</button>
+            <button type="button" class="ia-btn ia-btn-plain" id="cancelAssessmentBtn">Back to list</button>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Tab 4 · Examination -->
-      <div class="panel" data-panel="exam" hidden>
-        <div class="panel-head"><h3>Examination (if any)</h3><span class="panel-hint">Record only what was examined at triage.</span></div>
-        <textarea id="examGeneral" class="textarea" rows="3" placeholder="General examination — appearance, pallor, icterus, hydration…"></textarea>
-        <div class="system-grid">
-          <label class="system"><span>CVS</span><textarea id="examCvs" rows="2" placeholder="e.g. S1 S2 normal, no murmurs"></textarea></label>
-          <label class="system"><span>Respiratory</span><textarea id="examResp" rows="2" placeholder="e.g. NVBS, clear"></textarea></label>
-          <label class="system"><span>Abdomen</span><textarea id="examAbd" rows="2" placeholder="e.g. soft, non-tender"></textarea></label>
-          <label class="system"><span>CNS</span><textarea id="examCns" rows="2" placeholder="e.g. conscious, oriented"></textarea></label>
+    {% else %}
+      <!-- ── Empty state — no patient selected yet ── -->
+      <section class="ia-card ia-empty">
+        <div class="ia-empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </div>
-      </div>
-
-      <!-- Tab 5 · Summary -->
-      <div class="panel" data-panel="summary" hidden>
-        <div class="panel-head"><h3>Assessment Summary</h3><span class="panel-hint">Review before sending to the doctor queue.</span></div>
-        <div class="summary-grid">
-          <div class="summary-box"><span class="summary-k">Vitals</span><span class="summary-v" id="summaryVitals">—</span></div>
-          <div class="summary-box"><span class="summary-k">Chief complaint</span><span class="summary-v" id="summaryComplaints">—</span></div>
-          <div class="summary-box"><span class="summary-k">Allergies</span><span class="summary-v" id="summaryAllergies">{{ patient_ctx.allergies|join:", "|default:"—" }}</span></div>
-          <div class="summary-box"><span class="summary-k">Medications</span><span class="summary-v" id="summaryMedications">—</span></div>
-        </div>
-        <label class="mini block-mini">Nurse's assessment note
-          <textarea id="summaryNote" class="textarea" rows="4" placeholder="Final triage note — will be attached to the consultation record."></textarea>
-        </label>
-        <div class="ready-strip">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>
-          <span>All required fields captured — ready to hand over to the doctor.</span>
-        </div>
-      </div>
-    </form>
-  </section>
-
-  <aside class="ws-aside">
-    <section class="card ai-box">
-      <div class="ai-head">
-        <div class="ai-title">
-          <span class="ai-spark"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.7 4.6L18 8l-4.3 1.4L12 14l-1.7-4.6L6 8l4.3-1.4L12 2zM19 13l.9 2.4L22 16l-2.1.6L19 19l-.9-2.4L16 16l2.1-.6L19 13zM5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14z"/></svg></span>
-          <div><h3>AI Summary</h3><span class="ai-sub">Synthesised from recorded vitals & complaints</span></div>
-        </div>
-        <span class="chip chip-ai">AI Draft</span>
-      </div>
-      <div class="ai-tabs" role="tablist">
-        <button type="button" class="ai-tab active" data-ai="summary">Patient Summary</button>
-        <button type="button" class="ai-tab" data-ai="differential">Differential Diagnosis</button>
-        <button type="button" class="ai-tab" data-ai="tests">Suggested Tests</button>
-      </div>
-      <div class="ai-content" id="aiContent"></div>
-      <div class="ai-actions">
-        <button type="button" class="btn btn-outline btn-small" id="aiGenerate">
-          <span class="gen-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></span>
-          Regenerate draft
-        </button>
-        <button type="button" class="btn btn-small" id="aiAccept" style="background:var(--lav-deep, #a99ae9);">Use in Note</button>
-      </div>
-      <p class="ai-disclaimer">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:15px;height:15px;flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-        This is an AI-generated draft. Please review and edit before finalising the clinical note.
-      </p>
-    </section>
-
-    <section class="card">
-      <div class="section-title">
-        <h3>Active Clinical Alerts</h3>
-        <span class="alert-count" id="alertCount">0</span>
-      </div>
-      <div class="alerts" id="alertsList"></div>
-    </section>
-
-    <section class="card">
-      <h3 class="section-title-plain">Next Actions</h3>
-      <button type="button" class="cta" id="btnSendToQueue">
-        Send to Doctor Queue
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:18px;height:18px;"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-      </button>
-      <div class="action-grid">
-        <button type="button" class="action-btn" id="btnSavePool">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
-          Save & Keep in Pool
-        </button>
-        <button type="button" class="action-btn danger" id="btnUrgent">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5"/><circle cx="12" cy="17.2" r="1.1" fill="currentColor" stroke="none"/></svg>
-          Mark as Urgent
-        </button>
-        <button type="button" class="action-btn" id="btnReschedule">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-          Reschedule Appointment
-        </button>
-        <button type="button" class="action-btn danger-outline" id="btnCancel">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
-          Cancel Visit
-        </button>
-      </div>
-    </section>
-  </aside>
-</div>
-{% endif %}
-
-<!-- ── Social history "Others" popup ── -->
-<div class="modal-backdrop" id="socialOthersModal" hidden>
-  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="socialOthersTitle">
-    <div class="modal-head">
-      <h3 id="socialOthersTitle">Add Social History (Others)</h3>
-      <button type="button" class="icon-btn" id="socialOthersClose" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:15px;height:15px;"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="modal-body">
-      <label class="mini block-mini">Item
-        <input type="text" id="socialOthersInput" placeholder="e.g. Substance use, Occupational exposure…">
-      </label>
-      <div style="display:flex; gap:8px; margin-top:8px;">
-        <button type="button" class="btn btn-small" id="socialOthersAdd">Add</button>
-      </div>
-      <div class="quick-picks" style="margin-top:10px;">
-        <span class="pick" data-pick="Substance use">Substance use</span>
-        <span class="pick" data-pick="Occupational exposure">Occupational exposure</span>
-        <span class="pick" data-pick="Travel history">Travel history</span>
-      </div>
-      <div class="tag-row" id="socialOthersModalTags" style="margin-top:12px;"></div>
-      <div class="modal-foot">
-        <button type="button" class="btn btn-outline" id="socialOthersDone">Done</button>
-      </div>
-    </div>
+        <h2>Select a patient to begin</h2>
+        <p>Use the <strong>patient search</strong> panel on the right to find the patient you want to assess. Their triage form will open here with vitals, complaints, past history and the AI summary tab.</p>
+        {% if query %}
+        <p class="ia-empty-note">Showing results for “{{ query }}”.</p>
+        {% endif %}
+        <a class="ia-btn ia-btn-primary ia-empty-btn" href="#iaPatientRail">Find a patient</a>
+      </section>
+    {% endif %}
   </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       RIGHT — patient search / list rail
+       ══════════════════════════════════════════════════════════════ -->
+  <aside class="ia-rail" id="iaPatientRail">
+    <section class="ia-card ia-picker">
+      <div class="ia-picker-head">
+        <div>
+          <h3>Patient Search</h3>
+          <span class="ia-picker-sub">Search by name, MR number or phone{% if query %} · “{{ query }}”{% endif %}</span>
+        </div>
+        <span class="ia-count" id="patientCount">{{ patients|length }}</span>
+      </div>
+
+      <form method="get" action="{% url 'initial_assessment' %}" class="ia-search" id="patientSearchForm">
+        <input type="search" name="q" id="patientSearchInput" value="{{ query }}" placeholder="Search patient by name, MR number or phone…" autocomplete="off">
+        {% if selected_patient %}<input type="hidden" name="patient" value="{{ selected_patient.pk }}">{% endif %}
+        <button type="submit" class="ia-btn ia-btn-sm">Search</button>
+      </form>
+
+      <div class="ia-patient-list" id="patientList">
+        {% for p in patients %}
+        <a class="ia-patient{% if p.pk == selected_patient.pk %} is-selected{% endif %}"
+           href="{% url 'initial_assessment' %}?patient={{ p.pk }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}"
+           data-name="{{ p.full_name|lower }} {{ p.uhid|lower }} {{ p.phone|lower }}"
+           data-id="{{ p.pk }}">
+          <span class="ia-patient-avatar">{{ p.first_name|slice:":1"|upper }}{% if p.last_name %}{{ p.last_name|slice:":1"|upper }}{% endif %}</span>
+          <span class="ia-patient-info">
+            <span class="ia-patient-name">{{ p.full_name }}{% if p.is_emergency %}<span class="ia-chip ia-chip-urgent ia-chip-xs">Emergency</span>{% endif %}</span>
+            <span class="ia-patient-meta">{{ p.uhid }} · {{ p.age|default:"—" }} yrs · {{ p.get_gender_display|default:"—" }}{% if p.phone %} · {{ p.phone }}{% endif %}</span>
+          </span>
+          {% if p.has_assessment %}<span class="ia-patient-done" title="Initial assessment recorded">✓</span>{% endif %}
+        </a>
+        {% empty %}
+        <div class="ia-list-empty">
+          {% if query %}No patients match “{{ query }}”.{% else %}No patients registered yet.{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if query %}
+      <a class="ia-clear-search" href="{% url 'initial_assessment' %}">Clear search</a>
+      {% endif %}
+    </section>
+
+    {% if selected_patient %}
+    <!-- Orders & services -->
+    <section class="ia-card ia-orders">
+      <div class="ia-picker-head">
+        <div>
+          <h3>Orders &amp; Services</h3>
+          <span class="ia-picker-sub">Investigations requested during triage</span>
+        </div>
+      </div>
+
+      <div class="ia-order-tabs" role="tablist">
+        <button type="button" class="ia-order-tab active" data-order-tab="laboratory" role="tab" aria-selected="true">Lab</button>
+        <button type="button" class="ia-order-tab" data-order-tab="radiology" role="tab" aria-selected="false">Radiology</button>
+        <button type="button" class="ia-order-tab" data-order-tab="other" role="tab" aria-selected="false">Other</button>
+      </div>
+
+      <div class="ia-order-section active" data-order-section="laboratory">
+        <ul class="ia-order-list" data-order-list="laboratory">
+          {% for item in assessment.orders.laboratory %}
+          <li data-order-item="{{ item }}">
+            <span>{{ item }}</span>
+            <button type="button" class="ia-icon-btn ia-order-remove" aria-label="Remove order">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="ia-add-row">
+          <input type="text" class="ia-order-input" data-order-input="laboratory" placeholder="Add a lab test…">
+          <button type="button" class="ia-btn ia-btn-sm ia-order-add" data-order-add="laboratory">Add</button>
+        </div>
+      </div>
+
+      <div class="ia-order-section" data-order-section="radiology">
+        <ul class="ia-order-list" data-order-list="radiology">
+          {% for item in assessment.orders.radiology %}
+          <li data-order-item="{{ item }}">
+            <span>{{ item }}</span>
+            <button type="button" class="ia-icon-btn ia-order-remove" aria-label="Remove order">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="ia-add-row">
+          <input type="text" class="ia-order-input" data-order-input="radiology" placeholder="Add an imaging…">
+          <button type="button" class="ia-btn ia-btn-sm ia-order-add" data-order-add="radiology">Add</button>
+        </div>
+      </div>
+
+      <div class="ia-order-section" data-order-section="other">
+        <ul class="ia-order-list" data-order-list="other">
+          {% for item in assessment.orders.other %}
+          <li data-order-item="{{ item }}">
+            <span>{{ item }}</span>
+            <button type="button" class="ia-icon-btn ia-order-remove" aria-label="Remove order">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="ia-add-row">
+          <input type="text" class="ia-order-input" data-order-input="other" placeholder="Add a service…">
+          <button type="button" class="ia-btn ia-btn-sm ia-order-add" data-order-add="other">Add</button>
+        </div>
+      </div>
+    </section>
+    {% endif %}
+  </aside>
 </div>
 
 <!-- ── Toast ── -->
-<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<div class="ia-toast" id="iaToast" role="status" aria-live="polite" hidden></div>
 
+<!-- ── Client templates ── -->
 <template id="complaintTemplate">
-  <div class="complaint-row">
-    <textarea class="complaint-text" rows="2" placeholder="Describe another complaint…"></textarea>
-    <div class="complaint-meta">
-      <label class="mini">Duration
-        <select class="complaint-duration">
+  <div class="ia-complaint-row">
+    <textarea class="ia-complaint-text" rows="2" placeholder="Describe another complaint…"></textarea>
+    <div class="ia-complaint-meta">
+      <label class="ia-mini">Duration
+        <select class="ia-complaint-duration">
+          <option value="">—</option>
           <option>Few hours</option><option>1 day</option><option>2 days</option><option>3 days</option>
-          <option>1 week</option><option>2 weeks</option><option>1 month</option><option>> 1 month</option>
+          <option>1 week</option><option>2 weeks</option><option>1 month</option><option>&gt; 1 month</option>
         </select>
       </label>
-      <button type="button" class="icon-btn complaint-remove" aria-label="Remove complaint">
+      <button type="button" class="ia-icon-btn ia-complaint-remove" aria-label="Remove complaint">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
     </div>
@@ -419,14 +572,16 @@
 
 <template id="medRowTemplate">
   <tr>
-    <td><input type="text" placeholder="Medicine name" class="med-name"></td>
-    <td><input type="text" placeholder="Dose" class="med-dose"></td>
-    <td><input type="text" placeholder="Frequency" class="med-freq"></td>
-    <td class="td-x"><button type="button" class="icon-btn row-del" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></td>
+    <td><input type="text" class="ia-med-name" placeholder="Medicine name"></td>
+    <td><input type="text" class="ia-med-dose" placeholder="Dose"></td>
+    <td><input type="text" class="ia-med-freq" placeholder="OD / BD / TDS"></td>
+    <td class="ia-td-x"><button type="button" class="ia-icon-btn ia-med-remove" aria-label="Remove medication"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></td>
   </tr>
 </template>
 
-<script type="application/json" id="iaConfig">{{ allergies_json|safe }}</script>
-<script type="application/json" id="iaAssessment">{{ assessment_json|safe }}</script>
+{{ assessment|json_script:"iaAssessment" }}
+{% endblock %}
+
+{% block tail_scripts %}
 <script src="{% static 'js/initial_assessment.js' %}"></script>
 {% endblock %}

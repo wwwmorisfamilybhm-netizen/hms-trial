@@ -68,3 +68,37 @@ class PatientBillAdmin(admin.ModelAdmin):
         elif obj.status == PatientBill.Status.PENDING:
             obj.paid_at = None
         super().save_model(request, obj, form, change)
+
+
+from .models import InitialAssessment, ConsultationSession, PrescriptionItem, ClinicalOrder, DiagnosticReport
+
+@admin.register(InitialAssessment)
+class InitialAssessmentAdmin(admin.ModelAdmin):
+    list_display = ["patient", "temperature", "pulse", "bp_systolic", "bp_diastolic", "spo2", "created_at"]
+    search_fields = ["patient__first_name", "patient__last_name"]
+
+
+class PrescriptionItemInline(admin.TabularInline):
+    model = PrescriptionItem
+    extra = 1
+
+
+class ClinicalOrderInline(admin.TabularInline):
+    model = ClinicalOrder
+    extra = 1
+
+
+@admin.register(ConsultationSession)
+class ConsultationSessionAdmin(admin.ModelAdmin):
+    list_display = ["id", "patient", "doctor", "visit_type", "status", "diagnosis_primary", "created_at"]
+    list_filter = ["status", "visit_type", "created_at"]
+    search_fields = ["patient__first_name", "patient__last_name", "diagnosis_primary"]
+    inlines = [PrescriptionItemInline, ClinicalOrderInline]
+
+
+@admin.register(DiagnosticReport)
+class DiagnosticReportAdmin(admin.ModelAdmin):
+    list_display = ["title", "patient", "category", "status", "report_date"]
+    list_filter = ["category", "status", "report_date"]
+    search_fields = ["title", "patient__first_name", "patient__last_name"]
+

@@ -291,9 +291,156 @@ class InitialAssessment(models.Model):
     social_history = models.JSONField(default=list, blank=True)
     examination = models.JSONField(default=dict, blank=True)
 
+    # Orders requested during triage: {"laboratory": [...], "radiology": [...], "other": [...]}
+    orders = models.JSONField(default=dict, blank=True)
+
+    # Previous surgeries / hospitalisations
+    surgeries = models.TextField(blank=True, default="")
+
     class Meta:
         verbose_name = "Initial Assessment"
         verbose_name_plural = "Initial Assessments"
 
     def __str__(self):
         return f"Initial Assessment — {self.patient.full_name}"
+
+
+class ConsultationSession(models.Model):
+    """A doctor consultation encounter in Doctor's Desk."""
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        IN_PROGRESS = "in_progress", "In Progress"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    class VisitType(models.TextChoices):
+        NEW_PROBLEM = "new_problem", "New Problem"
+        FOLLOW_UP_SAME = "follow_up_same", "Follow-up (Same Problem)"
+        FOLLOW_UP_DIFF = "follow_up_diff", "Follow-up (Different Problem)"
+
+    patient = models.ForeignKey(
+        Patient, on_delete=models.CASCADE, related_name="consultations", verbose_name="Patient"
+    )
+    doctor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="doctor_consultations",
+        verbose_name="Doctor",
+    )
+    visit_token = models.CharField(max_length=50, blank=True, verbose_name="Visit Token")
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.DRAFT, verbose_name="Status"
+    )
+    visit_type = models.CharField(
+        max_length=20, choices=VisitType.choices, default=VisitType.NEW_PROBLEM, verbose_name="Visit Type"
+    )
+
+    # Clinical Notes & Objective findings
+    clinical_note = models.TextField(blank=True, default="", verbose_name="Doctor's Clinical Note")
+    examination = models.JSONField(default=dict, blank=True, verbose_name="Examination Findings")
+
+    # Diagnosis & Plan
+    diagnosis_primary = models.CharField(max_length=255, blank=True, default="", verbose_name="Primary Diagnosis")
+    diagnosis_primary_icd = models.CharField(max_length=30, blank=True, default="", verbose_name="ICD Code")
+    diagnosis_secondary = models.JSONField(default=list, blank=True, verbose_name="Secondary Diagnoses")
+    treatment_plan = models.TextField(blank=True, default="", verbose_name="Treatment Plan")
+
+    # Advice & Follow-up
+    special_advice = models.TextField(blank=True, default="", verbose_name="Special Advice")
+    patient_education = models.JSONField(default=list, blank=True, verbose_name="Patient Education")
+    mark_follow_up = models.BooleanField(default=False, verbose_name="Mark for Follow-up")
+    follow_up_after = models.CharField(max_length=50, blank=True, default="", verbose_name="Follow-up After")
+    follow_up_date = models.DateField(null=True, blank=True, verbose_name="Follow-up Date")
+    additional_orders = models.JSONField(default=list, blank=True, verbose_name="Additional Orders")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Consultation Session"
+        verbose_name_plural = "Consultation Sessions"
+
+    def __str__(self):
+        return f"Consultation #{self.pk} — {self.patient.full_name} ({self.get_status_display()})"
+
+
+class PrescriptionItem(models.Model):
+    """An individual prescribed medication in a consultation."""
+
+    consultation = models.ForeignKey(
+        ConsultationSession, on_delete=models.CASCADE, related_name="prescriptions"
+    )
+    medicine_name = models.CharField(max_length=255, verbose_name="Medicine")
+    dose = models.CharField(max_length=100, blank=True, default="", verbose_name="Dose")
+    route = models.CharField(max_length=50, default="Oral", verbose_name="Route")
+    frequency = models.CharField(max_length=50, default="OD", verbose_name="Frequency")
+    duration = models.CharField(max_length=50, default="5 days", verbose_name="Duration")
+    instructions = models.CharField(max_length=255, blank=True, default="", verbose_name="Instructions")
+    order_index = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order_index", "id"]
+        verbose_name = "Prescription Item"
+        verbose_name_plural = "Prescription Items"
+
+    def __str__(self):
+        return f"{self.medicine_name} {self.dose} ({self.frequency})"
+
+
+class ClinicalOrder(models.Model):
+    """Laboratory, Radiology, or Procedure order placed during consultation."""
+
+    class OrderType(models.TextChoices):
+        LABORATORY = "laboratory", "Laboratory"
+        RADIOLOGY = "radiology", "Radiology / Imaging"
+        OTHER = "other", "Other Services"
+
+    consultation = models.ForeignKey(
+        ConsultationSession, on_delete=models.CASCADE, related_name="orders"
+    )
+    order_type = models.CharField(max_length=30, choices=OrderType.choices, default=OrderType.LABORATORY)
+    name = models.CharField(max_length=255, verbose_name="Service / Test")
+    status = models.CharField(max_length=30, default="Ordered", verbose_name="Status")
+    result_summary = models.CharField(max_length=255, blank=True, default="", verbose_name="Result Summary")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        verbose_name = "Clinical Order"
+        verbose_name_plural = "Clinical Orders"
+
+    def __str__(self):
+        return f"{self.name} ({self.status})"
+
+
+class DiagnosticReport(models.Model):
+    """Diagnostic investigation report (Lab, X-Ray, ECG, USG, Documents) for a patient."""
+
+    class Category(models.TextChoices):
+        LABORATORY = "laboratory", "Laboratory"
+        RADIOLOGY = "radiology", "Radiology"
+        CARDIOLOGY = "cardiology", "Cardiology"
+        DOCUMENTS = "documents", "Documents"
+
+    patient = models.ForeignKey(
+        Patient, on_delete=models.CASCADE, related_name="diagnostic_reports", verbose_name="Patient"
+    )
+    category = models.CharField(max_length=30, choices=Category.choices, default=Category.LABORATORY)
+    title = models.CharField(max_length=255, verbose_name="Report Title")
+    status = models.CharField(max_length=30, default="Completed", verbose_name="Status")
+    details = models.JSONField(default=dict, blank=True, verbose_name="Report Details")
+    report_date = models.DateTimeField(auto_now_add=True, verbose_name="Report Date")
+
+    class Meta:
+        ordering = ["-report_date"]
+        verbose_name = "Diagnostic Report"
+        verbose_name_plural = "Diagnostic Reports"
+
+    def __str__(self):
+        return f"{self.title} — {self.patient.full_name} ({self.category})"
+

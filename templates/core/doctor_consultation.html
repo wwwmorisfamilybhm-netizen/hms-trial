@@ -1,0 +1,646 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Doctor Consultation (OPD) — Cams HMS{% endblock %}
+
+{% block heading %}
+<div class="page-head" style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+  <div>
+    <h1 style="font-size:22px; font-weight:800; color:var(--ink);">Doctor Consultation <span style="color:var(--muted); font-weight:600;">(OPD)</span></h1>
+    <p class="page-sub">Comprehensive clinical encounter workstation: assess, diagnose, prescribe, and review diagnostics.</p>
+  </div>
+  {% if selected_patient %}
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <a href="{% url 'doctor_consultation' %}" class="btn btn-outline" style="padding:7px 14px; font-size:12.5px;">Change Patient</a>
+    <button type="button" class="btn btn-outline" id="btnPrintTopSummary" style="padding:7px 14px; font-size:12.5px;" onclick="window.print();">🖨️ Print Summary</button>
+    <button type="button" class="btn" id="btnEndConsultation" style="background:#2563eb; color:#fff; font-weight:700; padding:7px 16px; font-size:12.5px; border-radius:8px;">End Consultation</button>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/doctor_consultation.css' %}">
+
+{% if not selected_patient %}
+<!-- ═══════════ Patient Selector / Queue Picker ═══════════ -->
+<section class="dc-card" style="margin-top:10px;">
+  <div class="dc-card-head">
+    <div>
+      <h3 class="dc-card-title">Select Patient for Consultation</h3>
+      <span style="font-size:12.5px; color:var(--dc-muted);">Search OPD queue by patient name, UHID, MR number, or phone number.</span>
+    </div>
+  </div>
+
+  <form method="get" action="{% url 'doctor_consultation' %}" style="display:flex; gap:10px; margin-bottom:18px;">
+    <input type="text" name="q" value="{{ query }}" class="dc-input" placeholder="Search patient by name, UHID, MR number or phone…">
+    <button type="submit" class="dc-btn dc-btn-primary" style="white-space:nowrap;">Search</button>
+  </form>
+
+  <div style="overflow-x:auto;">
+    {% if patients %}
+    <table class="dc-table">
+      <thead>
+        <tr>
+          <th>Patient Name</th>
+          <th>UHID</th>
+          <th>Demographics</th>
+          <th>Phone</th>
+          <th>Registration Date</th>
+          <th style="text-align:right;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in patients %}
+        <tr>
+          <td>
+            <strong>{{ p.full_name }}</strong>
+            {% if p.is_emergency %}<span class="dc-chip dc-chip-urgent" style="margin-left:6px;">Emergency</span>{% endif %}
+          </td>
+          <td style="font-family:monospace; font-weight:700; color:#0369a1;">{{ p.uhid }}</td>
+          <td>{{ p.age|default:"—" }} yrs · {{ p.get_gender_display|default:"—" }}</td>
+          <td>{{ p.phone|default:"—" }}</td>
+          <td>{{ p.created_at|date:"d M Y, h:i A" }}</td>
+          <td style="text-align:right;">
+            <a href="{% url 'doctor_consultation' %}?patient={{ p.pk }}" class="dc-btn dc-btn-primary dc-btn-sm">Start Consultation →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="dc-empty">
+      <p>No patients found in queue{% if query %} matching "{{ query }}"{% endif %}.</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+{% else %}
+
+<!-- ═══════════ Active Consultation Workspace ═══════════ -->
+<div class="dc-workspace">
+  <input type="hidden" id="dcPatientId" value="{{ patient_ctx.id }}">
+  <input type="hidden" id="dcConsultationId" value="{{ consultation.id }}">
+
+  <!-- 1. Patient Demographics Banner -->
+  <section class="dc-banner">
+    <div class="dc-banner-left">
+      <div class="dc-avatar">{{ patient_ctx.initials }}</div>
+      <div class="dc-banner-details">
+        <div class="dc-name-row">
+          <h2 class="dc-patient-name">{{ patient_ctx.name }}</h2>
+          <span class="dc-chip dc-chip-uhid">UHID: {{ patient_ctx.uhid }}</span>
+          <span class="dc-chip dc-chip-token">{{ patient_ctx.visit_token }}</span>
+          {% if patient_ctx.is_emergency %}
+          <span class="dc-chip dc-chip-urgent">Emergency</span>
+          {% endif %}
+        </div>
+        <div class="dc-meta-grid">
+          <span><strong>Age / Gender:</strong> {{ patient_ctx.age }} yrs / {{ patient_ctx.gender }}</span>
+          <span><strong>Phone:</strong> {{ patient_ctx.phone }}</span>
+          <span><strong>Address:</strong> {{ patient_ctx.address }}</span>
+          <span><strong>Visit Date:</strong> {{ patient_ctx.visit_timestamp }}</span>
+          <span><strong>Department:</strong> {{ patient_ctx.department }}</span>
+          <span><strong>Type:</strong> {{ patient_ctx.visit_type }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert Box -->
+    <div class="dc-banner-right">
+      <div class="dc-alert-box" id="bannerAlertBox">
+        <div class="dc-alert-title">
+          ⚠️ Allergy: 
+          {% if patient_ctx.allergies %}
+            {{ patient_ctx.allergies|join:", " }}
+          {% else %}
+            <span style="color:#059669; font-weight:600;">No Known Drug Allergies (NKDA)</span>
+          {% endif %}
+        </div>
+        <div class="dc-alert-item">
+          <strong>Known Illness:</strong> 
+          {% if patient_ctx.chronic_illnesses %}
+            {{ patient_ctx.chronic_illnesses|join:", " }}
+          {% else %}
+            None reported
+          {% endif %}
+        </div>
+        <div class="dc-alert-item">
+          <strong>Current Medicines:</strong> 
+          {% if patient_ctx.active_medications %}
+            {{ patient_ctx.active_medications|join:", " }}
+          {% else %}
+            None reported
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Sequential 7-Tab Navigation -->
+  <nav class="dc-tab-nav">
+    <button type="button" class="dc-tab-btn active" data-tab="1">1. Assessment</button>
+    <button type="button" class="dc-tab-btn" data-tab="2">2. Examination</button>
+    <button type="button" class="dc-tab-btn" data-tab="3">3. Diagnosis & Plan</button>
+    <button type="button" class="dc-tab-btn" data-tab="4">4. Orders</button>
+    <button type="button" class="dc-tab-btn" data-tab="5">5. Reports & Results</button>
+    <button type="button" class="dc-tab-btn" data-tab="6">6. Prescription</button>
+    <button type="button" class="dc-tab-btn" data-tab="7">7. Advice & Follow-up</button>
+  </nav>
+
+  <!-- ═══════════ TAB 1: Assessment ═══════════ -->
+  <div class="dc-tab-content active" data-tab="1">
+    <div class="dc-grid-main-side">
+      <!-- Main Column -->
+      <div>
+        <!-- Vitals from OPD Assistant -->
+        <section class="dc-card">
+          <div class="dc-card-head">
+            <h3 class="dc-card-title">🩺 Initial Assessment (from OPD Assistant)</h3>
+            <span style="font-size:12px; color:var(--dc-muted);">Recorded prior to consultation</span>
+          </div>
+
+          <div class="dc-vitals-grid">
+            <div class="dc-vital-box {% if assessment.temperature and assessment.temperature|floatformat:0 > 99 %}alert-red{% endif %}">
+              <div class="dc-vital-k">Temp (°F)</div>
+              <div class="dc-vital-v">{{ assessment.temperature|default:"—" }}</div>
+            </div>
+            <div class="dc-vital-box {% if assessment.pulse and assessment.pulse > 100 %}alert-amber{% endif %}">
+              <div class="dc-vital-k">Pulse (/min)</div>
+              <div class="dc-vital-v">{{ assessment.pulse|default:"—" }}</div>
+            </div>
+            <div class="dc-vital-box">
+              <div class="dc-vital-k">RR (/min)</div>
+              <div class="dc-vital-v">{{ assessment.respiratory_rate|default:"—" }}</div>
+            </div>
+            <div class="dc-vital-box {% if assessment.bp_systolic and assessment.bp_systolic > 139 %}alert-red{% endif %}">
+              <div class="dc-vital-k">BP (mmHg)</div>
+              <div class="dc-vital-v">
+                {% if assessment.bp_systolic and assessment.bp_diastolic %}
+                  {{ assessment.bp_systolic }} / {{ assessment.bp_diastolic }}
+                {% else %}
+                  —
+                {% endif %}
+              </div>
+            </div>
+            <div class="dc-vital-box {% if assessment.spo2 and assessment.spo2 < 95 %}alert-red{% endif %}">
+              <div class="dc-vital-k">SpO₂ (%)</div>
+              <div class="dc-vital-v">{{ assessment.spo2|default:"—" }}</div>
+            </div>
+            <div class="dc-vital-box">
+              <div class="dc-vital-k">Weight (kg)</div>
+              <div class="dc-vital-v">{{ assessment.weight|default:"—" }}</div>
+            </div>
+            <div class="dc-vital-box">
+              <div class="dc-vital-k">Height (cm)</div>
+              <div class="dc-vital-v">{{ assessment.height|default:"—" }}</div>
+            </div>
+            <div class="dc-vital-box">
+              <div class="dc-vital-k">RBS (mg/dL)</div>
+              <div class="dc-vital-v">{{ assessment.rbs|default:"—" }}</div>
+            </div>
+            <div class="dc-vital-box">
+              <div class="dc-vital-k">Pain (0-10)</div>
+              <div class="dc-vital-v">{{ assessment.pain_score|default:"0" }}</div>
+            </div>
+          </div>
+
+          <div style="background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:12px; margin-bottom:12px;">
+            <div style="font-size:12px; font-weight:700; color:var(--dc-muted); margin-bottom:4px;">Chief Complaints:</div>
+            <div style="font-size:14px; font-weight:600; color:var(--dc-ink);">
+              {{ assessment.complaints|default:"No primary complaints logged." }}
+            </div>
+          </div>
+        </section>
+
+        <!-- History of Present Illness & Clinical Notes -->
+        <section class="dc-card">
+          <div class="dc-card-head">
+            <h3 class="dc-card-title">📝 History of Present Illness</h3>
+          </div>
+          <div style="font-size:13.5px; color:var(--dc-ink-soft); line-height:1.6; margin-bottom:16px;">
+            {{ assessment.hpi|default:"Patient reports onset of symptoms. Detailed timeline to be verified during clinical examination." }}
+          </div>
+
+          <div class="dc-card-head" style="margin-top:16px;">
+            <h3 class="dc-card-title">👨‍⚕️ Doctor's Clinical Note</h3>
+          </div>
+          <div class="dc-toolbar">
+            <button type="button" class="dc-tool-btn" onclick="document.execCommand('bold', false, null);">B</button>
+            <button type="button" class="dc-tool-btn" onclick="document.execCommand('italic', false, null);">I</button>
+            <button type="button" class="dc-tool-btn" onclick="document.execCommand('underline', false, null);">U</button>
+            <button type="button" class="dc-tool-btn" onclick="document.execCommand('insertUnorderedList', false, null);">• List</button>
+          </div>
+          <textarea id="clinicalNoteText" class="dc-textarea" rows="6" placeholder="Enter clinical impressions, objective observations, and bedside assessment notes...">{{ consultation.clinical_note }}</textarea>
+        </section>
+      </div>
+
+      <!-- Right Column: Quick Orders & Services -->
+      <div>
+        <section class="dc-card">
+          <div class="dc-card-head">
+            <h3 class="dc-card-title">⚡ Quick Orders</h3>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px; font-weight:700; color:var(--dc-muted); margin-bottom:8px; text-transform:uppercase;">Laboratory Orders</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                <input type="checkbox" class="order-checkbox" data-name="Complete Blood Count (CBC)" data-type="laboratory" checked>
+                <span>Complete Blood Count (CBC)</span>
+                <span class="dc-pill dc-pill-success" style="margin-left:auto;">Ordered</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                <input type="checkbox" class="order-checkbox" data-name="C-Reactive Protein (CRP)" data-type="laboratory">
+                <span>C-Reactive Protein (CRP)</span>
+                <span class="dc-pill dc-pill-neutral" style="margin-left:auto;">Not Ordered</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                <input type="checkbox" class="order-checkbox" data-name="Liver Function Test (LFT)" data-type="laboratory">
+                <span>Liver Function Test (LFT)</span>
+                <span class="dc-pill dc-pill-neutral" style="margin-left:auto;">Not Ordered</span>
+              </label>
+            </div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px; font-weight:700; color:var(--dc-muted); margin-bottom:8px; text-transform:uppercase;">Radiology / Imaging</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                <input type="checkbox" class="order-checkbox" data-name="Chest X-Ray (PA View)" data-type="radiology">
+                <span>Chest X-Ray (PA View)</span>
+                <span class="dc-pill dc-pill-neutral" style="margin-left:auto;">Not Ordered</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                <input type="checkbox" class="order-checkbox" data-name="USG Whole Abdomen" data-type="radiology">
+                <span>USG Whole Abdomen</span>
+                <span class="dc-pill dc-pill-neutral" style="margin-left:auto;">Not Ordered</span>
+              </label>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ TAB 2: Examination ═══════════ -->
+  <div class="dc-tab-content" data-tab="2">
+    <section class="dc-card">
+      <div class="dc-card-head">
+        <h3 class="dc-card-title">🔍 Physical & Systemic Examination</h3>
+        <button type="button" class="dc-btn dc-btn-outline dc-btn-sm" onclick="alert('Preset: Standard normal findings applied.');">Apply All Normal Findings</button>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px; margin-bottom:16px;">
+        <div style="background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:14px;">
+          <h4 style="margin:0 0 10px; font-size:14px;">General Physical Exam (GPE)</h4>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <label><input type="checkbox"> Pallor</label>
+            <label><input type="checkbox"> Icterus</label>
+            <label><input type="checkbox"> Cyanosis</label>
+            <label><input type="checkbox"> Clubbing</label>
+            <label><input type="checkbox"> Lymphadenopathy</label>
+            <label><input type="checkbox"> Pedal Edema</label>
+          </div>
+        </div>
+
+        <div style="background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:14px;">
+          <h4 style="margin:0 0 10px; font-size:14px;">Respiratory System (RS)</h4>
+          <input type="text" class="dc-input" placeholder="Bilateral equal air entry, vesicular breath sounds, no added sounds" value="Bilateral vesicular breath sounds, no rhonchi">
+        </div>
+
+        <div style="background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:14px;">
+          <h4 style="margin:0 0 10px; font-size:14px;">Cardiovascular System (CVS)</h4>
+          <input type="text" class="dc-input" placeholder="S1 S2 heard, no murmurs" value="S1, S2 normal, no murmurs">
+        </div>
+
+        <div style="background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:14px;">
+          <h4 style="margin:0 0 10px; font-size:14px;">Per Abdomen (P/A)</h4>
+          <input type="text" class="dc-input" placeholder="Soft, non-tender, no organomegaly" value="Soft, non-tender, bowel sounds normal">
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ═══════════ TAB 3: Diagnosis & Plan ═══════════ -->
+  <div class="dc-tab-content" data-tab="3">
+    <section class="dc-card">
+      <div class="dc-card-head">
+        <h3 class="dc-card-title">🎯 Diagnosis & Clinical Management Plan</h3>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 180px; gap:14px; margin-bottom:14px; position:relative;">
+        <div>
+          <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:4px;">Primary Diagnosis *</label>
+          <input type="text" id="primaryDiagnosisInput" class="dc-input" placeholder="Type disease name or ICD-10 term (e.g., Acute Upper Respiratory Infection)…" value="{{ consultation.diagnosis_primary }}">
+          <div id="icdDropdownResults" style="display:none; position:absolute; left:0; right:194px; background:#fff; border:1px solid var(--dc-border-strong); border-radius:8px; box-shadow:var(--dc-shadow); z-index:20; max-height:200px; overflow-y:auto;"></div>
+        </div>
+        <div>
+          <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:4px;">ICD-10 Code</label>
+          <input type="text" id="primaryIcdInput" class="dc-input" placeholder="e.g. J06.9" value="{{ consultation.diagnosis_primary_icd }}" style="font-family:monospace; font-weight:700;">
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:6px;">Visit Type</label>
+        <div style="display:flex; gap:16px; font-size:13px;">
+          <label><input type="radio" name="visit_type" value="new_problem" {% if consultation.visit_type == 'new_problem' or not consultation.visit_type %}checked{% endif %}> New Problem</label>
+          <label><input type="radio" name="visit_type" value="follow_up_same" {% if consultation.visit_type == 'follow_up_same' %}checked{% endif %}> Follow-up (Same Problem)</label>
+          <label><input type="radio" name="visit_type" value="follow_up_diff" {% if consultation.visit_type == 'follow_up_diff' %}checked{% endif %}> Follow-up (Different Problem)</label>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:4px;">Treatment & Investigation Plan</label>
+        <textarea id="treatmentPlanText" class="dc-textarea" rows="4" placeholder="Detail conservative management, planned investigations, hydration, and monitoring guidelines...">{{ consultation.treatment_plan }}</textarea>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:14px; background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:12px;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600;">
+          <input type="checkbox" id="markFollowUpCheck" {% if consultation.mark_follow_up %}checked{% endif %}>
+          Mark for Follow-up
+        </label>
+        <select id="followUpDurationSelect" class="dc-input" style="width:160px;">
+          <option value="3 days" {% if consultation.follow_up_after == '3 days' %}selected{% endif %}>After 3 days</option>
+          <option value="5 days" {% if consultation.follow_up_after == '5 days' %}selected{% endif %}>After 5 days</option>
+          <option value="1 week" {% if consultation.follow_up_after == '1 week' %}selected{% endif %}>After 1 week</option>
+          <option value="2 weeks" {% if consultation.follow_up_after == '2 weeks' %}selected{% endif %}>After 2 weeks</option>
+          <option value="1 month" {% if consultation.follow_up_after == '1 month' %}selected{% endif %}>After 1 month</option>
+        </select>
+      </div>
+    </section>
+  </div>
+
+  <!-- ═══════════ TAB 4: Orders ═══════════ -->
+  <div class="dc-tab-content" data-tab="4">
+    <div class="dc-grid-main-side">
+      <div>
+        <section class="dc-card">
+          <div class="dc-card-head">
+            <h3 class="dc-card-title">📋 Clinical Blueprint Summary</h3>
+          </div>
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px; font-weight:700; color:var(--dc-muted);">Special Advice</div>
+            <textarea id="specialAdviceText" class="dc-textarea" rows="3" placeholder="Rest, hydration, temperature charting...">{{ consultation.special_advice }}</textarea>
+          </div>
+        </section>
+      </div>
+
+      <div>
+        <section class="dc-card">
+          <div class="dc-card-head">
+            <h3 class="dc-card-title">Current Visit Orders</h3>
+          </div>
+          <table class="dc-table">
+            <thead>
+              <tr><th>#</th><th>Service / Test</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {% for ord in current_orders %}
+              <tr>
+                <td>{{ forloop.counter }}</td>
+                <td><strong>{{ ord.name }}</strong></td>
+                <td><span class="dc-pill dc-pill-success">{{ ord.status }}</span></td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="3" class="dc-empty">No orders submitted for this visit yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ TAB 5: Reports & Results ═══════════ -->
+  <div class="dc-tab-content" data-tab="5">
+    <div class="dc-grid-main-side">
+      <!-- Reports List -->
+      <div>
+        <section class="dc-card">
+          <div class="dc-card-head">
+            <h3 class="dc-card-title">🧪 Diagnostic Reports & Results</h3>
+            <button type="button" class="dc-btn dc-btn-outline dc-btn-sm" onclick="alert('Upload report modal');">+ Upload Report</button>
+          </div>
+
+          <!-- Laboratory CBC Card -->
+          <div style="border:1px solid var(--dc-border); border-radius:8px; padding:14px; margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <strong>Laboratory Report — Complete Blood Count (CBC)</strong>
+              <span class="dc-pill dc-pill-success">Verified</span>
+            </div>
+            <table class="dc-table">
+              <thead>
+                <tr><th>Test Parameter</th><th>Observed Value</th><th>Unit</th><th>Reference Range</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Haemoglobin</td><td style="font-weight:700;">12.8</td><td>g/dL</td><td>13.0 – 17.0</td></tr>
+                <tr><td>Total WBC Count</td><td style="font-weight:700;">8,600</td><td>/µL</td><td>4,000 – 11,000</td></tr>
+                <tr><td>Platelets</td><td style="font-weight:700;">2.4</td><td>lakhs/µL</td><td>1.5 – 4.5</td></tr>
+                <tr><td>Neutrophils</td><td style="font-weight:700;">62</td><td>%</td><td>40 – 75</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- PACS / Radiology Viewer -->
+          <div style="border:1px solid var(--dc-border); border-radius:8px; padding:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <strong>Radiology — Chest X-Ray (PA View)</strong>
+              <span style="font-size:12px; color:var(--dc-muted);">Verified by Radiologist</span>
+            </div>
+            <div class="dc-viewer-container">
+              <svg width="220" height="220" viewBox="0 0 200 200" fill="none" id="radiologyMainImg" style="transition:transform 0.2s ease;">
+                <rect width="200" height="200" fill="#1e293b"/>
+                <path d="M60 40 Q100 60 140 40 Q160 120 130 170 Q100 180 70 170 Q40 120 60 40 Z" fill="#475569" opacity="0.6"/>
+                <path d="M100 30 L100 180" stroke="#94a3b8" stroke-width="4"/>
+                <path d="M70 70 Q100 85 130 70" stroke="#cbd5e1" stroke-width="2"/>
+                <path d="M65 95 Q100 110 135 95" stroke="#cbd5e1" stroke-width="2"/>
+                <path d="M68 120 Q100 135 132 120" stroke="#cbd5e1" stroke-width="2"/>
+              </svg>
+              <div class="dc-viewer-toolbar">
+                <button type="button" class="dc-viewer-btn" id="btnViewerZoomIn" title="Zoom In">🔍+</button>
+                <button type="button" class="dc-viewer-btn" id="btnViewerZoomOut" title="Zoom Out">🔍-</button>
+                <button type="button" class="dc-viewer-btn" id="btnViewerRotate" title="Rotate">↻</button>
+                <button type="button" class="dc-viewer-btn" id="btnViewerInvert" title="Invert Colors">◑</button>
+                <button type="button" class="dc-viewer-btn" id="btnViewerReset" title="Reset">↺</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Historical Reports -->
+      <div>
+        <section class="dc-card">
+          <div class="dc-card-head">
+            <h3 class="dc-card-title">Previous Records</h3>
+          </div>
+          <table class="dc-table">
+            <thead>
+              <tr><th>Date</th><th>Report Title</th><th>Type</th></tr>
+            </thead>
+            <tbody>
+              {% for rep in diagnostic_reports %}
+              <tr>
+                <td>{{ rep.report_date|date:"d M Y" }}</td>
+                <td><strong>{{ rep.title }}</strong></td>
+                <td>{{ rep.get_category_display }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="3" class="dc-empty">No prior reports on file.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ TAB 6: Prescription ═══════════ -->
+  <div class="dc-tab-content" data-tab="6">
+    <div class="dc-grid-main-side">
+      <!-- Active Prescriptions -->
+      <div>
+        <section class="dc-card">
+          <div class="dc-card-head">
+            <h3 class="dc-card-title">💊 Current Prescription</h3>
+            <button type="button" class="dc-btn dc-btn-outline dc-btn-sm" id="btnCopyPreviousRx">📋 Copy from Previous Visit</button>
+          </div>
+
+          <table class="dc-table" id="currentPrescriptionTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Medicine Name</th>
+                <th>Dose</th>
+                <th>Route</th>
+                <th>Freq</th>
+                <th>Duration</th>
+                <th>Instructions</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </section>
+
+        <!-- Live Printable Preview -->
+        <section class="dc-card">
+          <div class="dc-card-head">
+            <h3 class="dc-card-title">📄 Prescription Print Preview</h3>
+            <span style="font-size:12px; color:var(--dc-muted);">What the patient will receive</span>
+          </div>
+          <div id="prescriptionPreviewList" style="background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:14px;">
+            <!-- Rendered via JS -->
+          </div>
+        </section>
+      </div>
+
+      <!-- Right Column: Drug Formulary Search & Safety -->
+      <div>
+        <!-- Clinical Safety Box -->
+        <div id="safetyAlertCard" style="display:none; margin-bottom:14px;"></div>
+
+        <!-- Formulary Search -->
+        <section class="dc-card">
+          <div class="dc-card-head">
+            <h3 class="dc-card-title">🔎 Hospital Formulary</h3>
+          </div>
+
+          <input type="text" id="drugSearchInput" class="dc-input" placeholder="Search medicine by brand or generic…" style="margin-bottom:10px;">
+
+          <div class="dc-cat-chips">
+            <button type="button" class="dc-cat-pill active" data-cat="Common">Common</button>
+            <button type="button" class="dc-cat-pill" data-cat="Antibiotics">Antibiotics</button>
+            <button type="button" class="dc-cat-pill" data-cat="Analgesics">Analgesics</button>
+            <button type="button" class="dc-cat-pill" data-cat="Antihypertensives">Antihypertensives</button>
+            <button type="button" class="dc-cat-pill" data-cat="Antidiabetics">Antidiabetics</button>
+            <button type="button" class="dc-cat-pill" data-cat="GI Drugs">GI Drugs</button>
+            <button type="button" class="dc-cat-pill" data-cat="Respiratory">Respiratory</button>
+          </div>
+
+          <div class="dc-drug-list" id="drugResultsList">
+            {% for d in formulary|slice:":10" %}
+            <div class="dc-drug-row">
+              <div>
+                <div style="font-weight:700; color:var(--dc-ink);">{{ d.name }}</div>
+                <div style="font-size:11.5px; color:var(--dc-muted);">{{ d.generic }} · {{ d.dose }}</div>
+              </div>
+              <button type="button" class="dc-btn dc-btn-outline dc-btn-sm btn-quick-add-drug" data-drug='{"name":"{{ d.name }}","generic":"{{ d.generic }}","dose":"{{ d.dose }}","route":"{{ d.route }}","default_freq":"{{ d.default_freq }}","default_dur":"{{ d.default_dur }}","instructions":"{{ d.instructions }}"}'>+ Add</button>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ TAB 7: Advice & Follow-up ═══════════ -->
+  <div class="dc-tab-content" data-tab="7">
+    <section class="dc-card">
+      <div class="dc-card-head">
+        <h3 class="dc-card-title">🩺 Advice & Follow-up Directions</h3>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div>
+          <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:4px;">Dietary & Lifestyle Guidelines</label>
+          <textarea class="dc-textarea" rows="4" placeholder="e.g. Low salt diet, regular hydration, avoid strenuous physical activity..."></textarea>
+        </div>
+        <div>
+          <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:4px;">Emergency Red Flags / Warning Signs</label>
+          <textarea class="dc-textarea" rows="4" placeholder="e.g. Return to emergency immediately if breathing difficulty, chest pain, or persistent fever develops..."></textarea>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ═══════════ Fixed Bottom Action Bar ═══════════ -->
+<footer class="dc-action-bar">
+  <div class="dc-action-left">
+    <button type="button" class="dc-btn dc-btn-outline" onclick="alert('Marked encounter as urgent priority.');">🚩 Mark as Urgent</button>
+    <button type="button" class="dc-btn dc-btn-outline" onclick="alert('Refer to specialist modal');">👥 Refer to Another Doctor</button>
+    <button type="button" class="dc-btn dc-btn-outline" id="btnSaveDraft">💾 Save as Draft</button>
+  </div>
+  <div class="dc-action-right">
+    <button type="button" class="dc-btn dc-btn-outline" id="btnPrintPrescription">🖨️ Print Prescription</button>
+    <button type="button" class="dc-btn dc-btn-outline" onclick="alert('Digital prescription sent directly to the pharmacy dispensary.');">💊 Send to Pharmacy</button>
+    <button type="button" class="dc-btn dc-btn-primary" id="btnSaveContinue" data-action="continue">Save & Continue →</button>
+  </div>
+</footer>
+
+<script>
+  window.INITIAL_PRESCRIPTIONS = [
+    {% for rx in prescriptions %}
+    {
+      "medicine_name": "{{ rx.medicine_name|escapejs }}",
+      "dose": "{{ rx.dose|escapejs }}",
+      "route": "{{ rx.route|escapejs }}",
+      "frequency": "{{ rx.frequency|escapejs }}",
+      "duration": "{{ rx.duration|escapejs }}",
+      "instructions": "{{ rx.instructions|escapejs }}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  window.PREVIOUS_PRESCRIPTIONS = [
+    {% for rx in previous_prescriptions %}
+    {
+      "medicine_name": "{{ rx.medicine_name|escapejs }}",
+      "dose": "{{ rx.dose|escapejs }}",
+      "route": "{{ rx.route|escapejs }}",
+      "frequency": "{{ rx.frequency|escapejs }}",
+      "duration": "{{ rx.duration|escapejs }}",
+      "instructions": "{{ rx.instructions|escapejs }}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+</script>
+<script src="{% static 'js/doctor_consultation.js' %}"></script>
+{% endif %}
+
+{% endblock %}
+

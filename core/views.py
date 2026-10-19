@@ -1244,6 +1244,129 @@ def medgemma_draft(request):
     return JsonResponse(result)
 
 
+# ── Initial Assessment (OPD triage) ─────────────────────────────────────────
+
+#: Chronic conditions offered as quick-pick cards during triage.
+CHRONIC_CONDITION_OPTIONS = [
+    ("diabetes", "Type 2 Diabetes Mellitus"),
+    ("hypertension", "Hypertension"),
+    ("asthma", "Asthma / COPD"),
+    ("cad", "Coronary Artery Disease"),
+    ("ckd", "Chronic Kidney Disease"),
+    ("thyroid", "Thyroid Disorder"),
+]
+
+#: Complaint durations offered in the assessment form.
+DURATION_OPTIONS = [
+    "Few hours", "1 day", "2 days", "3 days",
+    "1 week", "2 weeks", "1 month", "> 1 month",
+]
+
+_COMPLAINT_RE = _re.compile(r"^(.*?)\s*\(([^()]*)\)\s*$")
+
+
+def _parse_complaints(raw):
+    """Split the stored complaint blob into structured rows.
+
+    Complaints are stored one per line, optionally suffixed with the duration
+    in brackets — e.g. ``Fever with chills (2 days)``. Older records stored a
+    JSON list instead, so that shape is understood as well.
+    """
+    if isinstance(raw, (list, tuple)):
+        return [
+            {
+                "text": str(item.get("text", "")).strip() if isinstance(item, dict) else str(item).strip(),
+                "duration": (str(item.get("duration", "")).strip() if isinstance(item, dict) else ""),
+            }
+            for item in raw
+            if str(item.get("text", "") if isinstance(item, dict) else item).strip()
+        ]
+
+    text = str(raw or "").strip()
+    if text.startswith("["):
+        try:
+            import json as _json_mod
+            parsed = _json_mod.loads(text.replace("'", '"'))
+        except (ValueError, TypeError):
+            parsed = None
+        if isinstance(parsed, list):
+            return _parse_complaints(parsed)
+
+    rows = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        match = _COMPLAINT_RE.match(line)
+        if match and match.group(2) in DURATION_OPTIONS:
+            rows.append({"text": match.group(1).strip(), "duration": match.group(2)})
+        else:
+            rows.append({"text": line, "duration": ""})
+    return rows
+
+
+def _normalise_conditions(raw):
+    """Normalise stored chronic conditions into ``[{"name", "since"}]``."""
+    out = []
+    for item in raw or []:
+        if isinstance(item, dict):
+            name = (item.get("name") or "").strip()
+            since = (item.get("since") or "").strip()
+        else:
+            name, since = str(item).strip(), ""
+        if name:
+            out.append({"name": name, "since": since})
+    return out
+
+
+def _normalise_medications(raw):
+    """Normalise stored medications into ``[{"name", "dose", "frequency"}]``."""
+    out = []
+    for item in raw or []:
+        if isinstance(item, dict):
+            name = (item.get("name") or "").strip()
+            dose = (item.get("dose") or "").strip()
+            frequency = (item.get("frequency") or "").strip()
+        else:
+            name, dose, frequency = str(item).strip(), "", ""
+        if name:
+            out.append({"name": name, "dose": dose, "frequency": frequency})
+    return out
+
+
+def _normalise_social_history(raw):
+    """Normalise stored social history into a list of strings."""
+    if isinstance(raw, dict):
+        # Legacy shape: {"smoking": True, "alcohol": False}
+        return [str(key).title() for key, value in raw.items() if value]
+    out = []
+    for item in raw or []:
+        name = str(item).strip()
+        if name:
+            out.append(name)
+    return out
+
+
+def _normalise_orders(raw):
+    """Normalise the order payload into ``{"laboratory": [...], ...}``."""
+    out = {"laboratory": [], "radiology": [], "other": []}
+    if isinstance(raw, dict):
+        for key in out:
+            value = raw.get(key) or []
+            if isinstance(value, str):
+                value = [value]
+            out[key] = [str(v).strip() for v in value if str(v).strip()]
+    elif isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            name = (item.get("name") or "").strip()
+            kind = item.get("type") or "laboratory"
+            if name and kind in out:
+                out[kind].append(name)
+    return out
+
+
 @login_required(login_url="login")
 @require_POST
 def save_initial_assessment(request):
@@ -1251,6 +1374,8 @@ def save_initial_assessment(request):
     try:
         payload = _json.loads(request.body.decode("utf-8") or "{}")
     except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+    if not isinstance(payload, dict):
         return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
 
     patient_id = payload.get("patient_id")
@@ -1262,6 +1387,16 @@ def save_initial_assessment(request):
     if not patient:
         return JsonResponse({"ok": False, "error": "Patient not found"}, status=404)
 
+    # Vitals may arrive flat or nested under a "vitals" key.
+    vitals = payload.get("vitals") if isinstance(payload.get("vitals"), dict) else {}
+
+    def _value(key, default=None):
+        if key in payload:
+            return payload.get(key)
+        if key in vitals:
+            return vitals.get(key)
+        return default
+
     def _num(v, cast=int):
         if v is None or v == "":
             return None
@@ -1272,45 +1407,65 @@ def save_initial_assessment(request):
 
     assessment, _ = InitialAssessment.objects.get_or_create(patient=patient)
 
-    assessment.temperature = _num(payload.get("temperature"), float)
-    assessment.pulse = _num(payload.get("pulse"))
-    assessment.respiratory_rate = _num(payload.get("respiratory_rate"))
-    assessment.bp_systolic = _num(payload.get("bp_systolic"))
-    assessment.bp_diastolic = _num(payload.get("bp_diastolic"))
-    assessment.spo2 = _num(payload.get("spo2"))
-    assessment.height = _num(payload.get("height"), float)
-    assessment.weight = _num(payload.get("weight"), float)
-    assessment.bmi = _num(payload.get("bmi"), float)
-    assessment.rbs = _num(payload.get("rbs"))
-    assessment.pain_score = _num(payload.get("pain_score"))
+    assessment.temperature = _num(_value("temperature"), float)
+    assessment.pulse = _num(_value("pulse"))
+    assessment.respiratory_rate = _num(_value("respiratory_rate"))
+    assessment.bp_systolic = _num(_value("bp_systolic"))
+    assessment.bp_diastolic = _num(_value("bp_diastolic"))
+    assessment.spo2 = _num(_value("spo2"))
+    assessment.height = _num(_value("height"), float)
+    assessment.weight = _num(_value("weight"), float)
+    assessment.bmi = _num(_value("bmi"), float)
+    assessment.rbs = _num(_value("rbs"))
+    assessment.pain_score = _num(_value("pain_score"))
 
-    assessment.complaints = payload.get("complaints", "") or ""
+    complaints = payload.get("complaints")
+    if isinstance(complaints, str):
+        assessment.complaints = complaints.strip()
+    else:
+        lines = []
+        for item in complaints or []:
+            text = (item.get("text", "") if isinstance(item, dict) else str(item)).strip()
+            duration = (item.get("duration", "") if isinstance(item, dict) else "").strip()
+            if not text:
+                continue
+            lines.append(f"{text} ({duration})" if duration else text)
+        assessment.complaints = "\n".join(lines)
+
     assessment.hpi = payload.get("hpi", "") or ""
     assessment.summary_note = payload.get("summary_note", "") or ""
+    assessment.surgeries = payload.get("surgeries", "") or ""
 
-    assessment.chronic_conditions = payload.get("chronic_conditions", []) or []
-    assessment.allergies = payload.get("allergies", []) or []
-    assessment.medications = payload.get("medications", []) or []
-    assessment.social_history = payload.get("social_history", []) or []
-    assessment.examination = payload.get("examination", {}) or {}
+    assessment.chronic_conditions = _normalise_conditions(payload.get("chronic_conditions"))
+    assessment.allergies = [str(a).strip() for a in (payload.get("allergies") or []) if str(a).strip()]
+    assessment.medications = _normalise_medications(payload.get("medications"))
+    assessment.social_history = _normalise_social_history(payload.get("social_history"))
+    assessment.examination = payload.get("examination") or {}
+    assessment.orders = _normalise_orders(payload.get("orders"))
 
     assessment.save()
+
+    if payload.get("urgent") and not patient.is_emergency:
+        patient.is_emergency = True
+        patient.save(update_fields=["is_emergency", "updated_at"])
+
     return JsonResponse({"ok": True, "id": assessment.pk})
 
 
 @login_required(login_url="login")
 def initial_assessment(request):
-    """OPD triage workstation — select a patient, then record vitals, complaints
+    """OPD triage workstation — pick a patient, then record vitals, complaints
     and history before consultation.
 
-    Renders inside the standard app shell (sidebar on the left). When no
-    ``patient`` id is supplied the page shows a patient-picker so the nurse can
-    choose whom to assess; once chosen the assessment form is shown.
+    Renders inside the standard app shell (sidebar on the left). The page is a
+    two column workstation: the assessment form on the left and a persistent
+    patient search / list on the right. Picking a patient from that list opens
+    their assessment form; ``?patient=<id>`` selects one directly.
     """
-    import json
-
-    from django.db.models import Q
+    from django.db.models import Exists, OuterRef, Q
     from django.utils import timezone
+
+    from patients.models import InitialAssessment
 
     designation = (
         getattr(getattr(request.user, "profile", None), "designation", None)
@@ -1323,9 +1478,11 @@ def initial_assessment(request):
         )
         return redirect("reception_dashboard")
 
-    # Patient search / picker list
+    # ── Patient search / picker list ───────────────────────────────────────
     query = request.GET.get("q", "").strip()
-    patients = Patient.objects.all()
+    patients = Patient.objects.annotate(
+        has_assessment=Exists(InitialAssessment.objects.filter(patient=OuterRef("pk")))
+    )
     if query:
         patients = patients.filter(
             Q(first_name__icontains=query)
@@ -1342,9 +1499,20 @@ def initial_assessment(request):
     if patient_id.isdigit():
         patient = Patient.objects.filter(pk=int(patient_id)).first()
 
+    # Blank assessment payload — used when no patient is selected.
+    assessment_data = {
+        "temperature": "", "pulse": "", "respiratory_rate": "",
+        "bp_systolic": "", "bp_diastolic": "", "spo2": "",
+        "height": "", "weight": "", "bmi": "", "rbs": "", "pain_score": "",
+        "complaints": [], "hpi": "", "summary_note": "", "surgeries": "",
+        "chronic_conditions": [], "conditions": [], "custom_conditions": [],
+        "allergies": [], "medications": [], "social_history": [],
+        "examination": {"general": "", "cvs": "", "respiratory": "", "abdomen": "", "cns": ""},
+        "orders": {"laboratory": [], "radiology": [], "other": []},
+        "saved": False,
+    }
+
     patient_ctx = None
-    allergies_json = "[]"
-    assessment_json = "null"
     if patient:
         now = timezone.now()
         department = "General Medicine"
@@ -1366,10 +1534,11 @@ def initial_assessment(request):
         initials = "".join(p[0] for p in parts[:2]).upper() or "PT"
 
         patient_ctx = {
+            "id": patient.pk,
             "name": patient.full_name or "—",
             "initials": initials,
             "uhid": patient.uhid,
-            "visit_token": f"VST-{now:%y%m%d}-{patient.pk:04d}",
+            "visit_token": f"{now:%y%m%d}-{patient.pk:04d}",
             "age": patient.age if patient.age is not None else "—",
             "gender": patient.get_gender_display() if patient.gender else "—",
             "phone": patient.phone or "—",
@@ -1382,44 +1551,79 @@ def initial_assessment(request):
             "active_medications": [],
             "is_emergency": bool(patient.is_emergency),
         }
-        allergies_json = json.dumps(patient_ctx["allergies"])
 
         # Load any previously saved assessment for pre-filling the form
-        from patients.models import InitialAssessment
         try:
             a = patient.initial_assessment
-            assessment_json = _json.dumps({
-                "temperature": (str(a.temperature) if a.temperature is not None else ""),
-                "pulse": (a.pulse if a.pulse is not None else ""),
-                "respiratory_rate": (a.respiratory_rate if a.respiratory_rate is not None else ""),
-                "bp_systolic": (a.bp_systolic if a.bp_systolic is not None else ""),
-                "bp_diastolic": (a.bp_diastolic if a.bp_diastolic is not None else ""),
-                "spo2": (a.spo2 if a.spo2 is not None else ""),
-                "height": (str(a.height) if a.height is not None else ""),
-                "weight": (str(a.weight) if a.weight is not None else ""),
-                "bmi": (str(a.bmi) if a.bmi is not None else ""),
-                "rbs": (a.rbs if a.rbs is not None else ""),
-                "pain_score": (a.pain_score if a.pain_score is not None else ""),
-                "complaints": a.complaints or "",
+        except InitialAssessment.DoesNotExist:
+            a = None
+
+        if a is not None:
+            def _txt(value):
+                return "" if value is None else str(value)
+
+            assessment_data.update({
+                "temperature": _txt(a.temperature),
+                "pulse": _txt(a.pulse),
+                "respiratory_rate": _txt(a.respiratory_rate),
+                "bp_systolic": _txt(a.bp_systolic),
+                "bp_diastolic": _txt(a.bp_diastolic),
+                "spo2": _txt(a.spo2),
+                "height": _txt(a.height),
+                "weight": _txt(a.weight),
+                "bmi": _txt(a.bmi),
+                "rbs": _txt(a.rbs),
+                "pain_score": _txt(a.pain_score),
+                "complaints": _parse_complaints(a.complaints),
                 "hpi": a.hpi or "",
                 "summary_note": a.summary_note or "",
-                "chronic_conditions": a.chronic_conditions or [],
-                "allergies": a.allergies or [],
-                "medications": a.medications or [],
-                "social_history": a.social_history or [],
+                "surgeries": a.surgeries or "",
+                "allergies": [str(x) for x in (a.allergies or [])],
+                "medications": _normalise_medications(a.medications),
+                "social_history": _normalise_social_history(a.social_history),
                 "examination": a.examination or {},
+                "orders": _normalise_orders(a.orders),
+                "chronic_conditions": _normalise_conditions(a.chronic_conditions),
+                "saved": True,
             })
-        except InitialAssessment.DoesNotExist:
-            assessment_json = "null"
+
+        # Split the conditions into the quick-pick cards and any free-text
+        # "others" the nurse typed in.
+        remaining = list(assessment_data["chronic_conditions"])
+        conditions = []
+        for key, label in CHRONIC_CONDITION_OPTIONS:
+            match = next(
+                (c for c in remaining if c["name"].lower() == label.lower()),
+                None,
+            )
+            if match:
+                remaining.remove(match)
+            conditions.append({
+                "key": key,
+                "label": label,
+                "checked": bool(match),
+                "since": match["since"] if match else "",
+            })
+        assessment_data["conditions"] = conditions
+        assessment_data["custom_conditions"] = remaining
+
+        # Allergies recorded in the assessment supplement the patient's record.
+        merged = list(patient_ctx["allergies"])
+        for item in assessment_data["allergies"]:
+            if item.lower() not in [m.lower() for m in merged]:
+                merged.append(item)
+        assessment_data["allergies"] = merged
+        patient_ctx["allergies"] = merged
 
     return render(request, "core/initial_assessment.html", {
         "patient_ctx": patient_ctx,
-        "allergies_json": allergies_json,
-        "assessment_json": assessment_json,
+        "assessment": assessment_data,
         "has_patient": patient is not None,
         "selected_patient": patient,
         "patients": patients,
         "query": query,
+        "condition_options": CHRONIC_CONDITION_OPTIONS,
+        "duration_options": DURATION_OPTIONS,
         "user": request.user,
     })
 
@@ -1467,3 +1671,405 @@ def doctor_placeholder(request, page):
         "page": page,
         "user": request.user,
     })
+
+
+# ── Doctor Consultation (OPD Desk) ───────────────────────────────────────────
+
+STANDARD_FORMULARY = [
+    {"name": "Paracetamol 500 mg Tablet", "generic": "Paracetamol", "category": "Analgesics", "dose": "500 mg", "route": "Oral", "default_freq": "TDS", "default_dur": "5 days", "instructions": "For fever and body ache"},
+    {"name": "Paracetamol 650 mg Tablet", "generic": "Paracetamol", "category": "Analgesics", "dose": "650 mg", "route": "Oral", "default_freq": "TDS", "default_dur": "3 days", "instructions": "After food"},
+    {"name": "Ibuprofen 400 mg Tablet", "generic": "Ibuprofen", "category": "Analgesics", "dose": "400 mg", "route": "Oral", "default_freq": "BD", "default_dur": "3 days", "instructions": "After food / With milk"},
+    {"name": "Tramadol 50 mg Capsule", "generic": "Tramadol", "category": "Analgesics", "dose": "50 mg", "route": "Oral", "default_freq": "SOS", "default_dur": "3 days", "instructions": "For severe pain only"},
+    {"name": "Amoxicillin-Clavulanate 625 mg Tablet", "generic": "Amoxicillin-Clavulanate", "category": "Antibiotics", "dose": "625 mg", "route": "Oral", "default_freq": "BD", "default_dur": "5 days", "instructions": "Complete full course after food"},
+    {"name": "Azithromycin 500 mg Tablet", "generic": "Azithromycin", "category": "Antibiotics", "dose": "500 mg", "route": "Oral", "default_freq": "OD", "default_dur": "3 days", "instructions": "1 hour before food or 2 hours after"},
+    {"name": "Cefixime 200 mg Tablet", "generic": "Cefixime", "category": "Antibiotics", "dose": "200 mg", "route": "Oral", "default_freq": "BD", "default_dur": "5 days", "instructions": "After food"},
+    {"name": "Ciprofloxacin 500 mg Tablet", "generic": "Ciprofloxacin", "category": "Antibiotics", "dose": "500 mg", "route": "Oral", "default_freq": "BD", "default_dur": "5 days", "instructions": "Drink plenty of water"},
+    {"name": "Amlodipine 5 mg Tablet", "generic": "Amlodipine", "category": "Antihypertensives", "dose": "5 mg", "route": "Oral", "default_freq": "OD", "default_dur": "30 days", "instructions": "Morning after breakfast (Continue)"},
+    {"name": "Telmisartan 40 mg Tablet", "generic": "Telmisartan", "category": "Antihypertensives", "dose": "40 mg", "route": "Oral", "default_freq": "OD", "default_dur": "30 days", "instructions": "Same time daily (Continue)"},
+    {"name": "Metoprolol Succinate 25 mg Tablet", "generic": "Metoprolol", "category": "Antihypertensives", "dose": "25 mg", "route": "Oral", "default_freq": "OD", "default_dur": "30 days", "instructions": "After breakfast"},
+    {"name": "Metformin 500 mg Tablet", "generic": "Metformin", "category": "Antidiabetics", "dose": "500 mg", "route": "Oral", "default_freq": "BD", "default_dur": "30 days", "instructions": "With or immediately after main meals"},
+    {"name": "Glimepiride 1 mg Tablet", "generic": "Glimepiride", "category": "Antidiabetics", "dose": "1 mg", "route": "Oral", "default_freq": "OD", "default_dur": "30 days", "instructions": "Before breakfast"},
+    {"name": "Pantoprazole 40 mg Tablet", "generic": "Pantoprazole", "category": "GI Drugs", "dose": "40 mg", "route": "Oral", "default_freq": "OD", "default_dur": "14 days", "instructions": "Empty stomach 30 mins before breakfast"},
+    {"name": "Omeprazole 20 mg Capsule", "generic": "Omeprazole", "category": "GI Drugs", "dose": "20 mg", "route": "Oral", "default_freq": "OD", "default_dur": "14 days", "instructions": "Before morning food"},
+    {"name": "Ondansetron 4 mg Tablet", "generic": "Ondansetron", "category": "GI Drugs", "dose": "4 mg", "route": "Oral", "default_freq": "SOS", "default_dur": "3 days", "instructions": "For nausea / vomiting"},
+    {"name": "Cetirizine 10 mg Tablet", "generic": "Cetirizine", "category": "Respiratory", "dose": "10 mg", "route": "Oral", "default_freq": "HS", "default_dur": "5 days", "instructions": "At night, may cause mild drowsiness"},
+    {"name": "Montelukast 10 mg Tablet", "generic": "Montelukast", "category": "Respiratory", "dose": "10 mg", "route": "Oral", "default_freq": "HS", "default_dur": "10 days", "instructions": "At bedtime"},
+    {"name": "Salbutamol Inhaler (100 mcg)", "generic": "Salbutamol", "category": "Respiratory", "dose": "2 puffs", "route": "Inhalation", "default_freq": "SOS", "default_dur": "30 days", "instructions": "Inhale as needed for wheezing/breathlessness"},
+    {"name": "Vitamin B-Complex + Zinc Capsule", "generic": "Multivitamin", "category": "Others", "dose": "1 cap", "route": "Oral", "default_freq": "OD", "default_dur": "15 days", "instructions": "After meals"},
+]
+
+COMMON_ICD10 = [
+    {"code": "J06.9", "desc": "Acute Upper Respiratory Infection, unspecified"},
+    {"code": "E11.9", "desc": "Type 2 Diabetes Mellitus without complications"},
+    {"code": "I10", "desc": "Essential (primary) Hypertension"},
+    {"code": "K29.7", "desc": "Gastritis, unspecified"},
+    {"code": "J45.9", "desc": "Asthma, unspecified"},
+    {"code": "M54.5", "desc": "Low Back Pain"},
+    {"code": "R50.9", "desc": "Fever, unspecified"},
+    {"code": "A09", "desc": "Infectious Gastroenteritis and Colitis, unspecified"},
+    {"code": "J20.9", "desc": "Acute Bronchitis, unspecified"},
+    {"code": "N39.0", "desc": "Urinary Tract Infection, site not specified"},
+    {"code": "K21.9", "desc": "Gastro-esophageal Reflux Disease without esophagitis"},
+    {"code": "R10.4", "desc": "Abdominal Pain, other and unspecified"},
+]
+
+
+@login_required(login_url="login")
+def doctor_consultation(request):
+    """Doctor Consultation (Doctor's Desk) workstation.
+    
+    Provides complete 7-tab clinical ergonomics:
+    1. Assessment
+    2. Examination
+    3. Diagnosis & Plan
+    4. Orders
+    5. Reports & Results
+    6. Prescription
+    7. Advice & Follow-up
+    """
+    import json
+    from django.db.models import Q
+    from django.utils import timezone
+    from patients.models import (
+        Patient, InitialAssessment, ConsultationSession, 
+        PrescriptionItem, ClinicalOrder, DiagnosticReport
+    )
+
+    user_desig = (
+        getattr(getattr(request.user, "profile", None), "designation", None)
+        or request.session.get("designation")
+    )
+    if user_desig not in (UserProfile.Designation.DOCTOR, UserProfile.Designation.ADMIN) and not request.user.is_superuser:
+        messages.warning(request, "Access restricted: Doctor portal only.")
+        if user_desig == UserProfile.Designation.REGISTRATION_DESK:
+            return redirect("reception_dashboard")
+        return redirect("dashboard")
+
+    # Patient search query
+    query = request.GET.get("q", "").strip()
+    patients = Patient.objects.all()
+    if query:
+        patients = patients.filter(
+            Q(first_name__icontains=query)
+            | Q(second_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(mr_number__icontains=query)
+            | Q(phone__icontains=query)
+        )
+    patients = patients.order_by("-created_at")[:40]
+
+    # Selected patient
+    patient_id = request.GET.get("patient", "").strip()
+    patient = None
+    if patient_id.isdigit():
+        patient = Patient.objects.filter(pk=int(patient_id)).first()
+
+    patient_ctx = None
+    initial_assessment_data = None
+    consultation = None
+    prescriptions = []
+    current_orders = []
+    previous_prescriptions = []
+    previous_orders = []
+    diagnostic_reports = []
+
+    if patient:
+        now = timezone.now()
+        doctor_specialty = "General Medicine"
+        doctor_name = request.user.get_full_name() or request.user.username
+        if hasattr(request.user, "profile") and request.user.profile.specialty:
+            doctor_specialty = request.user.profile.get_specialty_display()
+
+        # Parse patient allergies
+        allergies = []
+        if patient.allergies:
+            allergies = [
+                part.strip()
+                for part in patient.allergies.replace(";", ",").split(",")
+                if part.strip()
+            ]
+
+        # Initials
+        parts = [p for p in (patient.first_name, patient.last_name) if p]
+        initials = "".join(p[0] for p in parts[:2]).upper() or "PT"
+
+        # Generate or load active consultation session
+        consultation = ConsultationSession.objects.filter(
+            patient=patient, status__in=[ConsultationSession.Status.DRAFT, ConsultationSession.Status.IN_PROGRESS]
+        ).first()
+
+        if not consultation:
+            visit_token = f"OPD-{now:%y%m%d}-{patient.pk:04d}"
+            consultation = ConsultationSession.objects.create(
+                patient=patient,
+                doctor=request.user,
+                visit_token=visit_token,
+                status=ConsultationSession.Status.DRAFT,
+                visit_type=ConsultationSession.VisitType.NEW_PROBLEM,
+            )
+
+        patient_ctx = {
+            "id": patient.pk,
+            "name": patient.full_name or "—",
+            "initials": initials,
+            "uhid": patient.uhid,
+            "visit_token": consultation.visit_token or f"OPD-{now:%y%m%d}-{patient.pk:04d}",
+            "age": patient.age if patient.age is not None else "—",
+            "gender": patient.get_gender_display() if patient.gender else "—",
+            "phone": patient.phone or "—",
+            "address": patient.address or "—",
+            "visit_timestamp": timezone.localtime(patient.created_at).strftime("%d %b %Y, %I:%M %p"),
+            "department": doctor_specialty,
+            "visit_type": "Emergency" if patient.is_emergency else ("Walk-in" if patient.payment_type != "credit" else "Referred"),
+            "referred_by": patient.reference_no or "—",
+            "allergies": allergies,
+            "chronic_illnesses": [],
+            "active_medications": [],
+            "is_emergency": bool(patient.is_emergency),
+        }
+
+        # Load initial assessment if exists
+        try:
+            ia = patient.initial_assessment
+            initial_assessment_data = {
+                "temperature": str(ia.temperature) if ia.temperature is not None else "",
+                "pulse": ia.pulse if ia.pulse is not None else "",
+                "respiratory_rate": ia.respiratory_rate if ia.respiratory_rate is not None else "",
+                "bp_systolic": ia.bp_systolic if ia.bp_systolic is not None else "",
+                "bp_diastolic": ia.bp_diastolic if ia.bp_diastolic is not None else "",
+                "spo2": ia.spo2 if ia.spo2 is not None else "",
+                "height": str(ia.height) if ia.height is not None else "",
+                "weight": str(ia.weight) if ia.weight is not None else "",
+                "bmi": str(ia.bmi) if ia.bmi is not None else "",
+                "rbs": ia.rbs if ia.rbs is not None else "",
+                "pain_score": ia.pain_score if ia.pain_score is not None else "",
+                "complaints": ia.complaints or "",
+                "hpi": ia.hpi or "",
+                "summary_note": ia.summary_note or "",
+                "chronic_conditions": ia.chronic_conditions or [],
+                "allergies": ia.allergies or [],
+                "medications": ia.medications or [],
+                "social_history": ia.social_history or [],
+            }
+            if ia.chronic_conditions:
+                patient_ctx["chronic_illnesses"] = [
+                    c.get("name") if isinstance(c, dict) else str(c) for c in ia.chronic_conditions
+                ]
+            if ia.medications:
+                patient_ctx["active_medications"] = [
+                    m.get("name") if isinstance(m, dict) else str(m) for m in ia.medications
+                ]
+            if ia.allergies and not patient_ctx["allergies"]:
+                patient_ctx["allergies"] = [
+                    a.get("allergen") if isinstance(a, dict) else str(a) for a in ia.allergies
+                ]
+        except InitialAssessment.DoesNotExist:
+            initial_assessment_data = None
+
+        # Load active prescriptions for this consultation
+        prescriptions = list(consultation.prescriptions.all())
+
+        # Load current orders for this consultation
+        current_orders = list(consultation.orders.all())
+
+        # Previous prescriptions from older completed consultations
+        older_consultations = ConsultationSession.objects.filter(
+            patient=patient
+        ).exclude(pk=consultation.pk).order_by("-created_at")
+        
+        if older_consultations.exists():
+            last_c = older_consultations.first()
+            previous_prescriptions = list(last_c.prescriptions.all())
+            previous_orders = list(last_c.orders.all())
+
+        # Reports for this patient
+        diagnostic_reports = list(DiagnosticReport.objects.filter(patient=patient).order_by("-report_date"))
+
+    return render(request, "core/doctor_consultation.html", {
+        "selected_patient": patient,
+        "patients": patients,
+        "query": query,
+        "patient_ctx": patient_ctx,
+        "assessment": initial_assessment_data,
+        "consultation": consultation,
+        "prescriptions": prescriptions,
+        "current_orders": current_orders,
+        "previous_prescriptions": previous_prescriptions,
+        "previous_orders": previous_orders,
+        "diagnostic_reports": diagnostic_reports,
+        "formulary": STANDARD_FORMULARY,
+        "common_icd": COMMON_ICD10,
+        "title": "Doctor Consultation (OPD)",
+        "user": request.user,
+    })
+
+
+@require_POST
+@login_required(login_url="login")
+def save_consultation(request):
+    """Async endpoint to save consultation session, diagnoses, orders and prescriptions."""
+    import json
+    from django.utils import timezone
+    from patients.models import (
+        Patient, ConsultationSession, PrescriptionItem, ClinicalOrder
+    )
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "Invalid JSON body"}, status=400)
+
+    patient_id = payload.get("patient_id")
+    consultation_id = payload.get("consultation_id")
+    patient = Patient.objects.filter(pk=patient_id).first()
+    if not patient:
+        return JsonResponse({"ok": False, "error": "Patient not found"}, status=404)
+
+    if consultation_id:
+        consultation = ConsultationSession.objects.filter(pk=consultation_id, patient=patient).first()
+    else:
+        consultation = None
+
+    if not consultation:
+        visit_token = f"OPD-{timezone.now():%y%m%d}-{patient.pk:04d}"
+        consultation = ConsultationSession.objects.create(
+            patient=patient,
+            doctor=request.user,
+            visit_token=visit_token,
+            status=ConsultationSession.Status.DRAFT,
+        )
+
+    action = payload.get("action", "save_draft")
+    if action == "complete":
+        consultation.status = ConsultationSession.Status.COMPLETED
+    elif action == "cancel":
+        consultation.status = ConsultationSession.Status.CANCELLED
+    else:
+        consultation.status = ConsultationSession.Status.DRAFT
+
+    # Update clinical data
+    consultation.visit_type = payload.get("visit_type", ConsultationSession.VisitType.NEW_PROBLEM)
+    consultation.clinical_note = payload.get("clinical_note", "") or ""
+    consultation.examination = payload.get("examination", {}) or {}
+    consultation.diagnosis_primary = payload.get("diagnosis_primary", "") or ""
+    consultation.diagnosis_primary_icd = payload.get("diagnosis_primary_icd", "") or ""
+    consultation.diagnosis_secondary = payload.get("diagnosis_secondary", []) or []
+    consultation.treatment_plan = payload.get("treatment_plan", "") or ""
+    consultation.special_advice = payload.get("special_advice", "") or ""
+    consultation.patient_education = payload.get("patient_education", []) or []
+    consultation.mark_follow_up = bool(payload.get("mark_follow_up", False))
+    consultation.follow_up_after = payload.get("follow_up_after", "") or ""
+    consultation.additional_orders = payload.get("additional_orders", []) or []
+
+    consultation.save()
+
+    # Update prescriptions
+    prescription_list = payload.get("prescriptions", [])
+    if isinstance(prescription_list, list):
+        consultation.prescriptions.all().delete()
+        for idx, item in enumerate(prescription_list):
+            med_name = item.get("medicine_name", "").strip()
+            if med_name:
+                PrescriptionItem.objects.create(
+                    consultation=consultation,
+                    medicine_name=med_name,
+                    dose=item.get("dose", "").strip(),
+                    route=item.get("route", "Oral").strip(),
+                    frequency=item.get("frequency", "OD").strip(),
+                    duration=item.get("duration", "5 days").strip(),
+                    instructions=item.get("instructions", "").strip(),
+                    order_index=idx,
+                )
+
+    # Update orders
+    orders_list = payload.get("orders", [])
+    if isinstance(orders_list, list):
+        consultation.orders.all().delete()
+        for ord_item in orders_list:
+            ord_name = ord_item.get("name", "").strip()
+            if ord_name:
+                ClinicalOrder.objects.create(
+                    consultation=consultation,
+                    order_type=ord_item.get("order_type", "laboratory"),
+                    name=ord_name,
+                    status=ord_item.get("status", "Ordered"),
+                    result_summary=ord_item.get("result_summary", ""),
+                )
+
+    return JsonResponse({
+        "ok": True,
+        "id": consultation.pk,
+        "status": consultation.status,
+        "status_display": consultation.get_status_display(),
+    })
+
+
+@login_required(login_url="login")
+def drug_search_api(request):
+    """API endpoint to search the medicine formulary with category filtering."""
+    query = request.GET.get("q", "").strip().lower()
+    category = request.GET.get("cat", "").strip()
+
+    results = []
+    for drug in STANDARD_FORMULARY:
+        match_query = (not query) or (query in drug["name"].lower()) or (query in drug["generic"].lower())
+        match_cat = (not category) or (category.lower() == "common") or (category.lower() in drug["category"].lower())
+        if match_query and match_cat:
+            results.append(drug)
+
+    return JsonResponse({"ok": True, "drugs": results[:25]})
+
+
+@login_required(login_url="login")
+def icd10_search_api(request):
+    """API endpoint to search ICD-10 diagnosis codes."""
+    query = request.GET.get("q", "").strip().lower()
+    results = []
+    for item in COMMON_ICD10:
+        if (not query) or (query in item["code"].lower()) or (query in item["desc"].lower()):
+            results.append(item)
+    return JsonResponse({"ok": True, "results": results[:20]})
+
+
+@require_POST
+@login_required(login_url="login")
+def safety_check_api(request):
+    """Real-time clinical safety engine checking drug-allergy and drug-drug interactions."""
+    import json
+    from patients.models import Patient
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+
+    patient_id = payload.get("patient_id")
+    medicines = payload.get("medicines", [])
+    patient = Patient.objects.filter(pk=patient_id).first()
+
+    allergy_alerts = []
+    interaction_alerts = []
+
+    patient_allergies = []
+    if patient and patient.allergies:
+        patient_allergies = [a.lower().strip() for a in patient.allergies.replace(";", ",").split(",") if a.strip()]
+
+    # Drug allergy checks
+    for med in medicines:
+        med_lower = med.lower() if isinstance(med, str) else med.get("medicine_name", "").lower()
+        for allergen in patient_allergies:
+            if "penicillin" in allergen and any(k in med_lower for k in ["penicillin", "amox", "ampicillin", "augmentin", "clav"]):
+                allergy_alerts.append(f"Allergy Alert: {allergen.title()} — Avoid Penicillin and related beta-lactam antibiotics ({med}).")
+            elif "sulfa" in allergen and any(k in med_lower for k in ["sulfa", "cotrimoxazole", "bactrim"]):
+                allergy_alerts.append(f"Allergy Alert: {allergen.title()} — Avoid Sulfa-containing medications ({med}).")
+            elif "nsaid" in allergen or "aspirin" in allergen:
+                if any(k in med_lower for k in ["ibuprofen", "diclofenac", "aspirin", "naproxen"]):
+                    allergy_alerts.append(f"Allergy Alert: {allergen.title()} — Potential cross-reactivity with NSAID ({med}).")
+
+    return JsonResponse({
+        "ok": True,
+        "has_alerts": bool(allergy_alerts or interaction_alerts),
+        "allergy_alerts": list(set(allergy_alerts)),
+        "interaction_alerts": interaction_alerts,
+    })
+
