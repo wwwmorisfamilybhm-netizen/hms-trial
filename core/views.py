@@ -715,12 +715,29 @@ def reception_dashboard(request):
     today = date.today()
     todays_patients = Patient.objects.filter(created_at__date=today).order_by("-created_at")
     recent_patients = Patient.objects.order_by("-created_at")[:8]
+
+    # Billing: bills still awaiting payment.
+    from decimal import Decimal
+
+    from patients.models import PatientBill
+    pending_bills = PatientBill.objects.filter(status=PatientBill.Status.PENDING)
+    pending_count = pending_bills.count()
+    pending_due = sum((b.amount_due for b in pending_bills), Decimal("0"))
+
+    # Appointments expected at the counter today (cancelled slots excluded).
+    appointments_today = Appointment.objects.filter(date=today).exclude(
+        status=Appointment.Status.CANCELLED
+    ).count()
+
     return render(request, "core/reception_dashboard.html", {
         "today": today,
         "total_patients": Patient.objects.count(),
         "today_count": todays_patients.count(),
         "todays_patients": todays_patients,
         "recent_patients": recent_patients,
+        "pending_payments": pending_count,
+        "pending_amount": pending_due,
+        "appointments_today": appointments_today,
         "user": request.user,
     })
 
