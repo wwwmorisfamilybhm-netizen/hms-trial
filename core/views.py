@@ -1201,7 +1201,11 @@ def medgemma_draft(request):
     allergies = payload.get("allergies") or []
     patient_name = payload.get("patientName") or ""
 
+    import sys as _sys
+
     provider = os.environ.get("MEDGEMMA_PROVIDER", "mock").strip().lower()
+    _sys.stderr.write("medgemma_draft: provider=%r\n" % provider)
+    _sys.stderr.flush()
 
     result = None
     fallback_reason = None
@@ -1211,8 +1215,12 @@ def medgemma_draft(request):
                 result = _gemini_draft(vitals, complaints, allergies, patient_name)
             else:
                 result = _openai_compatible_draft(vitals, complaints, allergies, patient_name)
+            _sys.stderr.write("medgemma_draft: provider %s succeeded\n" % provider)
+            _sys.stderr.flush()
         except Exception as exc:  # noqa: BLE001 — any failure should fall back gracefully
             fallback_reason = str(exc)
+            _sys.stderr.write("medgemma_draft: provider %s failed: %s\n" % (provider, fallback_reason))
+            _sys.stderr.flush()
             result = None
 
     if result is None:
@@ -1223,6 +1231,7 @@ def medgemma_draft(request):
     if not (result.get("summary") and result.get("differential") and result.get("tests")):
         result = _medgemma_mock_draft(vitals, complaints, allergies)
 
+    result["_provider"] = provider if (fallback_reason is None and provider not in ("mock", "local", "")) else "mock"
     return JsonResponse(result)
 
 
