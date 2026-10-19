@@ -32,6 +32,22 @@ Open:
 | Apply migrations | `.venv/bin/python manage.py migrate` |
 | Create admin user | `.venv/bin/python manage.py createsuperuser` |
 | Django shell (query data) | `.venv/bin/python manage.py shell` |
+| **Refresh CSS/JS after editing assets** | `.venv/bin/python manage.py collectstatic --noinput` |
+
+### ⚠️ Static files: run `collectstatic` after CSS/JS changes
+
+The app serves CSS and JavaScript through WhiteNoise from `staticfiles/` (the collected
+copy), not straight from `static/`. If you edit `static/css/*.css` or `static/js/*.js`
+and the browser still shows the old styling or an unstyled page, the collected copy is
+stale — run:
+
+```bash
+.venv/bin/python manage.py collectstatic --noinput --clear
+```
+
+`collectstatic` is run automatically on every deploy (the `Procfile` does it), and with
+`DJANGO_DEBUG=True` the dev server serves the source files directly — but with
+`DJANGO_DEBUG=False` only the collected copy is served.
 
 ## Deploy a test app on Domain India
 
