@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Delete patient — Cams HMS{% endblock %}
+
+{% block heading %}
+  <div class="page-head">
+    <div>
+      <h1>Confirm Deletion</h1>
+      <p class="page-sub">Destructive action · requires your account password</p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+<section class="card" style="max-width:680px; border-radius:24px; padding:32px 36px;">
+
+  <!-- Warning summary -->
+  <div style="background:#fee2e2; border:1px solid #fecaca; border-radius:18px; padding:20px 24px; margin-bottom:24px;">
+    <h2 style="font-size:17px; font-weight:800; color:#b91c1c; margin:0 0 10px 0;">
+      ⚠️ You are about to permanently delete a patient record
+    </h2>
+    <div style="display:grid; grid-template-columns:170px 1fr; row-gap:8px; font-size:14px;">
+      <span style="color:#991b1b; font-weight:700;">MR Number</span>
+      <span style="font-weight:750; color:var(--ink);">#{{ patient.mr_number|default:patient.id }}</span>
+
+      <span style="color:#991b1b; font-weight:700;">Patient Name</span>
+      <span style="font-weight:750; color:var(--ink);">{{ patient.full_name }}</span>
+
+      <span style="color:#991b1b; font-weight:700;">Date of Birth</span>
+      <span>{{ patient.date_of_birth|date:"M j, Y"|default:"—" }}</span>
+
+      <span style="color:#991b1b; font-weight:700;">Phone</span>
+      <span>{{ patient.phone|default:"—" }}</span>
+
+      <span style="color:#991b1b; font-weight:700;">Linked Appointments</span>
+      <span>{{ appointment_count }} appointment{{ appointment_count|pluralize }} will also be removed</span>
+    </div>
+    <p style="font-size:13px; color:#991b1b; margin:14px 0 0 0; font-weight:600;">
+      This action cannot be undone. Every appointment booked for this patient is deleted as well.
+    </p>
+  </div>
+
+  <!-- Password authorization -->
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div style="margin-bottom:20px;">
+      <label for="id_delete_password" style="display:block; font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px;">
+        Enter your login password to authorize this deletion
+      </label>
+      <input type="password" id="id_delete_password" name="password" required autofocus
+             autocomplete="current-password" placeholder="Your account password"
+             style="width:100%; max-width:360px; padding:0.65rem 0.9rem; border:1.5px solid var(--line); border-radius:12px; font-size:0.95rem; font-family:inherit; background:#fff;">
+      <p style="font-size:12px; color:var(--muted); margin-top:6px;">
+        Only the correct password of your own Cams HMS account will confirm the deletion.
+      </p>
+    </div>
+
+    <div style="display:flex; gap:12px; align-items:center;">
+      <button type="submit" class="btn"
+              style="background:#dc2626; color:#fff; font-weight:800; padding:11px 24px; border-radius:12px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+          <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>
+        </svg>
+        <span>Confirm Delete</span>
+      </button>
+      <a href="{% url 'history' %}" class="btn btn-outline" style="padding:11px 20px; border-radius:12px; font-weight:700;">
+        Cancel — keep the record
+      </a>
+    </div>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,550 @@
+{% extends "base.html" %}
+
+{% block title %}OPD Central Dashboard — CAMS HMS{% endblock %}
+
+{% block heading %}
+<style>
+  /* ── OPD dashboard skin ── aligned to the Cams HMS design language ── */
+  .container { max-width: 1460px; padding: 30px 30px 48px; }
+
+  .opd-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 24px; flex-wrap: wrap; margin-bottom: 26px;
+  }
+  .opd-eyebrow {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 1.3px;
+    text-transform: uppercase; color: #70659e; margin-bottom: 10px;
+  }
+  .opd-eyebrow::before {
+    content: ""; width: 18px; height: 3px; border-radius: 2px; background: var(--lav-deep);
+  }
+  .opd-head h1 {
+    margin: 0; font-size: 30px; font-weight: 750; letter-spacing: -0.9px; color: var(--ink);
+  }
+  .opd-head p { margin: 7px 0 0; font-size: 14.5px; color: var(--muted); }
+
+  .opd-search { display: flex; align-items: center; min-width: 380px; }
+  .opd-search input {
+    flex: 1; padding: 12px 16px; font-size: 14px; font-family: inherit;
+    background: var(--card); color: var(--ink);
+    border: 1px solid var(--line); border-right: none;
+    border-radius: 999px 0 0 999px;
+  }
+  .opd-search input::placeholder { color: #a3a3aa; }
+  .opd-search input:focus { outline: none; border-color: var(--lav-deep); box-shadow: none; }
+  .opd-search button {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 22px; border: none; cursor: pointer;
+    background: var(--ink); color: #fff;
+    border-radius: 0 999px 999px 0;
+    font-family: inherit; font-size: 14px; font-weight: 600;
+    transition: filter 0.15s ease;
+  }
+  .opd-search button:hover { filter: brightness(1.5); }
+
+  /* ── KPI strip ── */
+  .kpi-strip {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 14px; margin-bottom: 22px;
+  }
+  .kpi-card {
+    background: var(--card); border-radius: 18px;
+    padding: 18px 20px; display: flex; align-items: center; gap: 15px;
+    border: 1px solid transparent;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .kpi-card:hover { border-color: var(--line); transform: translateY(-1px); }
+  .kpi-icon {
+    width: 44px; height: 44px; border-radius: 14px;
+    display: grid; place-items: center; flex-shrink: 0;
+  }
+  .kpi-icon.lime { background: var(--lime); color: var(--ink); }
+  .kpi-icon.lav { background: var(--lav); color: #2f2b3f; }
+  .kpi-icon.lav-soft { background: var(--lav-soft); color: #665b9d; }
+  .kpi-icon.gray { background: #eeeeef; color: #56565c; }
+  .kpi-icon.amber { background: var(--amber-soft); color: #89641b; }
+  .kpi-icon.green { background: var(--green-soft); color: #245e42; }
+  .kpi-icon.red { background: #fee2e2; color: var(--red); }
+  .kpi-icon.dark { background: var(--ink); color: var(--lime); }
+  .kpi-value { font-size: 27px; font-weight: 750; color: var(--ink); line-height: 1; letter-spacing: -0.6px; }
+  .kpi-label { font-size: 12.5px; color: var(--muted); margin-top: 5px; font-weight: 500; }
+
+  /* ── Toolbar ── */
+  .opd-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+  }
+  .opd-filters { display: flex; gap: 10px; flex-wrap: wrap; }
+  .opd-filters select {
+    width: auto; min-width: 152px; padding: 9px 34px 9px 14px;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: var(--card); color: #56565c;
+    font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  .opd-filters select:focus { outline: 2px solid var(--lav-soft); border-color: var(--lav-deep); }
+  .opd-tools { display: flex; gap: 10px; }
+  .opd-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 16px; border: 1px solid var(--line); border-radius: 12px;
+    background: var(--card); color: #56565c;
+    font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .opd-btn:hover { background: #f5f5f6; color: var(--ink); text-decoration: none; }
+
+  /* ── Queue table ── */
+  .queue-card {
+    background: var(--card); border-radius: var(--radius);
+    overflow: hidden; padding: 4px 0 0;
+    margin-left: -14px; margin-right: -14px;
+  }
+  .queue-scroll { overflow-x: auto; }
+  .queue-card table { width: 100%; border-collapse: collapse; min-width: 1240px; }
+  .queue-card th {
+    padding: 14px 14px; text-align: left; white-space: nowrap;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--muted);
+    background: #fafafb; border-bottom: 1px solid var(--line);
+  }
+  .queue-card td { padding: 13px 14px; border-bottom: 1px solid #f0f0f2; vertical-align: middle; }
+  .queue-card tbody tr:last-child td { border-bottom: none; }
+  .queue-card tbody tr:hover { background: #fafafb; }
+
+  .q-uhid {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11.5px; font-weight: 600; color: #665b9d; letter-spacing: 0.2px; white-space: nowrap;
+  }
+  .q-name { font-weight: 600; color: var(--ink); font-size: 14px; }
+  .q-name a { color: var(--ink); }
+  .q-name a:hover { color: #665b9d; text-decoration: none; }
+  .q-sub { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  .q-time { font-size: 13px; color: #56565c; font-weight: 500; white-space: nowrap; }
+
+  .status-cell { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 11px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 700; white-space: nowrap;
+  }
+  .status-badge.red { background: #fee2e2; color: var(--red); }
+  .status-badge.unassigned { background: #f4f4f5; color: #9a9aa1; border: 1px dashed #dcdce0; }
+  .status-sub { font-size: 11px; color: #a3a3aa; }
+
+  .q-tag {
+    display: inline-block; padding: 3px 9px; border-radius: 8px;
+    font-size: 11px; font-weight: 600; background: #f0eefb; color: #665b9d;
+  }
+  .q-tag.alert { background: #fee2e2; color: var(--red); }
+
+  /* Assigned doctor cell */
+  .q-doc { display: flex; align-items: center; gap: 10px; }
+  .q-doc-avatar {
+    width: 30px; height: 30px; border-radius: 10px; overflow: hidden; flex-shrink: 0;
+    background: linear-gradient(135deg, #e8e3f7, #c9bdf8); color: #2f2b3f;
+    display: grid; place-items: center; font-size: 12px; font-weight: 750;
+  }
+  .q-doc-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .q-doc-info { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+  .q-doc-name { font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+  .q-doc-spec { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+  .q-doc-form { margin-top: 4px; }
+  .q-doc-form select {
+    width: 100%; padding: 5px 10px; font-size: 11.5px; font-family: inherit;
+    border: 1px dashed #d8d8dd; border-radius: 8px;
+    background: #fcfcfd; color: var(--muted); cursor: pointer; white-space: nowrap;
+  }
+  .q-doc-form select:hover { border-style: solid; color: var(--ink); }
+
+  .q-doc-clear {
+    width: 22px; height: 22px; border-radius: 7px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--card); color: var(--muted);
+    font-size: 15px; line-height: 1; display: grid; place-items: center;
+    transition: background 0.14s ease, color 0.14s ease;
+  }
+  .q-doc-clear:hover { background: #fee2e2; color: var(--red); border-color: #fee2e2; }
+  .q-dash { color: #c4c4c8; }
+
+  .bill-pill { padding: 4px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+  .bill-pill.paid { background: var(--green-soft); color: #245e42; }
+  .bill-pill.pending { background: var(--amber-soft); color: #89641b; }
+
+  /* ── Row action: one elegant icon → floating action menu ── */
+  .q-menu-btn {
+    width: 32px; height: 32px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--card); color: #56565c;
+    display: grid; place-items: center; margin: 0 auto;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .q-menu-btn:hover { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .q-menu-btn.is-open { background: var(--ink); border-color: var(--ink); color: var(--lav); }
+  .q-menu-btn svg { width: 16px; height: 16px; }
+
+  .q-menu-pop {
+    position: fixed; z-index: 60; width: 226px;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 16px; padding: 8px;
+    box-shadow: 0 18px 40px -12px rgba(32, 32, 36, 0.26), 0 2px 6px rgba(32, 32, 36, 0.06);
+    opacity: 0; visibility: hidden; transform: translateY(-6px) scale(0.98);
+    transform-origin: top right;
+    transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
+  }
+  .q-menu-pop.is-open { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+  .q-menu-pop.up { transform-origin: bottom right; }
+
+  .q-menu-head {
+    margin: 2px 6px 8px; padding-bottom: 8px;
+    border-bottom: 1px solid #f0f0f2;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.9px;
+    text-transform: uppercase; color: #a3a3aa;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .q-menu-item {
+    display: flex; align-items: center; gap: 11px;
+    padding: 8px 9px; border-radius: 11px; color: var(--ink);
+    transition: background 0.14s ease;
+  }
+  .q-menu-item:hover { background: #f5f4fb; text-decoration: none; }
+  .q-mi-ic { width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; display: grid; place-items: center; }
+  .q-mi-ic svg { width: 15px; height: 15px; }
+  .q-mi-ic.ink { background: var(--ink); color: var(--lime); }
+  .q-mi-ic.lav { background: var(--lav-soft); color: #665b9d; }
+  .q-mi-ic.green { background: var(--green-soft); color: #245e42; }
+  .q-mi-txt { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+  .q-mi-txt strong { font-size: 13px; font-weight: 650; }
+  .q-mi-txt small { font-size: 10.5px; color: var(--muted); }
+
+  .q-empty { text-align: center; padding: 54px 20px; color: var(--muted); }
+
+  /* ── Legend ── */
+  .queue-legend {
+    display: flex; flex-wrap: wrap; gap: 10px 22px;
+    margin-top: 16px; padding: 16px 24px;
+    background: var(--card); border-radius: var(--radius);
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #56565c; font-weight: 500; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .legend-dot.slate { background: #9a9aa1; }
+  .legend-dot.blue { background: #665b9d; }
+  .legend-dot.orange { background: #d9a441; }
+  .legend-dot.purple { background: var(--lav); }
+  .legend-dot.green { background: #4ea873; }
+  .legend-dot.red { background: var(--red); }
+  .legend-dot.dark { background: #3a3a40; }
+
+  @media (max-width: 1180px) { .kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 860px) {
+    .kpi-strip { grid-template-columns: 1fr; }
+    .opd-search { min-width: 100%; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="opd-head">
+  <div>
+    <span class="opd-eyebrow">Outpatient Department</span>
+    <h1>OPD Central Dashboard</h1>
+    <p>Live view of patient flow, queues and service status</p>
+  </div>
+  <form class="opd-search" method="get" action="{% url 'dashboard' %}">
+    <input type="search" name="q" placeholder="Search by UHID, Name or Visit No." aria-label="Search patients">
+    <button type="submit">
+      <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="7.5" cy="7.5" r="6"/><path d="M12.2 12.2L16.5 16.5"/></svg>
+      Search
+    </button>
+  </form>
+</div>
+
+<!-- KPI strip -->
+<div class="kpi-strip">
+  <div class="kpi-card">
+    <span class="kpi-icon lime"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M16 18v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 16.5V18"/><circle cx="10" cy="7" r="3.5"/><path d="M18 18v-1.5a3.5 3.5 0 0 0-2.6-3.4"/><path d="M14.5 3.6a3.5 3.5 0 0 1 0 6.8"/></svg></span>
+    <div><div class="kpi-value">{{ kpi_total_today }}</div><div class="kpi-label">Total Patients Today</div></div>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-icon gray"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M10 5.5V10l3.2 2"/></svg></span>
+    <div><div class="kpi-value">{{ kpi_in_pool }}</div><div class="kpi-label">In Central Pool</div></div>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-icon lav"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 10h-3.5l-2.5 7L8 3l-2.5 7H2"/></svg></span>
+    <div><div class="kpi-value">{{ kpi_with_doctors }}</div><div class="kpi-label">With Doctors</div></div>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-icon lav-soft"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 2h5M9 2v5l-4 6.5A1 1 0 0 0 5.9 15.5h8.2a1 1 0 0 0 .9-2L11 7V2"/><path d="M6.5 12h7"/></svg></span>
+    <div><div class="kpi-value">{{ kpi_investigations }}</div><div class="kpi-label">Investigations</div></div>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-icon lav-soft"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="14" r="2.5"/><path d="M8.2 7.3 16 17M8.2 12.7 16 3"/></svg></span>
+    <div><div class="kpi-value">{{ kpi_procedures }}</div><div class="kpi-label">Procedures</div></div>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-icon amber"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M9.5 3h5.5v14H9.5zM6 6.5h3.5M6 13.5h3.5M12.2 5.5v6M9.5 8.5h5.5"/></svg></span>
+    <div><div class="kpi-value">{{ kpi_pharmacy }}</div><div class="kpi-label">Pharmacy</div></div>
+  </div>
+  <div class="kpi-card">
+    <span class="kpi-icon red"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2H6.5a1.5 1.5 0 0 0-1.5 1.5v13A1.5 1.5 0 0 0 6.5 18h7a1.5 1.5 0 0 0 1.5-1.5V6z"/><path d="M12 2v4h4M7.5 10h5M7.5 13.5h3.5"/></svg></span>
+    <div><div class="kpi-value">{{ kpi_review_required }}</div><div class="kpi-label">Review Required</div></div>
+  </div>
+  <div class="kpi-card dark">
+    <span class="kpi-icon lime"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 9.5a6.5 6.5 0 1 1-4.4-6.2"/><path d="M16.5 2.5v5h-5"/></svg></span>
+    <div><div class="kpi-value">{{ kpi_completed }}</div><div class="kpi-label">Completed</div></div>
+  </div>
+</div>
+
+<!-- Filter toolbar -->
+<div class="opd-toolbar">
+  <div class="opd-filters">
+    <select aria-label="Queue or Location"><option>Queue / Location</option><option>Central Pool</option><option>OPD</option><option>IPD</option></select>
+    <select aria-label="Doctor">
+      <option>Doctor</option>
+      {% for doc in doctor_accounts %}
+      <option>{{ doc.get_full_name|default:doc.username }}{% if doc.profile.specialty %} — {{ doc.profile.get_specialty_display }}{% endif %}</option>
+      {% empty %}
+      <option>No doctors added yet</option>
+      {% endfor %}
+    </select>
+    <select aria-label="Department">
+      <option>Department</option>
+      <option>General Medicine</option><option>Cardiology</option><option>Orthopedics</option>
+    </select>
+    <select aria-label="Status"><option>Status</option><option>Not Routed</option><option>Emergency</option></select>
+    <select aria-label="Priority"><option>Priority</option><option>Normal</option><option>Urgent</option><option>Emergency</option></select>
+  </div>
+  <div class="opd-tools">
+    <a class="opd-btn" href="{% url 'dashboard' %}">
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M17 10a7 7 0 1 1-4.6-6.6"/><path d="M17 2.5v5h-5"/></svg>
+      Refresh
+    </a>
+    <button type="button" class="opd-btn">
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 11.5v3.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15V6.5A1.5 1.5 0 0 1 4.5 5H8"/><path d="M13 12.5 17.5 8 13 3.5M17.5 8H8.5a5 5 0 0 0-5 5"/></svg>
+      Export
+    </button>
+  </div>
+</div>
+
+<!-- Patient queue -->
+<div class="queue-card">
+  <div class="queue-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>UHID</th>
+          <th>Patient Name</th>
+          <th>Age / Sex</th>
+          <th>Arrival</th>
+          <th>Current Location / Status</th>
+          <th>Assigned Doctor</th>
+          <th>Pending Services</th>
+          <th>Alerts</th>
+          <th>Billing</th>
+          <th>Last Update</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for patient in queue_patients %}
+        <tr>
+          <td class="q-sub">{{ forloop.counter }}</td>
+          <td class="q-uhid">{{ patient.uhid }}</td>
+          <td class="q-name"><a href="{% url 'patient_detail' patient.pk %}">{{ patient.full_name }}</a></td>
+          <td class="q-sub">{{ patient.age|default:"—" }} / {{ patient.gender|default:"—" }}</td>
+          <td class="q-time">{{ patient.created_at|time:"h:i A" }}</td>
+          <td>
+            <div class="status-cell">
+              {% if patient.is_emergency %}
+              <span class="status-badge red">
+                <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><circle cx="5" cy="5" r="5"/></svg>
+                Emergency
+              </span>
+              <span class="status-sub">Emergency Counter</span>
+              {% else %}
+              {# Status is assigned by nurse / other designation once wired. #}
+              <span class="status-badge unassigned">
+                <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="5" cy="5" r="4"/><path d="M5 2.6v2.6M5 6.6v.6"/></svg>
+                Not Routed
+              </span>
+              <span class="status-sub">Awaiting assignment</span>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            {% if patient.assigned_doctor %}
+              <div class="q-doc">
+                <span class="q-doc-avatar">
+                  {% if patient.assigned_doctor.profile.photo %}
+                    <img src="{{ patient.assigned_doctor.profile.photo.url }}" alt="">
+                  {% else %}
+                    {{ patient.assigned_doctor.first_name|default:patient.assigned_doctor.username|slice:":1"|upper }}
+                  {% endif %}
+                </span>
+                <span class="q-doc-info">
+                  <span class="q-doc-name">{{ patient.assigned_doctor.get_full_name|default:patient.assigned_doctor.username }}</span>
+                  <span class="q-doc-spec">{{ patient.assigned_doctor.profile.get_specialty_display|default:"General Medicine" }}</span>
+                </span>
+              </div>
+              <form method="post" action="{% url 'assign_doctor' patient.pk %}" class="q-doc-form">
+                <input type="hidden" name="doctor_id" value="">
+                <button type="submit" class="q-doc-clear" title="Unassign this doctor">×</button>
+              </form>
+            {% else %}
+              <form method="post" action="{% url 'assign_doctor' patient.pk %}" class="q-doc-form">
+                <select name="doctor_id" onchange="this.form.submit()" aria-label="Assign doctor">
+                  <option value="">Assign doctor…</option>
+                  {% for doc in doctor_accounts %}
+                    <option value="{{ doc.pk }}">{{ doc.get_full_name|default:doc.username }}{% if doc.profile.specialty %} — {{ doc.profile.get_specialty_display }}{% endif %}</option>
+                  {% empty %}
+                    <option value="" disabled>No doctors yet</option>
+                  {% endfor %}
+                </select>
+              </form>
+            {% endif %}
+          </td>
+          <td><span class="q-dash">—</span></td>
+          <td>
+            {% if patient.allergies %}<span class="q-tag alert">Allergy</span>{% else %}<span class="q-dash">—</span>{% endif %}
+          </td>
+          <td>
+            {% with bill=patient.bills.first %}
+              {% if bill %}{% if bill.status == "paid" %}<span class="bill-pill paid">Paid</span>{% else %}<span class="bill-pill pending">Pending</span>{% endif %}
+              {% else %}<span class="q-dash">—</span>{% endif %}
+            {% endwith %}
+          </td>
+          <td class="q-sub">{{ patient.updated_at|time:"h:i A" }} · Registration</td>
+          <td>
+            <button type="button" class="q-menu-btn"
+                    data-name="{{ patient.full_name }}"
+                    data-assess="{% url 'patient_detail' patient.pk %}"
+                    data-track="{% url 'patient_detail' patient.pk %}"
+                    data-view="{% url 'patient_detail' patient.pk %}"
+                    aria-haspopup="menu" aria-expanded="false"
+                    aria-label="Actions for {{ patient.full_name }}">
+              <svg viewBox="0 0 18 18" fill="currentColor" aria-hidden="true">
+                <circle cx="9" cy="3.4" r="1.6"/><circle cx="9" cy="9" r="1.6"/><circle cx="9" cy="14.6" r="1.6"/>
+              </svg>
+            </button>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="12">
+            <p class="q-empty">No patients registered yet. Patients registered at the Registration Desk appear here automatically.</p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Status legend -->
+<div class="queue-legend">
+  <div class="legend-item"><span class="legend-dot slate"></span> Waiting / In Queue</div>
+  <div class="legend-item"><span class="legend-dot blue"></span> In Progress</div>
+  <div class="legend-item"><span class="legend-dot orange"></span> Awaiting Payment</div>
+  <div class="legend-item"><span class="legend-dot purple"></span> Review Required</div>
+  <div class="legend-item"><span class="legend-dot green"></span> Completed</div>
+  <div class="legend-item"><span class="legend-dot red"></span> Urgent / Alert</div>
+  <div class="legend-item"><span class="legend-dot dark"></span> Cancelled</div>
+</div>
+
+<!-- Floating row-action menu — lives outside the scroll box so it is never clipped -->
+<div class="q-menu-pop" id="qMenuPop" role="menu" aria-hidden="true">
+  <p class="q-menu-head" id="qMenuHead">Patient</p>
+
+  <a class="q-menu-item" data-role="assess" href="#" role="menuitem">
+    <span class="q-mi-ic ink" aria-hidden="true">
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 3.6h12.4v8.8H8l-3.4 2.9v-2.9H2.8z"/><path d="M6 6.6h6M6 9.2h4"/></svg>
+    </span>
+    <span class="q-mi-txt"><strong>Assess</strong><small>Start the consultation</small></span>
+  </a>
+
+  <a class="q-menu-item" data-role="track" href="#" role="menuitem">
+    <span class="q-mi-ic lav" aria-hidden="true">
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 12.6h3l2.1-6.4 3 8.2 2-4.6h3.1"/></svg>
+    </span>
+    <span class="q-mi-txt"><strong>Track</strong><small>Follow the patient journey</small></span>
+  </a>
+
+  <a class="q-menu-item" data-role="view" href="#" role="menuitem">
+    <span class="q-mi-ic green" aria-hidden="true">
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 9S4.6 4.4 9 4.4 16.2 9 16.2 9 13.4 13.6 9 13.6 1.8 9 1.8 9Z"/><circle cx="9" cy="9" r="2.1"/></svg>
+    </span>
+    <span class="q-mi-txt"><strong>View</strong><small>Open the full record</small></span>
+  </a>
+</div>
+
+<script>
+  (function () {
+    var pop = document.getElementById("qMenuPop");
+    if (!pop) return;
+    var head = document.getElementById("qMenuHead");
+    var current = null;
+
+    function close() {
+      if (!current) return;
+      pop.classList.remove("is-open");
+      pop.setAttribute("aria-hidden", "true");
+      current.classList.remove("is-open");
+      current.setAttribute("aria-expanded", "false");
+      current = null;
+    }
+
+    function open(btn) {
+      head.textContent = btn.getAttribute("data-name") || "Patient";
+      pop.querySelector('[data-role="assess"]').setAttribute("href", btn.getAttribute("data-assess"));
+      pop.querySelector('[data-role="track"]').setAttribute("href", btn.getAttribute("data-track"));
+      pop.querySelector('[data-role="view"]').setAttribute("href", btn.getAttribute("data-view"));
+
+      pop.classList.add("is-open");
+      pop.setAttribute("aria-hidden", "false");
+      btn.classList.add("is-open");
+      btn.setAttribute("aria-expanded", "true");
+
+      var r = btn.getBoundingClientRect();
+      var pw = pop.offsetWidth, ph = pop.offsetHeight;
+
+      // Right-align under the button, kept inside the viewport.
+      var left = r.right - pw;
+      if (left < 8) left = 8;
+      if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+
+      // Flip above the button when there is no room below.
+      var top = r.bottom + 8, up = false;
+      if (top + ph > window.innerHeight - 8) {
+        top = r.top - ph - 8;
+        up = true;
+        if (top < 8) top = 8;
+      }
+      pop.classList.toggle("up", up);
+      pop.style.left = left + "px";
+      pop.style.top = top + "px";
+
+      current = btn;
+    }
+
+    document.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest(".q-menu-btn") : null;
+      if (btn) {
+        e.preventDefault();
+        if (btn === current) { close(); return; }
+        close();
+        open(btn);
+        return;
+      }
+      if (!e.target.closest || !e.target.closest(".q-menu-pop")) close();
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") close();
+    });
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+  })();
+</script>
+
+{% endblock %}

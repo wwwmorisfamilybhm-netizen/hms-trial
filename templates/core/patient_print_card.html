@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Print Card — MR #{{ patient.mr_number|default:patient.id }} — Cams HMS{% endblock %}
+
+{% block heading %}
+  <div class="page-head no-print" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:16px;">
+    <div>
+      <div style="display:inline-flex; align-items:center; gap:8px; background:rgba(214,242,95,0.18); color:var(--ink); padding:4px 12px; border-radius:99px; font-size:12px; font-weight:750; margin-bottom:8px;">
+        <span style="color:#16a34a;">●</span> PATIENT REGISTERED SUCCESSFULLY
+      </div>
+      <h1 style="margin:0 0 4px 0;">Patient Registration Card</h1>
+      <p class="page-sub" style="margin:0;">Print-ready cute card format for registration desk counter · MR #{{ patient.mr_number|default:patient.id }}</p>
+    </div>
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <button type="button" onclick="window.print()" class="btn" style="background:var(--lime); color:var(--ink); font-weight:800; padding:12px 26px; border-radius:14px; font-size:14px; display:inline-flex; align-items:center; gap:8px; border:none; cursor:pointer; box-shadow:0 6px 20px rgba(214,242,95,0.4); transition:transform 0.15s ease;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+        </svg>
+        <span>Print Card Now</span>
+      </button>
+      <a href="{% url 'registration_desk' %}" class="btn btn-outline" style="padding:12px 20px; font-size:13px; font-weight:700; border-radius:14px; display:inline-flex; align-items:center; gap:6px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        New Registration
+      </a>
+      <a href="{% url 'reception_dashboard' %}" class="btn btn-outline" style="padding:12px 20px; font-size:13px; font-weight:700; border-radius:14px;">
+        ← Reception Desk
+      </a>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+
+{# ── PRINT & PREVIEW STYLES ── #}
+<style>
+  @media print {
+    @page {
+      size: 90mm 140mm;
+      margin: 0;
+    }
+    html, body {
+      background: #ffffff !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      font-size: 12px;
+    }
+    /* Hide everything on screen except the cute card */
+    .sidebar, .topbar, .page-head, .no-print, nav, header, footer, .alert {
+      display: none !important;
+    }
+    .main {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    .card-preview-stage {
+      padding: 0 !important;
+      margin: 0 !important;
+      background: none !important;
+    }
+    .cute-card {
+      width: 86mm !important;
+      box-shadow: none !important;
+      border: 1.5px solid #202024 !important;
+      margin: 2mm auto !important;
+      page-break-inside: avoid;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+  }
+
+  /* Screen Stage */
+  .card-preview-stage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 30px 20px 60px;
+  }
+
+  /* Cute Card Structure */
+  .cute-card {
+    width: 410px;
+    max-width: 100%;
+    background: #ffffff;
+    border-radius: 26px;
+    box-shadow: 0 16px 50px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+    border: 2px solid #202024;
+    overflow: hidden;
+    position: relative;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  /* Header Section */
+  .cute-card-header {
+    background: #202024;
+    color: #ffffff;
+    padding: 22px 24px 18px;
+    text-align: center;
+    position: relative;
+  }
+  .cute-card-header .hosp-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    color: #d6f25f;
+    margin-bottom: 4px;
+  }
+  .cute-card-header .card-subtitle {
+    font-size: 11px;
+    font-weight: 500;
+    color: #a1a1aa;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin: 0 0 14px 0;
+  }
+
+  /* MR Number in a BIG way */
+  .mr-big-badge {
+    background: #d6f25f;
+    color: #202024;
+    border-radius: 16px;
+    padding: 10px 18px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(214,242,95,0.45);
+    border: 2px solid #202024;
+    min-width: 220px;
+  }
+  .mr-big-badge .mr-tag {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #3f3f46;
+    line-height: 1;
+    margin-bottom: 3px;
+  }
+  .mr-big-badge .mr-digits {
+    font-size: 34px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: #18181b;
+    line-height: 1.05;
+  }
+
+  /* Card Body */
+  .cute-card-body {
+    padding: 20px 24px 22px;
+  }
+
+  /* Patient Identity Section: Photo & Name */
+  .patient-identity-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1.5px dashed #e4e4e7;
+  }
+  .patient-photo-frame {
+    width: 82px;
+    height: 82px;
+    border-radius: 18px;
+    border: 2px solid #202024;
+    background: #f4f4f7;
+    overflow: hidden;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  }
+  .patient-photo-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .patient-photo-frame .fallback-icon {
+    color: #71717a;
+  }
+
+  .patient-name-block {
+    flex: 1;
+    min-width: 0;
+  }
+  .patient-name-block .sub-label {
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #71717a;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .patient-name-block .patient-name {
+    font-size: 19px;
+    font-weight: 850;
+    color: #18181b;
+    margin: 0;
+    line-height: 1.25;
+    word-break: break-word;
+  }
+
+  /* Core Patient Demographic Grid: DOB, Age, Phone, Validity ONLY */
+  .patient-details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .detail-tile {
+    background: #f8f8fb;
+    border-radius: 14px;
+    padding: 10px 14px;
+    border: 1px solid #f0f0f4;
+  }
+  .detail-tile .tile-label {
+    font-size: 9px;
+    font-weight: 750;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: #71717a;
+    display: block;
+    margin-bottom: 3px;
+  }
+  .detail-tile .tile-value {
+    font-size: 14px;
+    font-weight: 750;
+    color: #18181b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Billing Information Section ONLY: Billing Info, Amount, Discount */
+  .cute-billing-block {
+    background: #fdfdfd;
+    border: 1.5px solid #202024;
+    border-radius: 18px;
+    padding: 14px 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+  }
+  .billing-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e4e4e7;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .billing-header-row .b-title {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: #71717a;
+  }
+  .billing-header-row .b-info-pill {
+    background: #202024;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 99px;
+    letter-spacing: 0.4px;
+  }
+
+  .billing-metrics-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.1fr;
+    gap: 6px;
+    text-align: center;
+  }
+  .b-col {
+    padding: 2px 4px;
+  }
+  .b-col .b-label {
+    font-size: 9px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: #71717a;
+    margin-bottom: 2px;
+  }
+  .b-col .b-val {
+    font-size: 15px;
+    font-weight: 850;
+    color: #18181b;
+  }
+  .b-col .b-val.discount {
+    color: #dc2626;
+  }
+  .b-col .b-val.net {
+    color: #15803d;
+  }
+
+  /* Cute Card Footer */
+  .cute-card-footer {
+    background: #fafafc;
+    border-top: 1px solid #e4e4e7;
+    padding: 10px 20px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: #71717a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+</style>
+
+<div class="card-preview-stage">
+  <div class="cute-card">
+
+    {# ── HEADER: Hospital Branding & MR Number In A Big Way ── #}
+    <div class="cute-card-header">
+      <div class="hosp-brand">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M12 2v20M2 12h20"/>
+        </svg>
+        <span>Cams Hospital · OPD</span>
+      </div>
+      <div class="card-subtitle">Patient Registration Card</div>
+
+      <!-- MR Number displayed in a big prominent way -->
+      <div class="mr-big-badge">
+        <span class="mr-tag">Medical Record No.</span>
+        <span class="mr-digits">#{{ patient.mr_number|default:patient.id }}</span>
+      </div>
+    </div>
+
+    {# ── BODY: Patient Photo, Name, Core Info & Billing Info ── #}
+    <div class="cute-card-body">
+
+      <!-- Patient Photo + Name -->
+      <div class="patient-identity-row">
+        <div class="patient-photo-frame">
+          {% if patient.photo %}
+            <img src="{{ patient.photo.url }}" alt="{{ patient.full_name }}">
+          {% else %}
+            <svg class="fallback-icon" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
+            </svg>
+          {% endif %}
+        </div>
+        <div class="patient-name-block">
+          <span class="sub-label">Patient Name</span>
+          <h2 class="patient-name">{{ patient.full_name }}</h2>
+        </div>
+      </div>
+
+      <!-- Core Details Grid: DOB, Age, Phone Number, Validity ONLY -->
+      <div class="patient-details-grid">
+        <div class="detail-tile">
+          <span class="tile-label">Date of Birth</span>
+          <span class="tile-value">{{ patient.date_of_birth|date:"d M Y"|default:"—" }}</span>
+        </div>
+        <div class="detail-tile">
+          <span class="tile-label">Age</span>
+          <span class="tile-value">{% if patient.age != None %}{{ patient.age }} Yrs{% else %}—{% endif %}</span>
+        </div>
+        <div class="detail-tile">
+          <span class="tile-label">Phone Number</span>
+          <span class="tile-value">{{ patient.phone|default:"—" }}</span>
+        </div>
+        <div class="detail-tile">
+          <span class="tile-label">Validity</span>
+          <span class="tile-value">{{ patient.valid_upto|date:"d M Y"|default:"—" }}</span>
+        </div>
+      </div>
+
+      <!-- Billing Info, Amount, Discount ONLY -->
+      <div class="cute-billing-block">
+        <div class="billing-header-row">
+          <span class="b-title">Billing Info</span>
+          <span class="b-info-pill">
+            {{ patient.billing_type|default:"Individual" }} · {{ patient.get_payment_type_display|default:patient.payment_type|title }}
+          </span>
+        </div>
+        <div class="billing-metrics-row">
+          <div class="b-col">
+            <div class="b-label">Amount</div>
+            <div class="b-val">₹{{ gross_amount|floatformat:2 }}</div>
+          </div>
+          <div class="b-col">
+            <div class="b-label">Discount</div>
+            <div class="b-val discount">₹{{ discount|floatformat:2 }}</div>
+          </div>
+          <div class="b-col">
+            <div class="b-label">Net Amount</div>
+            <div class="b-val net">₹{{ net_amount|floatformat:2 }}</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    {# ── FOOTER: Issue timestamp & counter badge ── #}
+    <div class="cute-card-footer">
+      <span>Desk: Registration Counter</span>
+      <span>{{ patient.created_at|date:"d M Y, h:i A" }}</span>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

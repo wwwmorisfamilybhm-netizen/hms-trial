@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Slip {{ bill.bill_number }} — Cams HMS{% endblock %}
+
+{% block heading %}
+  <div class="page-head print-controls" style="display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap;">
+    <div><h1>Payment Slip</h1><p class="page-sub">{% if bill.status == "paid" %}This payment has been recorded as paid.{% else %}Print this slip for the patient. Payment remains pending until recorded separately.{% endif %}</p></div>
+    <div style="display:flex; gap:10px;">
+      <a href="{% url 'bill_command_center' %}" class="btn btn-outline">← Bill Command Center</a>
+      <a href="{% url 'bill_whatsapp' bill.pk %}" class="btn" style="background:#22c35e; color:#fff; font-weight:800; display:inline-flex; align-items:center; gap:8px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2Zm5.2 14.2c-.2.6-1.2 1.2-1.7 1.2-.4 0-1 .1-3-.9a12.4 12.4 0 0 1-5-4.4C6.9 11 7 9.8 7.2 9.2c.2-.6.8-1.1 1.2-1.2.3-.1.7-.1.9.1.2.1.5.1.7.5l.8 1.6c.1.3 0 .5-.1.7l-.5.6c-.2.2-.2.4-.1.6.4.8 1 1.4 1.6 1.8.3.2.6.5.9.6.2.1.4.1.6-.1l.8-.9c.2-.2.4-.2.6-.1l1.6.8c.3.1.5.3.5.5.1.2.1.6 0 .8Z"/></svg>
+        <span>Send on WhatsApp</span>
+      </a>
+      <button type="button" class="btn" onclick="window.print()">Print slip</button>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+<article class="payment-slip">
+  <header class="slip-header">
+    <div class="slip-brand"><span class="slip-mark">+</span><div><strong>Cams HMS</strong><small>Medical Center</small></div></div>
+    <div class="slip-title"><span>PAYMENT SLIP</span><strong>{{ bill.bill_number }}</strong><small>{{ bill.created_at|date:"d M Y, h:i A" }}</small></div>
+  </header>
+  <div class="slip-status {% if bill.status == 'paid' %}paid{% endif %}">{% if bill.status == "paid" %}✓ PAID{% else %}PENDING PAYMENT{% endif %}</div>
+  <div class="slip-actions" style="display:flex; gap:10px; margin:6px 0 0;">
+    <form method="post" action="{% url 'bill_set_status' bill.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="status" value="{% if bill.status == 'paid' %}pending{% else %}paid{% endif %}">
+      {% if bill.status == 'paid' %}
+        <button type="submit" class="btn btn-outline" style="font-size:12px; font-weight:750; padding:8px 16px; border-radius:99px;">
+          ↺ Mark as Pending
+        </button>
+      {% else %}
+        <button type="submit" class="btn" style="background:#16a34a; color:#fff; font-size:12px; font-weight:800; padding:8px 16px; border-radius:99px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          <span>Mark as Paid</span>
+        </button>
+      {% endif %}
+    </form>
+  </div>
+  <section class="slip-patient">
+    <h2>{{ bill.patient.full_name }}</h2>
+    <div><span>Registration / MR number</span><strong>{{ bill.patient.mr_number|default:bill.patient.pk }}</strong></div>
+    <div><span>Age &amp; gender</span><strong>{% if bill.patient.age %}{{ bill.patient.age }} years{% else %}—{% endif %} · {{ bill.patient.get_gender_display|default:"—" }}</strong></div>
+    <div><span>Phone</span><strong>{{ bill.patient.phone|default:"—" }}</strong></div>
+  </section>
+  <section class="slip-charge">
+    <div class="slip-charge-heading"><strong>Payment details</strong><span>{{ bill.get_source_display }}</span></div>
+    <div class="slip-description">{{ bill.description }}</div>
+    <div class="slip-line"><span>Amount</span><strong>₹{{ bill.amount|floatformat:2 }}</strong></div>
+    <div class="slip-line"><span>Discount</span><strong>− ₹{{ bill.discount|floatformat:2 }}</strong></div>
+    <div class="slip-total"><span>Amount due</span><strong>₹{{ bill.amount_due|floatformat:2 }}</strong></div>
+  </section>
+  <footer class="slip-footer"><span>Created by {{ bill.created_by.get_full_name|default:bill.created_by.username|default:"Registration Desk" }}</span><span>Thank you</span></footer>
+</article>
+<style>
+  .payment-slip{max-width:720px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:24px;padding:34px;box-shadow:0 12px 40px rgba(25,25,35,.08);color:#202024}
+  .slip-header{display:flex;justify-content:space-between;align-items:center;padding-bottom:24px;border-bottom:1px dashed #c9c9d4;gap:18px}
+  .slip-brand{display:flex;align-items:center;gap:12px}.slip-brand strong,.slip-brand small{display:block}.slip-brand strong{font-size:19px}.slip-brand small{color:#777;margin-top:3px}
+  .slip-mark{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#d6f25f;font-size:30px;font-weight:800}
+  .slip-title{text-align:right}.slip-title span,.slip-title strong,.slip-title small{display:block}.slip-title span{font-size:12px;letter-spacing:1.5px;color:#666}.slip-title strong{font-size:17px;margin:4px 0}.slip-title small{color:#777}
+  .slip-status{display:inline-block;margin:22px 0 8px;padding:7px 12px;background:#fff0cf;color:#805400;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:.6px}
+  .slip-status.paid{background:#dcfce7;color:#166534}
+  .slip-patient h2{font-size:23px;margin:8px 0 16px}.slip-patient>div,.slip-line,.slip-total{display:flex;justify-content:space-between;gap:18px;padding:10px 0}.slip-patient>div span,.slip-line span{color:#686873}.slip-patient>div{border-bottom:1px solid #eee}
+  .slip-charge{margin-top:24px;padding:20px;border-radius:16px;background:#f8f8fb}.slip-charge-heading{display:flex;justify-content:space-between;align-items:center;padding-bottom:14px;border-bottom:1px solid #dedee7}.slip-charge-heading span{font-size:12px;color:#686873}.slip-description{padding:15px 0;font-weight:700}.slip-line{padding:6px 0;font-size:14px}.slip-total{margin-top:10px;padding-top:15px;border-top:1px solid #c9c9d4;font-size:18px;font-weight:800}
+  .slip-footer{display:flex;justify-content:space-between;gap:12px;margin-top:25px;padding-top:15px;border-top:1px dashed #c9c9d4;color:#686873;font-size:12px}
+  @media print{.sidebar,.topbar,.print-controls,.messages,.slip-actions{display:none!important}.app,.main{display:block!important;width:100%!important;margin:0!important;padding:0!important}.content,.main-content{padding:0!important;margin:0!important}.payment-slip{max-width:none;border:1px solid #aaa;border-radius:0;box-shadow:none;margin:0;padding:24px;break-inside:avoid}body{background:#fff!important}}
+  @page{size:A4;margin:18mm}
+</style>
+{% endblock %}

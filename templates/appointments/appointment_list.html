@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Appointments — Cams HMS{% endblock %}
+
+{% block heading %}
+  <div class="page-header">
+    <h1>Appointments</h1>
+    {% if can_manage_appointments %}<a href="{% url 'appointment_create' %}" class="btn">+ Book appointment</a>{% endif %}
+  </div>
+{% endblock %}
+
+{% block content %}
+<div class="date-nav card">
+  <a class="btn btn-outline" href="?date={{ prev_date|date:'Y-m-d' }}">← Previous</a>
+  <form method="get" action="{% url 'appointment_list' %}">
+    <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}">
+    <button type="submit" class="btn btn-plain">Go</button>
+  </form>
+  <a class="btn btn-outline" href="?date={{ next_date|date:'Y-m-d' }}">Next →</a>
+  {% if not is_today %}<a class="btn btn-plain" href="{% url 'appointment_list' %}">Today</a>{% endif %}
+  <strong class="date-label">{{ selected_date|date:"l, F j, Y" }}</strong>
+</div>
+
+<section class="card">
+  {% if appointments %}
+    <table>
+      <thead>
+        <tr><th>Time</th><th>Patient</th><th>Doctor</th><th>Reason</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for appointment in appointments %}
+        <tr>
+          <td>{{ appointment.start_time|time:"H:i" }}–{{ appointment.end_time|time:"H:i" }}</td>
+          <td><a href="{% url 'patient_detail' appointment.patient.pk %}">{{ appointment.patient }}</a></td>
+          <td>{{ appointment.doctor }}<br><small>{{ appointment.doctor.specialty_display }}</small></td>
+          <td>{{ appointment.reason }}</td>
+          <td><span class="badge badge-{{ appointment.status|lower }}">{{ appointment.get_status_display }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No appointments on this date.{% if can_manage_appointments %} <a href="{% url 'appointment_create' %}">Book one →</a>{% endif %}</p>
+  {% endif %}
+</section>
+{% endblock %}

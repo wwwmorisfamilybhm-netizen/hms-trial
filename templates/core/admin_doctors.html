@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}Doctor Management — Cams HMS{% endblock %}
+
+{% block heading %}
+<style>
+  .container { max-width: 1320px; }
+
+  /* ── Header ── */
+  .dm-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 20px; flex-wrap: wrap; margin-bottom: 24px;
+  }
+  .dm-kicker {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 1.3px;
+    text-transform: uppercase; color: #70659e; margin-bottom: 9px;
+  }
+  .dm-kicker::before { content: ""; width: 18px; height: 3px; border-radius: 2px; background: var(--lav-deep); }
+  .dm-head h1 { margin: 0; font-size: 30px; font-weight: 750; letter-spacing: -0.9px; }
+  .dm-head p { margin: 6px 0 0; font-size: 14px; color: var(--muted); }
+
+  /* ── Stat pills ── */
+  .dm-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+  .dm-stat {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px 10px 10px; border-radius: 999px;
+    background: var(--card); border: 1px solid var(--line);
+  }
+  .dm-stat-dot { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; }
+  .dm-stat-num { font-size: 17px; font-weight: 750; line-height: 1; color: var(--ink); }
+  .dm-stat-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Layout ── */
+  .dm-layout { display: grid; grid-template-columns: 400px 1fr; gap: 20px; align-items: start; }
+
+  .dm-card {
+    background: var(--card); border-radius: var(--radius);
+    padding: 24px; position: sticky; top: 92px;
+  }
+  .dm-card h2 { margin: 0; font-size: 18px; letter-spacing: -0.3px; }
+  .dm-card-sub { margin: 5px 0 20px; font-size: 13px; color: var(--muted); }
+
+  /* ── Form ── */
+  .dm-field { margin-bottom: 16px; }
+  .dm-field label { display: block; font-size: 12.5px; font-weight: 600; color: #3a3a40; margin-bottom: 6px; }
+  .dm-field input, .dm-field select, .dm-field textarea {
+    width: 100%; padding: 10px 13px; font-size: 14px; font-family: inherit;
+    border: 1px solid var(--line); border-radius: 12px; background: #fcfcfd; color: var(--ink);
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .dm-field input:focus, .dm-field select:focus {
+    outline: none; border-color: var(--lav-deep); background: var(--card);
+    box-shadow: 0 0 0 3px var(--lav-soft);
+  }
+  .dm-field .help { font-size: 11.5px; color: var(--muted); margin-top: 5px; }
+  .dm-field ul.errorlist { list-style: none; margin: 6px 0 0; padding: 0; }
+  .dm-field ul.errorlist li { color: var(--red); font-size: 12px; font-weight: 600; }
+
+  /* ── Photo picker ── */
+  .dm-photo { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+  .dm-photo-preview {
+    width: 76px; height: 76px; border-radius: 22px; overflow: hidden;
+    background: linear-gradient(135deg, #c9bdf8, #a99ae9);
+    display: grid; place-items: center; flex-shrink: 0;
+    color: #2f2b3f; font-size: 26px; font-weight: 800;
+  }
+  .dm-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+  .dm-photo-side { display: flex; flex-direction: column; gap: 5px; }
+  .dm-photo-side label {
+    display: inline-block; padding: 7px 14px; border-radius: 10px;
+    background: var(--ink); color: #fff; font-size: 12.5px; font-weight: 600;
+    cursor: pointer; text-align: center;
+  }
+  .dm-photo-side label:hover { filter: brightness(1.35); }
+  .dm-photo-side input[type="file"] { display: none; }
+  .dm-photo-side small { font-size: 11px; color: var(--muted); }
+
+  .dm-submit {
+    width: 100%; padding: 13px; border: none; border-radius: 14px;
+    background: var(--ink); color: #fff; cursor: pointer;
+    font-family: inherit; font-size: 14.5px; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: filter 0.15s ease;
+  }
+  .dm-submit:hover { filter: brightness(1.35); }
+
+  /* ── Roster ── */
+  .dm-roster { background: var(--card); border-radius: var(--radius); overflow: hidden; }
+  .dm-roster-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px; flex-wrap: wrap; padding: 20px 24px; border-bottom: 1px solid var(--line);
+  }
+  .dm-roster-head h2 { margin: 0; font-size: 17px; letter-spacing: -0.3px; }
+
+  .dm-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .dm-tab {
+    padding: 6px 13px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 600;
+    color: var(--muted); text-decoration: none; border: 1px solid transparent;
+    transition: background 0.14s ease, color 0.14s ease;
+  }
+  .dm-tab:hover { background: #f5f5f6; color: var(--ink); text-decoration: none; }
+  .dm-tab.active { background: var(--ink); color: #fff; }
+
+  .dm-search {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px;
+    background: #fcfcfd; min-width: 200px;
+  }
+  .dm-search input { border: 0; background: transparent; outline: 0; font: inherit; font-size: 13px; width: 100%; }
+  .dm-search input::placeholder { color: #a3a3aa; }
+
+  .dm-list { list-style: none; margin: 0; padding: 0; }
+  .dm-row {
+    display: flex; align-items: center; gap: 16px;
+    padding: 15px 24px; border-bottom: 1px solid #f0f0f2;
+    transition: background 0.14s ease;
+  }
+  .dm-row:last-child { border-bottom: none; }
+  .dm-row:hover { background: #fafafb; }
+
+  .dm-avatar {
+    width: 46px; height: 46px; border-radius: 15px; overflow: hidden; flex-shrink: 0;
+    display: grid; place-items: center; font-size: 16px; font-weight: 750; color: #2f2b3f;
+    background: linear-gradient(135deg, #e8e3f7, #c9bdf8);
+  }
+  .dm-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .dm-avatar.lime { background: linear-gradient(135deg, #eaf7b6, #d7f261); color: #3f4418; }
+  .dm-avatar.green { background: linear-gradient(135deg, #d9f2e3, #a8dcc0); color: #1f5138; }
+  .dm-avatar.gray { background: linear-gradient(135deg, #f0f0f2, #dcdce0); color: #56565c; }
+  .dm-avatar.dark { background: linear-gradient(135deg, #3a3a40, #202024); color: var(--lime); }
+
+  .dm-info { flex: 1; min-width: 0; }
+  .dm-name { font-size: 14.5px; font-weight: 650; color: var(--ink); }
+  .dm-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .dm-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 700; white-space: nowrap;
+  }
+  .dm-badge.doctor { background: var(--lav-soft); color: #665b9d; }
+  .dm-badge.nurse { background: var(--green-soft); color: #245e42; }
+  .dm-badge.registration_desk { background: var(--amber-soft); color: #89641b; }
+  .dm-badge.admin { background: #eeeeef; color: #3a3a40; }
+
+  .dm-edit {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card); color: #56565c;
+    font-size: 12.5px; font-weight: 600; white-space: nowrap;
+    transition: background 0.14s ease, color 0.14s ease;
+  }
+  .dm-edit:hover { background: #f5f5f6; color: var(--ink); text-decoration: none; }
+
+  .dm-empty { text-align: center; padding: 56px 24px; color: var(--muted); font-size: 14px; }
+
+  @media (max-width: 1080px) { .dm-layout { grid-template-columns: 1fr; } .dm-card { position: static; } }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="dm-head">
+  <div>
+    <span class="dm-kicker">Admin Console</span>
+    <h1>Doctor Management</h1>
+    <p>Provision staff accounts — photo, name, designation and login credentials</p>
+  </div>
+  <div class="dm-stats">
+    <div class="dm-stat">
+      <span class="dm-stat-dot" style="background:var(--ink); color:var(--lime);">{{ counts.all }}</span>
+      <span><span class="dm-stat-num">{{ counts.all }}</span><div class="dm-stat-lbl">Total Staff</div></span>
+    </div>
+    <div class="dm-stat">
+      <span class="dm-stat-dot" style="background:var(--lav-soft); color:#665b9d;">D</span>
+      <span><span class="dm-stat-num">{{ counts.doctor }}</span><div class="dm-stat-lbl">Doctors</div></span>
+    </div>
+    <div class="dm-stat">
+      <span class="dm-stat-dot" style="background:var(--green-soft); color:#245e42;">N</span>
+      <span><span class="dm-stat-num">{{ counts.nurse }}</span><div class="dm-stat-lbl">Nurses</div></span>
+    </div>
+    <div class="dm-stat">
+      <span class="dm-stat-dot" style="background:var(--amber-soft); color:#89641b;">R</span>
+      <span><span class="dm-stat-num">{{ counts.registration_desk }}</span><div class="dm-stat-lbl">Front Desk</div></span>
+    </div>
+  </div>
+</div>
+
+<div class="dm-layout">
+
+  <!-- ── Create account ── -->
+  <section class="dm-card">
+    <h2>Add Staff Account</h2>
+    <p class="dm-card-sub">Create a login with photo and designation access.</p>
+
+    <form method="post" enctype="multipart/form-data" id="dmCreateForm">
+      {% csrf_token %}
+
+      <div class="dm-photo">
+        <span class="dm-photo-preview" id="dmPreview">
+          {% if form.photo.value %}<img src="{{ form.photo.value.url }}" alt="">{% else %}+{% endif %}
+        </span>
+        <span class="dm-photo-side">
+          <label for="{{ form.photo.id_for_label }}">Upload photo</label>
+          {{ form.photo }}
+          <small>Square JPG or PNG</small>
+        </span>
+      </div>
+
+      {% for field in form %}
+        {% if field.name != "photo" %}
+          <div class="dm-field{% if field.errors %} has-error{% endif %}"
+               {% if field.name == "specialty" %}id="dmSpecialtyField" style="display:none;"{% endif %}>
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<span class="help">{{ field.help_text }}</span>{% endif %}
+            {% if field.errors %}<ul class="errorlist">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+
+      {% if form.non_field_errors %}
+        <ul class="errorlist" style="margin-bottom:12px;">{% for e in form.non_field_errors %}<li style="color:var(--red); font-weight:600; font-size:12.5px;">{{ e }}</li>{% endfor %}</ul>
+      {% endif %}
+
+      <button type="submit" class="dm-submit">
+        <svg width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 3v12M3 9h12"/></svg>
+        Create Account
+      </button>
+    </form>
+  </section>
+
+  <!-- ── Roster ── -->
+  <section class="dm-roster">
+    <div class="dm-roster-head">
+      <h2>Staff Roster</h2>
+      <div class="dm-tabs">
+        <a class="dm-tab{% if not designation_filter %} active{% endif %}" href="{% url 'admin_doctors' %}">All</a>
+        <a class="dm-tab{% if designation_filter == 'doctor' %} active{% endif %}" href="?designation=doctor">Doctors</a>
+        <a class="dm-tab{% if designation_filter == 'nurse' %} active{% endif %}" href="?designation=nurse">Nurses</a>
+        <a class="dm-tab{% if designation_filter == 'registration_desk' %} active{% endif %}" href="?designation=registration_desk">Front Desk</a>
+        <a class="dm-tab{% if designation_filter == 'admin' %} active{% endif %}" href="?designation=admin">Admins</a>
+      </div>
+    </div>
+
+    <div class="dm-roster-head" style="border-bottom:none; padding-top:0;">
+      <form class="dm-search" method="get" style="width:100%;">
+        {% if designation_filter %}<input type="hidden" name="designation" value="{{ designation_filter }}">{% endif %}
+        <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="#a3a3aa" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="7.5" cy="7.5" r="6.5"/><path d="M12.5 12.5 17 17"/></svg>
+        <input type="search" name="q" value="{{ search }}" placeholder="Search by name or username…" aria-label="Search staff">
+      </form>
+    </div>
+
+    <ul class="dm-list">
+      {% for row in staff_list %}
+      <li class="dm-row">
+        <span class="dm-avatar {% if row.designation == 'doctor' %}{% elif row.designation == 'nurse' %}green{% elif row.designation == 'admin' %}dark{% elif row.designation == 'registration_desk' %}lime{% else %}gray{% endif %}">
+          {% if row.photo %}<img src="{{ row.photo.url }}" alt="{{ row.user.first_name }}">{% else %}{{ row.initials }}{% endif %}
+        </span>
+        <span class="dm-info">
+          <span class="dm-name">{{ row.user.get_full_name|default:row.user.username }}</span>
+          <span class="dm-meta">
+            {% if row.specialty_label %}{{ row.specialty_label }} · {% endif %}@{{ row.user.username }}
+          </span>
+        </span>
+        <span class="dm-badge {{ row.designation }}">{{ row.designation_label }}</span>
+        <a class="dm-edit" href="{% url 'admin_doctor_edit' row.user.pk %}">
+          <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5H5A1.5 1.5 0 0 0 3.5 4v10A1.5 1.5 0 0 0 5 15.5h8a1.5 1.5 0 0 0 1.5-1.5V6.5"/><path d="M13.5 2.5a1.6 1.6 0 0 1 2.3 2.3L8 12.6l-3 .8.8-3Z"/></svg>
+          Edit
+        </a>
+      </li>
+      {% empty %}
+      <li class="dm-empty">No staff match this filter. Add the first account on the left.</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+
+<script>
+  (function () {
+    var input = document.querySelector("#dmCreateForm input[type=file]");
+    var preview = document.getElementById("dmPreview");
+    if (!input || !preview) return;
+    input.addEventListener("change", function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        preview.innerHTML = '<img src="' + e.target.result + '" alt="">';
+      };
+      reader.readAsDataURL(file);
+    });
+  })();
+
+  // Show the Specialty field only when the designation is Doctor.
+  (function () {
+    var desig = document.getElementById("id_designation");
+    var wrap = document.getElementById("dmSpecialtyField");
+    if (!desig || !wrap) return;
+    function sync() {
+      wrap.style.display = desig.value === "doctor" ? "block" : "none";
+    }
+    desig.addEventListener("change", sync);
+    sync();
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Settings — Cams HMS{% endblock %}
+
+{% block heading %}
+  <div class="page-head" style="align-items:center; flex-wrap:wrap;">
+    <div>
+      <h1>Settings</h1>
+      <p class="page-sub">Manage administrator preferences and data tools</p>
+    </div>
+    <span class="badge" style="background:var(--lime); color:var(--ink); padding:8px 16px; font-weight:800;">ADMIN VIEW</span>
+  </div>
+{% endblock %}
+
+{% block content %}
+<section class="card settings-overview">
+  <div class="settings-overview-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.7a7.6 7.6 0 0 1-1.6.9l-.3 1.8h-2.8l-.3-1.8a7.6 7.6 0 0 1-1.6-.9l-1.7.7-1.4-2.4 1.4-1.1a7.7 7.7 0 0 1 0-1.9l-1.4-1.1 1.4-2.4 1.7.7a7.6 7.6 0 0 1 1.6-.9l.3-1.8h2.8l.3 1.8a7.6 7.6 0 0 1 1.6.9l1.7-.7 1.4 2.4-1.4 1.1a7.7 7.7 0 0 1 0 1.8Z" transform="translate(-1 -1)"/></svg>
+  </div>
+  <div>
+    <p class="settings-kicker">ADMINISTRATION</p>
+    <h2>Settings</h2>
+    <p class="settings-description">Choose a settings area to manage your hospital workspace.</p>
+  </div>
+</section>
+
+<a class="card settings-option" href="{% url 'admin_backup_import' %}">
+  <span class="option-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m-4-4 4 4 4-4"/><rect x="4" y="15" width="16" height="6" rx="2"/><path d="M8 18h.01M12 18h.01"/></svg>
+  </span>
+  <span class="option-copy">
+    <strong>Backup &amp; Import</strong>
+    <span>Export patient records or import a previously saved patient backup.</span>
+  </span>
+  <span class="option-arrow" aria-hidden="true">→</span>
+</a>
+
+<a class="card settings-option" href="{% url 'admin_doctors' %}">
+  <span class="option-icon" style="background:var(--lav-soft); color:#665b9d;" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.4"/><path d="M2.8 19.5a6.2 6.2 0 0 1 12.4 0"/><path d="M18.5 8.5v5M21 11h-5"/></svg>
+  </span>
+  <span class="option-copy">
+    <strong>Doctor Management</strong>
+    <span>Add and manage staff accounts — upload a photo, set the name, designation, username and password. Designation decides which portal and sidebar each person sees.</span>
+  </span>
+  <span class="option-arrow" aria-hidden="true">→</span>
+</a>
+
+<a class="card settings-option" href="{% url 'admin:app_list' app_label='patients' %}">
+  <span class="option-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v14H4zM8 9h8M8 13h5M8 17h8"/><circle cx="18" cy="15" r="3" fill="white"/></svg>
+  </span>
+  <span class="option-copy">
+    <strong>Patient Registration Setup</strong>
+    <span>Configure the default registration fee, patient categories, states, and religions. Deactivate options to stop new use while keeping existing patient records intact.</span>
+  </span>
+  <span class="option-arrow" aria-hidden="true">→</span>
+</a>
+
+<style>
+  .settings-overview { display:flex; align-items:center; gap:18px; padding:24px; border-radius:20px; margin-bottom:18px; }
+  .settings-overview-icon,.option-icon { display:grid; place-items:center; flex:0 0 auto; border-radius:17px; }
+  .settings-overview-icon { width:52px; height:52px; color:var(--ink); background:var(--lime); }
+  .settings-overview-icon svg { width:27px; height:27px; }
+  .settings-kicker { margin:0 0 5px; color:var(--muted); font-size:10px; font-weight:800; letter-spacing:1.3px; }
+  .settings-overview h2 { margin:0; font-size:19px; letter-spacing:-.3px; }
+  .settings-description { margin:6px 0 0; color:var(--muted); font-size:13px; }
+  .settings-option { display:flex; align-items:center; gap:16px; padding:20px; border-radius:18px; color:var(--ink); text-decoration:none; transition:transform .15s ease, box-shadow .15s ease; }
+  .settings-option:hover { transform:translateY(-2px); box-shadow:0 12px 30px #20202412; }
+  .option-icon { width:48px; height:48px; color:#245e42; background:var(--green-soft); }
+  .option-icon svg { width:25px; height:25px; }
+  .option-copy { display:grid; gap:5px; flex:1; }
+  .option-copy strong { font-size:15px; }
+  .option-copy>span { color:var(--muted); font-size:12px; line-height:1.5; }
+  .option-arrow { color:var(--muted); font-size:20px; }
+  @media(max-width:600px) { .settings-option { align-items:flex-start; } }
+</style>
+{% endblock %}

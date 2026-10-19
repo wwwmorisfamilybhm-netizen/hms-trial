@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}History — Cams HMS{% endblock %}
+
+{% block heading %}
+  <div class="page-head">
+    <div>
+      <h1>History</h1>
+      <p class="page-sub">{% if is_registration_desk %}Patient registration records · filter &amp; edit{% else %}All registered patients and booked appointments · filter &amp; edit{% endif %}</p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Filters -->
+<form method="get" action="{% url 'history' %}" class="card" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; padding:18px 22px; border-radius:20px; margin-bottom:24px;">
+  <div style="display:flex; flex-direction:column; gap:4px;">
+    <label style="font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.5px;">TYPE</label>
+    <select name="type" style="padding:8px 10px; border:1px solid var(--line); border-radius:10px; font:inherit; background:#fff; min-width:150px;">
+      <option value="all" {% if item_type == 'all' %}selected{% endif %}>All records</option>
+      <option value="patients" {% if item_type == 'patients' %}selected{% endif %}>Patients only</option>
+      {% if not is_registration_desk %}<option value="appointments" {% if item_type == 'appointments' %}selected{% endif %}>Appointments only</option>{% endif %}
+    </select>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:4px; flex:1; min-width:220px;">
+    <label style="font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.5px;">SEARCH</label>
+    <input type="search" name="q" value="{{ query }}" placeholder="{% if is_registration_desk %}Name, MR no., phone…{% else %}Name, MR no., phone, doctor, reason…{% endif %}" style="padding:8px 10px; border:1px solid var(--line); border-radius:10px; font:inherit; width:100%;">
+  </div>
+  <div style="display:flex; flex-direction:column; gap:4px;">
+    <label style="font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.5px;">DATE</label>
+    <input type="date" name="date" value="{{ date_str }}" style="padding:8px 10px; border:1px solid var(--line); border-radius:10px; font:inherit; background:#fff;">
+  </div>
+  {% if not is_registration_desk %}<div style="display:flex; flex-direction:column; gap:4px;">
+    <label style="font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.5px;">APPT. STATUS</label>
+    <select name="status" {% if item_type == 'patients' %}disabled{% endif %} style="padding:8px 10px; border:1px solid var(--line); border-radius:10px; font:inherit; background:#fff; min-width:130px;">
+      <option value="">Any status</option>
+      {% for value, label in status_choices %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>{% endif %}
+  <button type="submit" class="btn" style="padding:9px 18px;">Apply filters</button>
+  <a href="{% url 'history' %}" class="btn btn-plain" style="padding:9px 14px;">Reset</a>
+</form>
+
+<!-- Records -->
+<section class="card" style="border-radius:24px; padding:24px 28px;">
+  {% if rows %}
+    <table>
+      <thead>
+        <tr>
+          <th>Date &amp; Time</th>
+          <th>Type</th>
+          <th>Record</th>
+          <th class="ta-r">Status</th>
+          <th class="ta-r">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="cell-strong">{{ row.when|date:"M j, Y" }}<br><small class="muted">{{ row.when|date:"H:i" }}</small></td>
+          <td>
+            {% if row.kind == 'patient' %}
+              <span class="badge" style="background:var(--lav-soft); color:var(--ink); font-weight:700;">PATIENT</span>
+              {% if row.is_emergency %}
+                <span class="badge" style="background:var(--red); color:#fff; font-weight:800; margin-left:6px;">⚑ EMERGENCY</span>
+              {% endif %}
+            {% else %}
+              <span class="badge" style="background:var(--lime); color:var(--ink); font-weight:700;">APPOINTMENT</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ row.view_url }}" style="font-weight:600; color:var(--ink); text-decoration:none;">{{ row.title }}</a>
+            <br><small class="muted">{{ row.badge }} · {{ row.detail }}</small>
+          </td>
+          <td class="ta-r">
+            {% if row.status %}
+              <span class="badge badge-{{ row.status_lower }}">{{ row.status }}</span>
+            {% else %}
+              <span class="badge">Registered</span>
+            {% endif %}
+          </td>
+          <td class="ta-r" style="white-space:nowrap;">
+            <a href="{{ row.edit_url }}" class="btn btn-outline" style="padding:4px 12px; font-size:11px; font-weight:750; border-radius:8px; margin-right:6px;">
+              {% if row.is_emergency %}✎ Continue details{% else %}✎ Edit{% endif %}
+            </a>
+            {% if row.delete_url %}
+              <a href="{{ row.delete_url }}" class="btn btn-outline" style="padding:4px 12px; font-size:11px; font-weight:750; border-radius:8px; margin-right:6px; color:#b91c1c; border-color:#fecaca;" title="Delete patient (password required)">
+                🗑 Delete
+              </a>
+            {% endif %}
+            <a href="{{ row.view_url }}" class="link" style="font-size:13px;">View →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p style="font-size:12px; color:var(--muted); margin:14px 4px 0;">Showing the {{ row_count }} most recent records.</p>
+  {% else %}
+    <div style="text-align:center; padding:48px 20px;">
+      <p style="color:var(--muted); font-size:15px; margin-bottom:16px;">No records match these filters.</p>
+      <a href="{% url 'registration_desk' %}" class="btn" style="background:var(--lime); color:var(--ink); font-weight:700; padding:10px 20px; border-radius:12px; text-decoration:none;">
+        + Register a Patient
+      </a>
+    </div>
+  {% endif %}
+</section>
+
+{% endblock %}
