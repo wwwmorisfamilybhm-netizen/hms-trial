@@ -31,6 +31,7 @@ urlpatterns = [
     path("doctor/initial-assessment/", views.initial_assessment, name="initial_assessment"),
     path("api/medgemma/draft/", views.medgemma_draft, name="medgemma_draft"),
     path("api/initial-assessment/save/", views.save_initial_assessment, name="save_initial_assessment"),
+    path("api/initial-assessment/patients/", views.initial_assessment_patients, name="initial_assessment_patients"),
     path("doctor/patient-queue/", views.doctor_placeholder, {"page": "patient_queue"}, name="patient_queue"),
     path("doctor/consultation/", views.doctor_consultation, name="doctor_consultation"),
     path("api/consultation/save/", views.save_consultation, name="save_consultation"),

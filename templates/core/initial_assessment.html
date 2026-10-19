@@ -428,7 +428,7 @@
         {% if query %}
         <p class="ia-empty-note">Showing results for “{{ query }}”.</p>
         {% endif %}
-        <a class="ia-btn ia-btn-primary ia-empty-btn" href="#iaPatientRail">Find a patient</a>
+        <button type="button" class="ia-btn ia-btn-primary ia-empty-btn" id="iaFindPatientBtn" data-open-patient-modal>Find a patient</button>
       </section>
     {% endif %}
   </div>
@@ -437,34 +437,29 @@
        RIGHT — patient search / list rail
        ══════════════════════════════════════════════════════════════ -->
   <aside class="ia-rail" id="iaPatientRail">
-    <section class="ia-card ia-picker">
+    <section class="ia-card ia-picker" data-patient-picker>
       <div class="ia-picker-head">
         <div>
           <h3>Patient Search</h3>
           <span class="ia-picker-sub">Search by name, MR number or phone{% if query %} · “{{ query }}”{% endif %}</span>
         </div>
-        <span class="ia-count" id="patientCount">{{ patients|length }}</span>
+        <div class="ia-picker-head-actions">
+          <span class="ia-count" id="patientCount" data-patient-count>{{ patients|length }}</span>
+          <button type="button" class="ia-icon-btn" data-open-patient-modal title="Open patient search" aria-label="Open patient search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          </button>
+        </div>
       </div>
 
-      <form method="get" action="{% url 'initial_assessment' %}" class="ia-search" id="patientSearchForm">
-        <input type="search" name="q" id="patientSearchInput" value="{{ query }}" placeholder="Search patient by name, MR number or phone…" autocomplete="off">
+      <form method="get" action="{% url 'initial_assessment' %}" class="ia-search" id="patientSearchForm" data-patient-search>
+        <input type="search" name="q" id="patientSearchInput" data-patient-search-input value="{{ query }}" placeholder="Search patient by name, MR number or phone…" autocomplete="off">
         {% if selected_patient %}<input type="hidden" name="patient" value="{{ selected_patient.pk }}">{% endif %}
         <button type="submit" class="ia-btn ia-btn-sm">Search</button>
       </form>
 
-      <div class="ia-patient-list" id="patientList">
+      <div class="ia-patient-list" id="patientList" data-patient-list>
         {% for p in patients %}
-        <a class="ia-patient{% if p.pk == selected_patient.pk %} is-selected{% endif %}"
-           href="{% url 'initial_assessment' %}?patient={{ p.pk }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}"
-           data-name="{{ p.full_name|lower }} {{ p.uhid|lower }} {{ p.phone|lower }}"
-           data-id="{{ p.pk }}">
-          <span class="ia-patient-avatar">{{ p.first_name|slice:":1"|upper }}{% if p.last_name %}{{ p.last_name|slice:":1"|upper }}{% endif %}</span>
-          <span class="ia-patient-info">
-            <span class="ia-patient-name">{{ p.full_name }}{% if p.is_emergency %}<span class="ia-chip ia-chip-urgent ia-chip-xs">Emergency</span>{% endif %}</span>
-            <span class="ia-patient-meta">{{ p.uhid }} · {{ p.age|default:"—" }} yrs · {{ p.get_gender_display|default:"—" }}{% if p.phone %} · {{ p.phone }}{% endif %}</span>
-          </span>
-          {% if p.has_assessment %}<span class="ia-patient-done" title="Initial assessment recorded">✓</span>{% endif %}
-        </a>
+          {% include "core/_patient_item.html" %}
         {% empty %}
         <div class="ia-list-empty">
           {% if query %}No patients match “{{ query }}”.{% else %}No patients registered yet.{% endif %}
@@ -546,6 +541,44 @@
     </section>
     {% endif %}
   </aside>
+</div>
+
+<!-- ── Patient search popup ── -->
+<div class="ia-modal-backdrop" id="iaPatientModal" hidden>
+  <div class="ia-modal" role="dialog" aria-modal="true" aria-labelledby="iaPatientModalTitle" data-patient-picker>
+    <div class="ia-modal-head">
+      <div>
+        <h3 id="iaPatientModalTitle">Find a patient</h3>
+        <span class="ia-picker-sub">Search by name, MR number or phone — then pick the patient to assess.</span>
+      </div>
+      <button type="button" class="ia-icon-btn" id="iaPatientModalClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="ia-modal-body">
+      <div class="ia-search" data-patient-search>
+        <input type="search" id="iaModalSearchInput" data-patient-search-input data-live-search="1"
+               data-patient-api="{% url 'initial_assessment_patients' %}"
+               placeholder="Search patient by name, MR number or phone…" autocomplete="off">
+        <button type="button" class="ia-btn ia-btn-sm" data-patient-search-btn>Search</button>
+      </div>
+
+      <div class="ia-patient-list ia-modal-list" id="iaModalPatientList" data-patient-list>
+        {% for p in patients %}
+          {% include "core/_patient_item.html" %}
+        {% empty %}
+        <div class="ia-list-empty">No patients registered yet.</div>
+        {% endfor %}
+      </div>
+      <div class="ia-list-empty" data-patient-empty hidden>No patients match that search.</div>
+    </div>
+
+    <div class="ia-modal-foot">
+      <span class="ia-modal-hint"><span data-patient-count>{{ patients|length }}</span> patient(s) listed</span>
+      <button type="button" class="ia-btn ia-btn-ghost" id="iaPatientModalCancel">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── Toast ── -->

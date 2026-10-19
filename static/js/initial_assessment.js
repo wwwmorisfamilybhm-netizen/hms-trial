@@ -801,48 +801,138 @@
     }
   }
 
-  /* ───────────────────── Patient rail ──────────────────────── */
-  function initPatientRail() {
-    var input = document.getElementById("patientSearchInput");
-    var list = document.getElementById("patientList");
-    var count = document.getElementById("patientCount");
-    if (!input || !list) { return; }
+  /* ───────────────────── Patient pickers ───────────────────── */
+  function patientRow(item) {
+    var row = document.createElement("a");
+    row.className = "ia-patient";
+    row.href = item.url;
+    row.setAttribute("data-name", item.search || "");
+    row.setAttribute("data-id", item.id);
+    row.innerHTML =
+      '<span class="ia-patient-avatar">' + escapeHtml(item.initials || "PT") + "</span>" +
+      '<span class="ia-patient-info">' +
+        '<span class="ia-patient-name">' + escapeHtml(item.name || "—") +
+          (item.emergency ? '<span class="ia-chip ia-chip-urgent ia-chip-xs">Emergency</span>' : "") +
+        "</span>" +
+        '<span class="ia-patient-meta">' + escapeHtml(item.meta || "") + "</span>" +
+      "</span>" +
+      (item.has_assessment ? '<span class="ia-patient-done" title="Initial assessment recorded">✓</span>' : "");
+    return row;
+  }
 
-    function applyFilter(term) {
-      var query = String(term || "").trim().toLowerCase();
-      var visible = 0;
-      $$(".ia-patient", list).forEach(function (item) {
-        var haystack = item.getAttribute("data-name") || "";
-        var match = !query || haystack.indexOf(query) !== -1;
-        item.hidden = !match;
-        if (match) { visible += 1; }
-      });
-      if (count) { count.textContent = visible; }
-      var empty = list.querySelector(".ia-filter-empty");
-      if (!query) {
-        if (empty) { empty.remove(); }
-      } else if (!visible) {
-        if (!empty) {
-          empty = document.createElement("div");
-          empty.className = "ia-list-empty ia-filter-empty";
-          empty.textContent = "No patient matches “" + term + "”.";
-          list.appendChild(empty);
+  function filterPatientList(list, term, countEl, emptyEl) {
+    var query = String(term || "").trim().toLowerCase();
+    var visible = 0;
+    $$(".ia-patient", list).forEach(function (item) {
+      var haystack = item.getAttribute("data-name") || "";
+      var match = !query || haystack.indexOf(query) !== -1;
+      item.hidden = !match;
+      if (match) { visible += 1; }
+    });
+    if (countEl) { countEl.textContent = visible; }
+    if (emptyEl) { emptyEl.hidden = visible !== 0; }
+    return visible;
+  }
+
+  function initPatientPickers() {
+    $$("[data-patient-search-input]").forEach(function (input) {
+      // The search box, the result list and the counter all live inside the
+      // same picker container (the rail card or the search popup).
+      var scope = input.closest("[data-patient-picker]") || document;
+      var list = scope.querySelector("[data-patient-list]");
+      if (!list) { return; }
+      var countEl = scope.querySelector("[data-patient-count]");
+      var emptyEl = scope.querySelector("[data-patient-empty]");
+      var apiUrl = input.getAttribute("data-patient-api");
+      var live = input.getAttribute("data-live-search") === "1" && !!apiUrl;
+      var initialHtml = list.innerHTML;
+      var timer = null;
+
+      if (live) {
+        var search = function () {
+          var term = String(input.value || "").trim();
+          if (!term) {
+            list.innerHTML = initialHtml;
+            filterPatientList(list, "", countEl, emptyEl);
+            return;
+          }
+          fetch(apiUrl + "?q=" + encodeURIComponent(term), {
+            credentials: "same-origin",
+            headers: { "Accept": "application/json" }
+          }).then(function (response) {
+            if (!response.ok) { throw new Error("HTTP " + response.status); }
+            return response.json();
+          }).then(function (data) {
+            var results = (data && data.results) || [];
+            list.innerHTML = "";
+            results.forEach(function (item) { list.appendChild(patientRow(item)); });
+            if (countEl) { countEl.textContent = results.length; }
+            if (emptyEl) { emptyEl.hidden = results.length !== 0; }
+          }).catch(function () {
+            showToast("Patient search is unavailable right now.", "error");
+          });
+        };
+
+        input.addEventListener("input", function () {
+          clearTimeout(timer);
+          timer = setTimeout(search, 250);
+        });
+        var btn = scope.querySelector("[data-patient-search-btn]");
+        if (btn) { btn.addEventListener("click", search); }
+      } else {
+        input.addEventListener("input", function () {
+          filterPatientList(list, input.value, countEl, emptyEl);
+        });
+        var formEl = scope.querySelector("form");
+        if (formEl) {
+          formEl.addEventListener("submit", function () {
+            if (!String(input.value || "").trim()) { filterPatientList(list, "", countEl, emptyEl); }
+          });
         }
-      } else if (empty) {
-        empty.remove();
+      }
+    });
+  }
+
+  /* ───────────────────── Patient search popup ───────────────────── */
+  function initPatientModal() {
+    var modal = document.getElementById("iaPatientModal");
+    if (!modal) { return; }
+    var input = document.getElementById("iaModalSearchInput");
+    var lastFocus = null;
+
+    function open() {
+      lastFocus = document.activeElement;
+      modal.hidden = false;
+      document.body.classList.add("ia-modal-open");
+      if (input) {
+        input.value = "";
+        input.focus();
       }
     }
 
-    input.addEventListener("input", function () { applyFilter(input.value); });
-
-    var formEl = document.getElementById("patientSearchForm");
-    if (formEl) {
-      formEl.addEventListener("submit", function () {
-        if (!String(input.value || "").trim()) {
-          applyFilter("");
-        }
-      });
+    function close() {
+      modal.hidden = true;
+      document.body.classList.remove("ia-modal-open");
+      if (lastFocus && lastFocus.focus) { lastFocus.focus(); }
     }
+
+    $$("[data-open-patient-modal]").forEach(function (btn) {
+      btn.addEventListener("click", open);
+    });
+
+    var closeBtn = document.getElementById("iaPatientModalClose");
+    if (closeBtn) { closeBtn.addEventListener("click", close); }
+
+    var cancelBtn = document.getElementById("iaPatientModalCancel");
+    if (cancelBtn) { cancelBtn.addEventListener("click", close); }
+
+    modal.addEventListener("click", function (e) {
+      if (e.target === modal) { close(); }
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !modal.hidden) { close(); }
+    });
   }
 
   /* ───────────────────── Boot ──────────────────────────────── */
@@ -856,7 +946,8 @@
     initOrders();
     initAI();
     initSaveActions();
-    initPatientRail();
+    initPatientPickers();
+    initPatientModal();
 
     ["height", "weight"].forEach(function (id) {
       var el = document.getElementById(id);

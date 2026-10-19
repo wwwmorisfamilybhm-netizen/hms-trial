@@ -627,6 +627,7 @@
 /* ───────────────────── Patient rail ───────────────────── */
 .ia-picker-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .ia-picker-head h3 { margin: 0; font-size: 14.5px; font-weight: 750; letter-spacing: -0.2px; }
+.ia-picker-head-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .ia-picker-sub { display: block; font-size: 11.5px; color: var(--ia-muted); margin-top: 3px; }
 .ia-count {
   display: inline-grid;
@@ -724,6 +725,54 @@
 }
 .ia-order-list li:last-child { border-bottom: none; }
 .ia-order-list .ia-icon-btn { width: 26px; height: 26px; }
+
+/* ───────────────────── Patient search popup ───────────────────── */
+.ia-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 120;
+  padding: 20px;
+  animation: iaFadeIn 0.14s ease;
+}
+.ia-modal-backdrop[hidden] { display: none; }
+body.ia-modal-open { overflow: hidden; }
+
+.ia-modal {
+  width: 100%;
+  max-width: 540px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: var(--ia-radius);
+  box-shadow: var(--ia-shadow-lg);
+  overflow: hidden;
+  animation: iaModalIn 0.18s ease;
+}
+@keyframes iaModalIn { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+.ia-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px 12px; }
+.ia-modal-head h3 { margin: 0; font-size: 16.5px; font-weight: 750; letter-spacing: -0.2px; }
+.ia-modal-body { padding: 0 22px 4px; display: flex; flex-direction: column; min-height: 0; }
+.ia-modal-list { max-height: min(46vh, 420px); margin: 0; }
+.ia-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 22px 18px;
+  border-top: 1px solid var(--ia-border);
+  margin-top: 12px;
+}
+.ia-modal-hint { font-size: 12px; color: var(--ia-muted); }
+
+@media (max-width: 560px) {
+  .ia-modal { max-height: 92vh; }
+  .ia-modal-head, .ia-modal-body, .ia-modal-foot { padding-left: 16px; padding-right: 16px; }
+}
 
 /* ───────────────────── Toast ───────────────────── */
 .ia-toast {

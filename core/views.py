@@ -1628,6 +1628,58 @@ def initial_assessment(request):
     })
 
 
+@login_required(login_url="login")
+def initial_assessment_patients(request):
+    """Live patient search used by the Initial Assessment patient picker.
+
+    Returns a small JSON payload (name, UHID, demographics, assessment flag and
+    a deep link) so the picker popup can search without a page reload.
+    """
+    from django.db.models import Exists, OuterRef, Q
+    from django.urls import reverse
+
+    from patients.models import InitialAssessment
+
+    query = request.GET.get("q", "").strip()
+    patients = Patient.objects.annotate(
+        has_assessment=Exists(InitialAssessment.objects.filter(patient=OuterRef("pk")))
+    )
+    if query:
+        patients = patients.filter(
+            Q(first_name__icontains=query)
+            | Q(second_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(mr_number__icontains=query)
+            | Q(phone__icontains=query)
+        )
+    patients = patients.order_by("-created_at")[:20]
+
+    base_url = reverse("initial_assessment")
+    results = []
+    for p in patients:
+        initials = "".join(part[0] for part in (p.first_name, p.last_name) if part)[:2].upper() or "PT"
+        meta = "%s · %s yrs · %s" % (
+            p.uhid,
+            p.age if p.age is not None else "—",
+            p.get_gender_display() if p.gender else "—",
+        )
+        if p.phone:
+            meta += " · %s" % p.phone
+        results.append({
+            "id": p.pk,
+            "name": p.full_name or "—",
+            "initials": initials,
+            "uhid": p.uhid,
+            "meta": meta,
+            "emergency": bool(p.is_emergency),
+            "has_assessment": bool(p.has_assessment),
+            "url": "%s?patient=%s" % (base_url, p.pk),
+            "search": " ".join([p.full_name.lower(), p.uhid.lower(), p.phone.lower()]),
+        })
+
+    return JsonResponse({"ok": True, "query": query, "results": results})
+
+
 # ── Doctor portal placeholders ────────────────────────────────────────────────
 
 DOCTOR_PAGES = {
