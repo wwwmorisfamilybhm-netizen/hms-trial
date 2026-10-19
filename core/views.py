@@ -794,6 +794,8 @@ def registration_desk(request):
         "is_registration_desk": is_registration_desk,
         "can_register": can_register,
         "next_mr": next_mr,
+        "today_count": Patient.objects.filter(created_at__date=date.today()).count(),
+        "total_patients": Patient.objects.count(),
         "recent_registered": recent_registered,
         "last_registered": recent_registered[0] if recent_registered else None,
         "user": request.user,

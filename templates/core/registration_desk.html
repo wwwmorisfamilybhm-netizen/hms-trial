@@ -6,7 +6,7 @@
   <div class="page-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:16px;">
     <div>
       <h1>Patient Registration</h1>
-      <p class="page-sub">Registration Desk Counter · Search the register, start a new registration and review past records</p>
+      <p class="page-sub">Registration Desk Counter · Register a patient, search the register and review past records</p>
     </div>
     <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
       <span class="badge" style="background:var(--lime); color:var(--ink); font-weight:800; padding:8px 16px; border-radius:99px; font-size:13px; letter-spacing:0.5px;">
@@ -21,13 +21,65 @@
 
 {% block content %}
 
-<!-- ═══════════ 1. SEARCH BAR ═══════════ -->
+<!-- ═══════════ 1. PRIMARY ACTION ═══════════ -->
+<section class="rd-hero">
+  <div class="rd-primary">
+    <div class="rd-primary-copy">
+      {% if can_register %}
+        <span class="rd-primary-tag">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          PRIMARY DESK ACTION
+        </span>
+        <h2>Register a New Patient</h2>
+        <p>Open the comprehensive registration form to enter personal, contact, address and billing details — a unique Medical Record (MR) Number is issued automatically.</p>
+      {% else %}
+        <span class="rd-primary-tag rd-primary-tag-muted">PATIENT REGISTER</span>
+        <h2>Search &amp; Review Patient Records</h2>
+        <p>Every patient registered at this counter, with the MR number, contact details and quick edit / delete actions. New registrations are raised by the Registration Desk staff.</p>
+      {% endif %}
+    </div>
+
+    <div class="rd-primary-actions">
+      {% if can_register %}
+        <a href="{% url 'registration_desk_new' %}" class="btn rd-btn-lime">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+            <circle cx="8" cy="6" r="4"/><path d="M1 18c1-6 3.5-8 7-8s6 2 7 8M16 5a4 4 0 0 1 0 8"/>
+          </svg>
+          <span>+ New Registration</span>
+        </a>
+      {% endif %}
+      {% if last_registered %}
+        <a href="{% url 'patient_print_card' last_registered.pk %}" class="btn rd-btn-ghost">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          <span>Print Last Card</span>
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <aside class="rd-counter">
+    <div class="rd-counter-row">
+      <span class="rd-counter-k">Next MR No</span>
+      <span class="rd-counter-v">#{{ next_mr }}</span>
+    </div>
+    <div class="rd-counter-row">
+      <span class="rd-counter-k">Registered Today</span>
+      <span class="rd-counter-v">{{ today_count }}</span>
+    </div>
+    <div class="rd-counter-row">
+      <span class="rd-counter-k">Total Patients</span>
+      <span class="rd-counter-v">{{ total_patients }}</span>
+    </div>
+  </aside>
+</section>
+
+<!-- ═══════════ 2. SEARCH BAR ═══════════ -->
 <form method="get" action="{% url 'registration_desk' %}" class="card rd-search" role="search">
   <div class="rd-search-field rd-search-main">
     <label for="rdSearchInput">SEARCH PATIENT REGISTER</label>
     <div class="rd-search-input-wrap">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input type="search" id="rdSearchInput" name="q" value="{{ query }}" placeholder="Search by patient name, MR number, phone, Aadhaar or ABHA…" autocomplete="off">
+      <input type="search" id="rdSearchInput" name="q" value="{{ query }}" placeholder="Name, MR number, phone, Aadhaar or ABHA…" autocomplete="off">
     </div>
   </div>
 
@@ -49,58 +101,29 @@
   {% endif %}
 
   <div class="rd-search-actions">
-    <button type="submit" class="btn" style="padding:10px 20px; border-radius:12px;">Search</button>
-    <a href="{% url 'registration_desk' %}" class="btn btn-plain" style="padding:10px 16px; border-radius:12px;">Reset</a>
+    <button type="submit" class="btn rd-btn-search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <span>Search</span>
+    </button>
+    <a href="{% url 'registration_desk' %}" class="btn btn-plain">Reset</a>
   </div>
 </form>
 
-<!-- ═══════════ 2. NEW REGISTRATION ═══════════ -->
-<section class="card rd-newreg">
-  <div class="rd-newreg-copy">
-    {% if can_register %}
-      <span class="rd-newreg-tag">PRIMARY DESK ACTION</span>
-      <h2>Register a New Patient</h2>
-      <p>Open the comprehensive registration form to enter personal, contact, address and billing details — a unique Medical Record (MR) Number is issued automatically.</p>
-    {% else %}
-      <span class="rd-newreg-tag rd-newreg-tag-muted">REFERENCE</span>
-      <h2>Patient Register</h2>
-      <p>Search and review every patient registered at this counter. New registrations are raised by the Registration Desk staff.</p>
-    {% endif %}
-  </div>
-
-  <div class="rd-newreg-actions">
-    {% if can_register %}
-      <a href="{% url 'registration_desk_new' %}" class="btn rd-btn-lime">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-          <circle cx="8" cy="6" r="4"/><path d="M1 18c1-6 3.5-8 7-8s6 2 7 8M16 5a4 4 0 0 1 0 8"/>
-        </svg>
-        <span>+ New Registration</span>
-      </a>
-    {% endif %}
-    {% if last_registered %}
-      <a href="{% url 'patient_print_card' last_registered.pk %}" class="btn btn-outline rd-btn-outline">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        <span>Print Last Card (#{{ last_registered.mr_number|default:last_registered.id }})</span>
-      </a>
-    {% endif %}
-  </div>
-</section>
-
 <!-- ═══════════ 3. RECORDS (History functionality) ═══════════ -->
-<section class="card" style="border-radius:24px; padding:24px 28px;">
-  <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; gap:12px; flex-wrap:wrap;">
+<section class="card rd-records">
+  <div class="rd-records-head">
     <div>
-      <h2 style="font-size:18px; font-weight:750; margin-bottom:4px;">Registration Records</h2>
-      <p style="font-size:13px; color:var(--muted); margin:0;">
+      <h2>Registration Records</h2>
+      <p>
         {% if query %}Showing records matching “{{ query }}”{% else %}All patient registrations{% endif %}
         {% if selected_date %} on {{ selected_date|date:"d M Y" }}{% endif %}
       </p>
     </div>
-    <span class="badge" style="background:var(--lav-soft); color:var(--ink); font-weight:700;">{{ row_count }} record{{ row_count|pluralize }}</span>
+    <span class="rd-records-count">{{ row_count }} record{{ row_count|pluralize }}</span>
   </div>
 
   {% if rows %}
-    <div style="overflow-x:auto;">
+    <div class="rd-table-wrap">
       <table>
         <thead>
           <tr>
@@ -126,7 +149,7 @@
                 {% endif %}
               </td>
               <td>
-                <a href="{{ row.view_url }}" style="font-weight:600; color:var(--ink); text-decoration:none;">{{ row.title }}</a>
+                <a href="{{ row.view_url }}" class="rd-record-name">{{ row.title }}</a>
                 <br><small class="muted">{{ row.badge }} · {{ row.detail }}</small>
               </td>
               <td class="ta-r">
@@ -152,16 +175,15 @@
         </tbody>
       </table>
     </div>
-    <p style="font-size:12px; color:var(--muted); margin:14px 4px 0;">Showing the {{ row_count }} most recent records.</p>
+    <p class="rd-records-foot">Showing the {{ row_count }} most recent records.</p>
   {% else %}
-    <div style="text-align:center; padding:48px 20px;">
-      <p style="color:var(--muted); font-size:15px; margin-bottom:16px;">
-        {% if query %}No records match “{{ query }}”.{% else %}No patients registered yet.{% endif %}
-      </p>
+    <div class="rd-empty">
+      <span class="rd-empty-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      </span>
+      <p>{% if query %}No records match “{{ query }}”.{% else %}No patients registered yet.{% endif %}</p>
       {% if can_register %}
-        <a href="{% url 'registration_desk_new' %}" class="btn" style="background:var(--lime); color:var(--ink); font-weight:700; padding:10px 20px; border-radius:12px; text-decoration:none;">
-          + Register a Patient
-        </a>
+        <a href="{% url 'registration_desk_new' %}" class="btn rd-btn-lime rd-btn-lime-sm">+ Register a Patient</a>
       {% endif %}
     </div>
   {% endif %}
