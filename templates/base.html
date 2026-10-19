@@ -15,7 +15,7 @@
 
   <!-- ============ SIDEBAR ============ -->
   <aside class="sidebar">
-    <a class="brand" href="{% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}{% url 'reception_dashboard' %}{% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}{% url 'admin_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
+    <a class="brand" href="{% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}{% url 'reception_dashboard' %}{% elif request.session.designation == 'opd_assistant' or request.resolver_match.url_name == 'opd_assistant_dashboard' %}{% url 'opd_assistant_dashboard' %}{% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}{% url 'admin_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
       <span class="brand-mark">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M3 10l9-7 5 4-4 4z" fill="#d6f25f"/>
@@ -133,6 +133,19 @@
           <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l-.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
           <span class="nav-label">Settings</span>
         </a>
+      {% elif request.session.designation == 'opd_assistant' or request.resolver_match.url_name == 'opd_assistant_dashboard' %}
+        <!-- OPD Assistant branch -->
+        <a href="{% url 'opd_assistant_dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'opd_assistant_dashboard' %}active{% endif %}">
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+              <rect x="2" y="2" width="6" height="6" rx="1.5"/>
+              <rect x="10" y="2" width="6" height="6" rx="1.5"/>
+              <rect x="2" y="10" width="6" height="6" rx="1.5"/>
+              <rect x="10" y="10" width="6" height="6" rx="1.5"/>
+            </svg>
+          </span>
+          <span class="nav-label">Dashboard</span>
+        </a>
       {% else %}
         <!-- Default/Other branch (nurse, etc.) -->
         <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
@@ -172,6 +185,17 @@
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#202024" stroke-width="2"><path d="M2 7l3.5 3.5L12 3.5"/></svg>
           </span>
           <span class="status-title">Registration Desk</span>
+        </div>
+        <p class="status-text">Counter Active</p>
+        <a href="{% url 'logout' %}" class="status-admin" style="color:#ff8e8e; margin-top:8px; display:inline-block;">Sign out →</a>
+      </div>
+    {% elif request.session.designation == 'opd_assistant' or request.resolver_match.url_name == 'opd_assistant_dashboard' %}
+      <div class="side-status" style="margin-top:auto;">
+        <div class="status-head">
+          <span class="status-check">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#202024" stroke-width="2"><path d="M2 7l3.5 3.5L12 3.5"/></svg>
+          </span>
+          <span class="status-title">OPD Desk</span>
         </div>
         <p class="status-text">Counter Active</p>
         <a href="{% url 'logout' %}" class="status-admin" style="color:#ff8e8e; margin-top:8px; display:inline-block;">Sign out →</a>
@@ -227,6 +251,13 @@
               <path d="M21.4 12.6c1.9 1 2.4 2.9 1.4 4.3" fill="none" stroke="#202024" stroke-width="1.4" stroke-linecap="round"/>
               <circle cx="22.4" cy="17.4" r="1.2" fill="#202024"/>
             </svg>
+          {% elif request.session.designation == 'opd_assistant' or request.resolver_match.url_name == 'opd_assistant_dashboard' %}
+            <svg width="26" height="26" viewBox="0 0 30 30" aria-hidden="true">
+              <path d="M15 4.5a5 5 0 0 1 5 5v1.2h.8A2.7 2.7 0 0 1 23.5 13v.6H19v-.8a4 4 0 0 0-8 0v.8H6.5V13a2.7 2.7 0 0 1 2.7-2.3H10v-1.2a5 5 0 0 1 5-5Z" fill="#7669a3"/>
+              <circle cx="15" cy="9.6" r="3.1" fill="#c5b9f4"/>
+              <path d="M6.5 13h17v9.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V13Z" fill="#c5b9f4"/>
+              <path d="M11 24.5V17h8v7.5" fill="#7669a3"/>
+            </svg>
           {% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}
             <svg width="26" height="26" viewBox="0 0 30 30" aria-hidden="true">
               <circle cx="15" cy="11" r="5.5" fill="#7669a3"/>
@@ -244,6 +275,9 @@
           {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}
             <span class="doctor-name reception-name">Registration Desk</span>
             <span class="doctor-spec reception-spec">Reception Desk Portal</span>
+          {% elif request.session.designation == 'opd_assistant' or request.resolver_match.url_name == 'opd_assistant_dashboard' %}
+            <span class="doctor-name">OPD Assistant</span>
+            <span class="doctor-spec">OPD Desk Portal</span>
           {% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}
             <span class="doctor-name">Hospital Admin</span>
             <span class="doctor-spec">Administration Portal</span>

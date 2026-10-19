@@ -18,6 +18,7 @@ def patient_list(request):
             | Q(second_name__icontains=query)
             | Q(last_name__icontains=query)
             | Q(mr_number__icontains=query)
+            | Q(care_of__icontains=query)
             | Q(phone__icontains=query)
             | Q(aadhar_no__icontains=query)
             | Q(abha_no__icontains=query)

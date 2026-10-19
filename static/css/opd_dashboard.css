@@ -1,0 +1,186 @@
+/* ============================================================
+   Cams HMS — OPD Desk (OPD Assistant portal)
+   ------------------------------------------------------------
+   Riverside design language: #e5e5e8 canvas, white cards,
+   dark ink, lavender/lime accents, 24px card radius.
+   ============================================================ */
+
+:root {
+  --opd-border: #e5e5e8;
+  --opd-border-strong: #d4d4d8;
+  --opd-ink: #202024;
+  --opd-ink-soft: #3a3a40;
+  --opd-muted: #74747a;
+  --opd-faint: #9d9da3;
+  --opd-lime: #d7f261;
+  --opd-lav: #c5b9f4;
+  --opd-lav-deep: #a99ae9;
+  --opd-lav-soft: #f0eefb;
+  --opd-shadow: 0 1px 2px rgba(32, 32, 36, 0.04), 0 10px 26px -18px rgba(32, 32, 36, 0.25);
+}
+
+/* ───────────────────── Counter metrics ───────────────────── */
+.opd-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.opd-stat {
+  background: var(--card);
+  border-radius: 24px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: var(--opd-shadow);
+}
+.opd-stat-icon {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.opd-stat-icon.lime { background: var(--opd-lime); }
+.opd-stat-icon.lav { background: var(--opd-lav); }
+.opd-stat-icon.lav-soft { background: #e7e3f7; }
+.opd-stat-icon.amber { background: #f5edc9; }
+.opd-stat-value { font-size: 24px; font-weight: 750; color: var(--opd-lav-deep); line-height: 1.1; letter-spacing: -0.4px; }
+.opd-stat-label { color: var(--opd-muted); font-size: 12.5px; margin-top: 2px; }
+
+/* ───────────────────── Layout ───────────────────── */
+.opd-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+@media (max-width: 1024px) {
+  .opd-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.opd-card {
+  background: var(--card);
+  border-radius: 24px;
+  padding: 22px 24px;
+  box-shadow: var(--opd-shadow);
+}
+.opd-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.opd-card-head h2 { margin: 0 0 3px; font-size: 17px; font-weight: 750; letter-spacing: -0.3px; }
+.opd-card-head p { margin: 0; font-size: 13px; color: var(--opd-muted); }
+.opd-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 13px;
+  border-radius: 99px;
+  background: var(--opd-lav-soft);
+  color: var(--opd-ink);
+  border: 1px solid var(--opd-lav);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ───────────────────── Table ───────────────────── */
+.opd-table-wrap { overflow-x: auto; }
+.opd-table-wrap table { margin: 0; }
+.opd-table-wrap th { padding: 10px 12px; }
+.opd-table-wrap td { padding: 12px; }
+.opd-table-wrap tbody tr { transition: background 0.13s ease; }
+.opd-table-wrap tbody tr:hover { background: #f7f7f9; }
+.opd-name { font-weight: 650; color: var(--opd-ink); text-decoration: none; }
+.opd-name:hover { color: var(--opd-lav-deep); text-decoration: underline; }
+
+.opd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: filter 0.14s ease, background 0.14s ease;
+}
+.opd-btn.primary { background: var(--opd-ink); color: #fff; border: 1px solid var(--opd-ink); }
+.opd-btn.primary:hover { filter: brightness(1.35); text-decoration: none; }
+
+/* ───────────────────── Recently assessed list ───────────────────── */
+.opd-list { list-style: none; margin: 0; padding: 0; }
+.opd-list li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--opd-border);
+}
+.opd-list li:last-child { border-bottom: none; }
+.opd-list-avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #c5b9f4, #a99ae9);
+  color: #2f2b3f;
+  font-size: 12.5px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+.opd-list-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.opd-list-meta { font-size: 11.5px; color: var(--opd-muted); }
+.opd-link { font-size: 12.5px; font-weight: 650; color: var(--opd-lav-deep); text-decoration: none; white-space: nowrap; }
+.opd-link:hover { text-decoration: underline; }
+
+/* ───────────────────── Empty state ───────────────────── */
+.opd-empty { text-align: center; padding: 34px 20px; }
+.opd-empty-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 12px;
+  border-radius: 16px;
+  background: var(--opd-lav-soft);
+  color: var(--opd-lav-deep);
+  display: grid;
+  place-items: center;
+}
+.opd-empty p { margin: 0; color: var(--opd-muted); font-size: 14px; }
+
+/* ───────────────────── Coming soon strip ───────────────────── */
+.opd-coming {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, #f0eefb 0%, #fbfaff 100%);
+  border: 1px dashed var(--opd-lav);
+}
+.opd-coming-icon {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--opd-lav-deep);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--opd-lav);
+}
+.opd-coming h3 { margin: 0 0 3px; font-size: 15px; font-weight: 700; }
+.opd-coming p { margin: 0; font-size: 13px; color: var(--opd-muted); line-height: 1.5; }
+
+@media (max-width: 560px) {
+  .opd-stat { padding: 14px 16px; gap: 12px; }
+  .opd-stat-value { font-size: 21px; }
+  .opd-card { padding: 18px 16px; }
+}

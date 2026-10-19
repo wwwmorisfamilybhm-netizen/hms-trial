@@ -37,6 +37,7 @@ from patients.models import Patient, PatientBill
 
 DESIGNATION_CHOICES = [
     ("registration_desk", "Registration Desk"),
+    ("opd_assistant", "OPD Assistant"),
     ("doctor", "Doctor"),
     ("nurse", "Nurse"),
     ("admin", "Admin"),
@@ -92,6 +93,8 @@ def login_view(request):
 
             if effective_designation == "registration_desk":
                 return redirect("reception_dashboard")
+            if effective_designation == "opd_assistant":
+                return redirect("opd_assistant_dashboard")
             if effective_designation == UserProfile.Designation.ADMIN:
                 return redirect("admin_dashboard")
             else:
@@ -133,6 +136,10 @@ def dashboard(request):
         from django.contrib import messages
         messages.warning(request, "Access restricted: Registration Desk users only have access to the Registration Desk portal.")
         return redirect("reception_dashboard")
+    if user_desig == "opd_assistant" and not request.user.is_superuser:
+        from django.contrib import messages
+        messages.warning(request, "Access restricted: OPD Assistants use the OPD Desk portal.")
+        return redirect("opd_assistant_dashboard")
 
     today = date.today()
     context = {
@@ -609,6 +616,9 @@ def admin_doctors(request):
         "registration_desk": User.objects.filter(
             profile__designation=UserProfile.Designation.REGISTRATION_DESK
         ).count(),
+        "opd_assistant": User.objects.filter(
+            profile__designation=UserProfile.Designation.OPD_ASSISTANT
+        ).count(),
         "admin": User.objects.filter(profile__designation=UserProfile.Designation.ADMIN).count(),
     }
 
@@ -700,6 +710,77 @@ def admin_backup_export(request):
     return FileResponse(backup, as_attachment=True, filename=filename, content_type="application/zip")
 
 
+# ── OPD Desk (OPD Assistant portal) ───────────────────────────────────────────
+
+@login_required(login_url="login")
+def opd_assistant_dashboard(request):
+    """OPD Desk — the home portal for OPD Assistants.
+
+    Shows the counter numbers for the day and the patients still waiting for
+    their initial assessment, so the desk can pick the next one and open the
+    assessment workstation.
+    """
+    from django.db.models import Exists, OuterRef
+
+    from patients.models import InitialAssessment
+
+    user_desig = (
+        getattr(getattr(request.user, "profile", None), "designation", None)
+        or request.session.get("designation")
+    )
+    if user_desig not in (UserProfile.Designation.OPD_ASSISTANT, UserProfile.Designation.ADMIN) \
+            and not request.user.is_superuser:
+        from django.contrib import messages
+        messages.warning(request, "Access restricted: the OPD Desk is for OPD Assistants.")
+        if user_desig == UserProfile.Designation.REGISTRATION_DESK:
+            return redirect("reception_dashboard")
+        if user_desig == UserProfile.Designation.ADMIN:
+            return redirect("admin_dashboard")
+        return redirect("dashboard")
+
+    today = date.today()
+
+    # Patients registered today and whether their triage is still outstanding.
+    todays_patients = (
+        Patient.objects
+        .annotate(
+            has_assessment=Exists(
+                InitialAssessment.objects.filter(patient=OuterRef("pk"))
+            )
+        )
+        .filter(created_at__date=today)
+        .order_by("-created_at")
+    )
+    todays_patients = list(todays_patients)
+    waiting = [p for p in todays_patients if not p.has_assessment]
+    assessed_today = sum(1 for p in todays_patients if p.has_assessment)
+
+    # Most recent completed assessments, for quick reference.
+    recent_assessments = (
+        InitialAssessment.objects
+        .select_related("patient")
+        .order_by("-updated_at")[:6]
+    )
+
+    appointments_today = (
+        Appointment.objects
+        .filter(date=today)
+        .exclude(status=Appointment.Status.CANCELLED)
+        .count()
+    )
+
+    return render(request, "core/opd_assistant_dashboard.html", {
+        "today": today,
+        "registered_today": len(todays_patients),
+        "assessed_today": assessed_today,
+        "waiting_count": len(waiting),
+        "appointments_today": appointments_today,
+        "waiting_patients": waiting[:12],
+        "recent_assessments": recent_assessments,
+        "user": request.user,
+    })
+
+
 # ── Registration Desk ─────────────────────────────────────────────────────────
 
 @login_required(login_url="login")
@@ -707,8 +788,11 @@ def reception_dashboard(request):
     """Dedicated dashboard for registration desk."""
     # Block Doctor/Nurse users from accessing registration desk dashboard
     user_desig = getattr(getattr(request.user, "profile", None), "designation", None) or request.session.get("designation")
-    if user_desig in ["doctor", "nurse"] and not request.user.is_superuser:
+    if user_desig in ["doctor", "nurse", "opd_assistant"] and not request.user.is_superuser:
         from django.contrib import messages
+        if user_desig == "opd_assistant":
+            messages.warning(request, "Access restricted: OPD Assistants use the OPD Desk portal.")
+            return redirect("opd_assistant_dashboard")
         messages.warning(request, "Access restricted: Doctor/Nurse users should use the Doctor Dashboard.")
         return redirect("dashboard")
 
@@ -1040,6 +1124,7 @@ def _history_rows(query="", status="", selected_date=None, include_appointments=
             | Q(second_name__icontains=query)
             | Q(last_name__icontains=query)
             | Q(mr_number__icontains=query)
+            | Q(care_of__icontains=query)
             | Q(phone__icontains=query)
             | Q(aadhar_no__icontains=query)
             | Q(abha_no__icontains=query)
@@ -1053,6 +1138,7 @@ def _history_rows(query="", status="", selected_date=None, include_appointments=
             "badge": f"Patient · MR #{patient.mr_number or patient.id}",
             "title": patient.full_name,
             "detail": patient.phone or "—",
+            "care_of": patient.care_of,
             "status": None,
             "status_lower": "",
             "is_emergency": patient.is_emergency,
@@ -1069,6 +1155,7 @@ def _history_rows(query="", status="", selected_date=None, include_appointments=
                 | Q(patient__second_name__icontains=query)
                 | Q(patient__last_name__icontains=query)
                 | Q(patient__mr_number__icontains=query)
+                | Q(patient__care_of__icontains=query)
                 | Q(doctor__first_name__icontains=query)
                 | Q(doctor__last_name__icontains=query)
                 | Q(reason__icontains=query)

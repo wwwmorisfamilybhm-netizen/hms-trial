@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}OPD Desk — Cams HMS{% endblock %}
+
+{% block heading %}
+  <div class="page-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:16px;">
+    <div>
+      <h1>OPD Desk</h1>
+      <p class="page-sub">Outpatient assistant counter · triage, vitals and handover to the doctor</p>
+    </div>
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+      <span class="badge" style="background:var(--lime); color:var(--ink); font-weight:750; padding:6px 14px; border-radius:99px; font-size:12px; letter-spacing:0.5px;">
+        ● COUNTER ACTIVE
+      </span>
+      <span style="font-size:13px; color:var(--muted); font-weight:500;">
+        {{ today|date:"l, F j, Y" }}
+      </span>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/opd_dashboard.css' %}">
+
+<!-- ═══════════ Counter metrics ═══════════ -->
+<div class="opd-stats">
+  <div class="opd-stat">
+    <span class="opd-stat-icon lime">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#27272b" stroke-width="1.8" aria-hidden="true">
+        <circle cx="8" cy="6" r="3.5"/><path d="M2 17c.8-5 3-6.5 6-6.5s5.2 1.5 6 6.5M15 5a3.5 3.5 0 0 1 0 7"/>
+      </svg>
+    </span>
+    <div>
+      <div class="opd-stat-value">{{ registered_today }}</div>
+      <div class="opd-stat-label">Registered Today</div>
+    </div>
+  </div>
+
+  <div class="opd-stat">
+    <span class="opd-stat-icon lav">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#29272f" stroke-width="1.8" aria-hidden="true">
+        <path d="M9 3h6v4H9z"/><path d="M7 5H5v16h14V5h-2"/><path d="M9 12h6M12 9v6"/>
+      </svg>
+    </span>
+    <div>
+      <div class="opd-stat-value">{{ assessed_today }}</div>
+      <div class="opd-stat-label">Assessed Today</div>
+    </div>
+  </div>
+
+  <div class="opd-stat">
+    <span class="opd-stat-icon amber">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#27272b" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+      </svg>
+    </span>
+    <div>
+      <div class="opd-stat-value">{{ waiting_count }}</div>
+      <div class="opd-stat-label">Waiting for Assessment</div>
+    </div>
+  </div>
+
+  <div class="opd-stat">
+    <span class="opd-stat-icon lav-soft">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#70659e" stroke-width="1.7" aria-hidden="true">
+        <rect x="1" y="3" width="18" height="16" rx="3"/><path d="M1 8h18M6 1v4M14 1v4"/>
+      </svg>
+    </span>
+    <div>
+      <div class="opd-stat-value">{{ appointments_today }}</div>
+      <div class="opd-stat-label">Appointments Today</div>
+    </div>
+  </div>
+</div>
+
+<div class="opd-grid">
+
+  <!-- ═══════════ Waiting for assessment ═══════════ -->
+  <section class="opd-card">
+    <div class="opd-card-head">
+      <div>
+        <h2>Waiting for Assessment</h2>
+        <p>Patients registered today whose triage is still outstanding.</p>
+      </div>
+      <span class="opd-pill">{{ waiting_count }} waiting</span>
+    </div>
+
+    {% if waiting_patients %}
+      <div class="opd-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>MR Number</th>
+              <th>Patient</th>
+              <th>Age / Gender</th>
+              <th>Registered</th>
+              <th class="ta-r">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in waiting_patients %}
+              <tr>
+                <td class="cell-strong">#{{ p.mr_number|default:p.id }}</td>
+                <td>
+                  <a href="{% url 'patient_detail' p.pk %}" class="opd-name">{{ p.full_name }}</a>
+                  {% if p.is_emergency %}<span class="badge" style="background:var(--red); color:#fff; font-weight:800; margin-left:6px;">⚑</span>{% endif %}
+                  <br><small class="muted">{{ p.phone|default:"—" }}</small>
+                </td>
+                <td>{{ p.age|default:"—" }} yrs · {{ p.get_gender_display|default:"—" }}</td>
+                <td class="muted">{{ p.created_at|date:"h:i A" }}</td>
+                <td class="ta-r">
+                  <a href="{% url 'initial_assessment' %}?patient={{ p.pk }}" class="opd-btn primary">Start Assessment →</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="opd-empty">
+        <span class="opd-empty-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 6 9 17l-5-5"/>
+          </svg>
+        </span>
+        <p>Every patient registered today has been assessed.</p>
+      </div>
+    {% endif %}
+  </section>
+
+  <!-- ═══════════ Recently assessed ═══════════ -->
+  <section class="opd-card">
+    <div class="opd-card-head">
+      <div>
+        <h2>Recently Assessed</h2>
+        <p>Latest triage records recorded at the counter.</p>
+      </div>
+    </div>
+
+    {% if recent_assessments %}
+      <ul class="opd-list">
+        {% for a in recent_assessments %}
+          <li>
+            <span class="opd-list-avatar">{{ a.patient.first_name|slice:":1"|upper }}{% if a.patient.last_name %}{{ a.patient.last_name|slice:":1"|upper }}{% endif %}</span>
+            <span class="opd-list-info">
+              <a href="{% url 'patient_detail' a.patient.pk %}" class="opd-name">{{ a.patient.full_name }}</a>
+              <span class="opd-list-meta">
+                {% if a.temperature %}{{ a.temperature }}°C{% else %}—{% endif %}
+                {% if a.pulse %} · {{ a.pulse }}/min{% endif %}
+                {% if a.bp_systolic and a.bp_diastolic %} · {{ a.bp_systolic }}/{{ a.bp_diastolic }}{% endif %}
+                · {{ a.updated_at|date:"d M, h:i A" }}
+              </span>
+            </span>
+            <a href="{% url 'initial_assessment' %}?patient={{ a.patient.pk }}" class="opd-link">Open →</a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="opd-empty">
+        <p>No assessments recorded yet.</p>
+      </div>
+    {% endif %}
+  </section>
+</div>
+
+<!-- ═══════════ Extension point ═══════════ -->
+<section class="opd-card opd-coming">
+  <span class="opd-coming-icon">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
+  </span>
+  <div>
+    <h3>More OPD tools are on the way</h3>
+    <p>This portal is ready for additional OPD Assistant features — appointments, handover lists and counters will be added here as they are built.</p>
+  </div>
+</section>
+
+{% endblock %}

@@ -10,6 +10,7 @@ class UserProfile(models.Model):
 
     class Designation(models.TextChoices):
         REGISTRATION_DESK = "registration_desk", "Registration Desk"
+        OPD_ASSISTANT = "opd_assistant", "OPD Assistant"
         DOCTOR = "doctor", "Doctor"
         NURSE = "nurse", "Nurse"
         ADMIN = "admin", "Hospital Administrator"

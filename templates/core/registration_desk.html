@@ -3,17 +3,35 @@
 {% block title %}Patient Registration — Cams HMS{% endblock %}
 
 {% block heading %}
-  <div class="page-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:16px;">
-    <div>
-      <h1>Patient Registration</h1>
-      <p class="page-sub">Registration Desk Counter · Register a patient, search the register and review past records</p>
+  <div class="page-head rd-page-head">
+    <div class="rd-head-left">
+      <div class="rd-title-row">
+        <h1>Patient Registration</h1>
+        <span class="rd-counter-badge" title="Registration desk counter is active">
+          <span class="rd-pulse-dot"></span>
+          Counter Active
+        </span>
+      </div>
+      <p class="page-sub">Registration Desk Counter · Outpatient register, fast search &amp; records management</p>
     </div>
-    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-      <span class="badge" style="background:var(--lime); color:var(--ink); font-weight:750; padding:6px 14px; border-radius:99px; font-size:12px; letter-spacing:0.5px;">
-        ● COUNTER ACTIVE
-      </span>
-      <a href="{% url 'reception_dashboard' %}" class="btn btn-outline" style="padding:8px 16px; font-size:13px;">
-        ← Back to Dashboard
+
+    <div class="rd-head-actions">
+      {% if can_register %}
+        <a href="{% url 'registration_desk_new' %}" class="btn rd-btn-primary">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+            <circle cx="8" cy="6" r="4"/><path d="M1 18c1-6 3.5-8 7-8s6 2 7 8M16 5a4 4 0 0 1 0 8"/>
+          </svg>
+          <span>+ New Registration →</span>
+        </a>
+      {% endif %}
+      {% if last_registered %}
+        <a href="{% url 'patient_print_card' last_registered.pk %}" class="btn rd-btn-outline" title="Print card for {{ last_registered.full_name }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          <span>Print Last Card</span>
+        </a>
+      {% endif %}
+      <a href="{% url 'reception_dashboard' %}" class="btn rd-btn-ghost">
+        ← Dashboard
       </a>
     </div>
   </div>
@@ -21,153 +39,686 @@
 
 {% block content %}
 
-<!-- ═══════════ 1. PRIMARY DESK ACTION ═══════════ -->
-<section class="rd-hero">
-  <div class="rd-primary">
-    <div class="rd-primary-top">
-      {% if can_register %}
-        <span class="rd-primary-tag">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          PRIMARY DESK ACTION
-        </span>
-        <h2>Register a New Patient</h2>
-      {% else %}
-        <span class="rd-primary-tag rd-primary-tag-lav">PATIENT REGISTER</span>
-        <h2>Search &amp; Review Records</h2>
-      {% endif %}
-    </div>
+<style>
+  /* ═══════════ Registration Desk — Riverside Clean System ═══════════ */
+  .rd-page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .rd-head-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .rd-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .rd-title-row h1 {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 750;
+    letter-spacing: -0.5px;
+    color: var(--ink);
+  }
+  .rd-counter-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: #eef8f2;
+    color: #1e7048;
+    border: 1px solid rgba(30, 112, 72, 0.2);
+    font-weight: 700;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    letter-spacing: 0.3px;
+  }
+  .rd-pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+    animation: rdPulse 2s infinite;
+  }
+  @keyframes rdPulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+  }
 
-    <div class="rd-primary-actions">
-      {% if can_register %}
-        <a href="{% url 'registration_desk_new' %}" class="btn rd-btn-lime">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-            <circle cx="8" cy="6" r="4"/><path d="M1 18c1-6 3.5-8 7-8s6 2 7 8M16 5a4 4 0 0 1 0 8"/>
-          </svg>
-          <span>+ New Registration →</span>
-        </a>
-      {% endif %}
-      {% if last_registered %}
-        <a href="{% url 'patient_print_card' last_registered.pk %}" class="btn rd-btn-ghost">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          <span>Print Last Card</span>
-        </a>
-      {% endif %}
-    </div>
-  </div>
-</section>
+  .rd-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .rd-btn-primary {
+    background: var(--ink) !important;
+    color: #ffffff !important;
+    border: 1px solid var(--ink) !important;
+    padding: 9px 18px !important;
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+    font-size: 13.5px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    box-shadow: 0 4px 14px rgba(32, 32, 36, 0.16) !important;
+    transition: transform 0.14s ease, filter 0.14s ease !important;
+    text-decoration: none !important;
+  }
+  .rd-btn-primary:hover {
+    transform: translateY(-1px) !important;
+    filter: brightness(1.2) !important;
+  }
+  .rd-btn-outline {
+    background: #ffffff !important;
+    color: var(--ink) !important;
+    border: 1px solid #dcdce2 !important;
+    padding: 8px 16px !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    text-decoration: none !important;
+    transition: background 0.14s ease, border-color 0.14s ease !important;
+  }
+  .rd-btn-outline:hover {
+    background: #f7f7f9 !important;
+    border-color: #c8c8d0 !important;
+  }
+  .rd-btn-ghost {
+    background: transparent !important;
+    color: var(--muted) !important;
+    border: 1px solid transparent !important;
+    padding: 8px 14px !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    text-decoration: none !important;
+  }
+  .rd-btn-ghost:hover {
+    color: var(--ink) !important;
+    background: rgba(0, 0, 0, 0.04) !important;
+  }
 
-<!-- ═══════════ 2. SEARCH BAR ═══════════ -->
-<form method="get" action="{% url 'registration_desk' %}" class="card rd-search" role="search">
-  <div class="rd-search-field rd-search-main">
-    <label for="rdSearchInput">SEARCH PATIENT REGISTER</label>
-    <div class="rd-search-input-wrap">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input type="search" id="rdSearchInput" name="q" value="{{ query }}" placeholder="Name, MR number, phone, Aadhaar or ABHA…" autocomplete="off">
-    </div>
-  </div>
+  /* ═══════════ Unified Card ═══════════ */
+  .rd-main-card {
+    background: var(--card);
+    border-radius: 20px;
+    padding: 0;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
 
-  <div class="rd-search-field">
-    <label for="rdDateInput">REGISTERED ON</label>
-    <input type="date" id="rdDateInput" name="date" value="{{ date_str }}">
-  </div>
+  /* Header inside Card */
+  .rd-card-topbar {
+    padding: 22px 26px 18px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .rd-card-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .rd-card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .rd-card-titles h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 750;
+    color: var(--ink);
+    letter-spacing: -0.3px;
+  }
+  .rd-badge-count {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--lav-soft);
+    color: #5b4a8a;
+    border: 1px solid rgba(197, 185, 244, 0.4);
+    font-size: 11.5px;
+    font-weight: 700;
+  }
+  .rd-card-sub {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
 
-  {% if not is_registration_desk %}
-  <div class="rd-search-field">
-    <label for="rdStatusInput">APPOINTMENT STATUS</label>
-    <select id="rdStatusInput" name="status">
-      <option value="">Any status</option>
-      {% for value, label in status_choices %}
-        <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  {% endif %}
+  /* Integrated Filter Bar */
+  .rd-filter-bar {
+    background: #fbfbfd;
+    padding: 14px 26px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .rd-filter-search {
+    position: relative;
+    flex: 1;
+    min-width: 260px;
+    display: flex;
+    align-items: center;
+  }
+  .rd-search-icon {
+    position: absolute;
+    left: 12px;
+    color: #9d9da3;
+    pointer-events: none;
+  }
+  .rd-filter-search input {
+    width: 100%;
+    padding: 9px 34px 9px 36px;
+    font-size: 13.5px;
+    border: 1px solid #dcdce2;
+    border-radius: 10px;
+    background: #ffffff;
+    color: var(--ink);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .rd-filter-search input:focus {
+    outline: none;
+    border-color: var(--lav-deep);
+    box-shadow: 0 0 0 3px var(--lav-soft);
+  }
+  .rd-clear-search {
+    position: absolute;
+    right: 10px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: bold;
+    text-decoration: none;
+    padding: 3px 6px;
+    border-radius: 50%;
+  }
+  .rd-clear-search:hover {
+    color: var(--ink);
+    background: #f0f0f3;
+    text-decoration: none;
+  }
 
-  <div class="rd-search-actions">
-    <button type="submit" class="btn rd-btn-search">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <span>Search</span>
-    </button>
-    <a href="{% url 'registration_desk' %}" class="btn btn-plain">Reset</a>
-  </div>
-</form>
+  .rd-filter-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .rd-filter-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .rd-filter-item input[type="date"],
+  .rd-filter-item select {
+    padding: 8px 11px;
+    border: 1px solid #dcdce2;
+    border-radius: 10px;
+    font-size: 13px;
+    background: #ffffff;
+    color: var(--ink);
+    width: auto;
+  }
+  .rd-filter-item input[type="date"]:focus,
+  .rd-filter-item select:focus {
+    outline: none;
+    border-color: var(--lav-deep);
+    box-shadow: 0 0 0 3px var(--lav-soft);
+  }
 
-<!-- ═══════════ 3. RECORDS (History functionality) ═══════════ -->
-<section class="card rd-records">
-  <div class="rd-records-head">
-    <div>
-      <h2>Registration Records</h2>
-      <p>
-        {% if query %}Showing records matching “{{ query }}”{% else %}All patient registrations{% endif %}
-        {% if selected_date %} on {{ selected_date|date:"d M Y" }}{% endif %}
+  .rd-filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .rd-btn-filter {
+    background: var(--ink);
+    color: #ffffff;
+    border: 1px solid var(--ink);
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 650;
+    cursor: pointer;
+    transition: filter 0.14s ease;
+  }
+  .rd-btn-filter:hover {
+    filter: brightness(1.25);
+  }
+  .rd-btn-reset {
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 10px;
+    text-decoration: none;
+    background: transparent;
+  }
+  .rd-btn-reset:hover {
+    color: var(--ink);
+    background: #f1f1f4;
+    text-decoration: none;
+  }
+
+  /* ═══════════ Table Styling ═══════════ */
+  .rd-table-wrap {
+    overflow-x: auto;
+  }
+  .rd-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+  }
+  .rd-table th {
+    background: #ffffff;
+    padding: 12px 20px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .rd-table td {
+    padding: 14px 20px;
+    border-bottom: 1px solid #f0f0f3;
+    vertical-align: middle;
+  }
+  .rd-table tbody tr {
+    transition: background 0.12s ease;
+  }
+  .rd-table tbody tr:hover {
+    background: #fbfbfd;
+  }
+  .rd-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  /* Row Cells */
+  .rd-cell-date {
+    white-space: nowrap;
+  }
+  .rd-date-main {
+    font-size: 13.5px;
+    font-weight: 650;
+    color: var(--ink);
+  }
+  .rd-date-time {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .rd-cell-record {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 220px;
+  }
+  .rd-patient-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--lav-soft);
+    color: #5b4a8a;
+    font-weight: 750;
+    font-size: 13px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    border: 1px solid rgba(197, 185, 244, 0.4);
+  }
+  .rd-patient-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.3;
+  }
+  .rd-patient-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+    text-decoration: none;
+    transition: color 0.12s ease;
+  }
+  .rd-patient-name:hover {
+    color: #5b4a8a;
+    text-decoration: underline;
+  }
+  .rd-patient-sub {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .rd-mr-chip {
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  /* Type & Status Badges */
+  .rd-badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: 0.3px;
+  }
+  .rd-badge-patient {
+    background: var(--lav-soft);
+    color: #5b4a8a;
+  }
+  .rd-badge-emergency {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid rgba(185, 28, 28, 0.2);
+  }
+  .rd-badge-appt {
+    background: #eef8f2;
+    color: #1e7048;
+  }
+
+  .rd-status-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    background: #f1f1f4;
+    color: #55555d;
+  }
+  .rd-status-tag.active {
+    background: #eef8f2;
+    color: #1e7048;
+  }
+
+  /* Action Buttons Cluster */
+  .rd-actions-cell {
+    text-align: right;
+    white-space: nowrap;
+  }
+  .rd-actions-cluster {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+  .rd-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 11px;
+    font-size: 12px;
+    font-weight: 650;
+    border-radius: 8px;
+    text-decoration: none;
+    border: 1px solid #dcdce2;
+    background: #ffffff;
+    color: var(--ink);
+    transition: all 0.12s ease;
+  }
+  .rd-action-btn:hover {
+    background: #f6f6f9;
+    border-color: #c4c4cc;
+    text-decoration: none;
+  }
+  .rd-action-btn.delete {
+    color: #b91c1c;
+    border-color: #fecaca;
+    background: #fff;
+  }
+  .rd-action-btn.delete:hover {
+    background: #fee2e2;
+    border-color: #fca5a5;
+  }
+  .rd-action-btn.view {
+    background: #f7f6fc;
+    color: #5b4a8a;
+    border-color: #ded9f5;
+  }
+  .rd-action-btn.view:hover {
+    background: var(--lav-soft);
+    border-color: var(--lav);
+  }
+
+  /* Footer */
+  .rd-card-footer {
+    padding: 14px 26px;
+    background: #fbfbfd;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Empty state */
+  .rd-empty-container {
+    text-align: center;
+    padding: 54px 24px;
+  }
+  .rd-empty-bubble {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--lav-soft);
+    color: var(--lav-deep);
+    display: grid;
+    place-items: center;
+    margin: 0 auto 16px;
+  }
+  .rd-empty-container h3 {
+    margin: 0 0 6px;
+    font-size: 16px;
+    font-weight: 750;
+    color: var(--ink);
+  }
+  .rd-empty-container p {
+    margin: 0 0 18px;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 900px) {
+    .rd-filter-bar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .rd-filter-search {
+      min-width: 100%;
+    }
+    .rd-filter-actions {
+      margin-left: 0;
+      justify-content: flex-end;
+    }
+  }
+</style>
+
+<!-- ═══════════ Unified Patient Registration Card ═══════════ -->
+<section class="card rd-main-card">
+  <!-- Card Header -->
+  <div class="rd-card-topbar">
+    <div class="rd-card-titles">
+      <div class="rd-card-title-row">
+        <h2>Patient Records</h2>
+        <span class="rd-badge-count">{{ row_count }} record{{ row_count|pluralize }}</span>
+      </div>
+      <p class="rd-card-sub">
+        {% if query %}
+          Showing records matching <strong style="color:var(--ink);">“{{ query }}”</strong>
+        {% else %}
+          Outpatient registration directory
+        {% endif %}
+        {% if selected_date %} on <strong style="color:var(--ink);">{{ selected_date|date:"d M Y" }}</strong>{% endif %}
       </p>
     </div>
-    <span class="rd-records-count">{{ row_count }} record{{ row_count|pluralize }}</span>
   </div>
 
+  <!-- Integrated Filter Toolbar -->
+  <form method="get" action="{% url 'registration_desk' %}" class="rd-filter-bar" role="search">
+    <div class="rd-filter-search">
+      <svg class="rd-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+      </svg>
+      <input type="search" id="rdSearchInput" name="q" value="{{ query }}" placeholder="Search by name, MR number, phone, C/O, Aadhaar or ABHA…" autocomplete="off">
+      {% if query %}
+        <a href="{% url 'registration_desk' %}{% if date_str %}?date={{ date_str }}{% endif %}" class="rd-clear-search" title="Clear query">✕</a>
+      {% endif %}
+    </div>
+
+    <div class="rd-filter-item">
+      <label for="rdDateInput" class="rd-filter-label">Registered:</label>
+      <input type="date" id="rdDateInput" name="date" value="{{ date_str }}">
+    </div>
+
+    {% if not is_registration_desk %}
+    <div class="rd-filter-item">
+      <label for="rdStatusInput" class="rd-filter-label">Status:</label>
+      <select id="rdStatusInput" name="status">
+        <option value="">Any status</option>
+        {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <div class="rd-filter-actions">
+      <button type="submit" class="btn rd-btn-filter">
+        Search
+      </button>
+      {% if query or date_str or status %}
+        <a href="{% url 'registration_desk' %}" class="rd-btn-reset">Reset</a>
+      {% endif %}
+    </div>
+  </form>
+
+  <!-- Records Table -->
   {% if rows %}
     <div class="rd-table-wrap">
-      <table>
+      <table class="rd-table">
         <thead>
           <tr>
             <th>Date &amp; Time</th>
             <th>Type</th>
-            <th>Record</th>
-            <th class="ta-r">Status</th>
-            <th class="ta-r">Actions</th>
+            <th>Patient / Record</th>
+            <th>Status</th>
+            <th class="rd-actions-cell">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for row in rows %}
             <tr>
-              <td class="cell-strong">{{ row.when|date:"M j, Y" }}<br><small class="muted">{{ row.when|date:"H:i" }}</small></td>
+              <td class="rd-cell-date">
+                <div class="rd-date-main">{{ row.when|date:"M j, Y" }}</div>
+                <div class="rd-date-time">{{ row.when|date:"H:i" }}</div>
+              </td>
               <td>
                 {% if row.kind == 'patient' %}
-                  <span class="badge" style="background:var(--lav-soft); color:var(--ink); font-weight:700;">PATIENT</span>
+                  <span class="rd-badge-pill rd-badge-patient">PATIENT</span>
                   {% if row.is_emergency %}
-                    <span class="badge" style="background:var(--red); color:#fff; font-weight:800; margin-left:6px;">⚑ EMERGENCY</span>
+                    <span class="rd-badge-pill rd-badge-emergency">⚑ EMERGENCY</span>
                   {% endif %}
                 {% else %}
-                  <span class="badge" style="background:var(--lime); color:var(--ink); font-weight:700;">APPOINTMENT</span>
+                  <span class="rd-badge-pill rd-badge-appt">APPOINTMENT</span>
                 {% endif %}
               </td>
               <td>
-                <a href="{{ row.view_url }}" class="rd-record-name">{{ row.title }}</a>
-                <br><small class="muted">{{ row.badge }} · {{ row.detail }}</small>
+                <div class="rd-cell-record">
+                  <div class="rd-patient-avatar">
+                    {{ row.title|slice:":1"|upper }}
+                  </div>
+                  <div class="rd-patient-info">
+                    <a href="{{ row.view_url }}" class="rd-patient-name">{{ row.title }}</a>
+                    <span class="rd-patient-sub">
+                      <span class="rd-mr-chip">{{ row.badge }}</span>
+                      {% if row.care_of %} · <span>C/O: {{ row.care_of }}</span>{% endif %}
+                      {% if row.detail and row.detail != '—' %} · {{ row.detail }}{% endif %}
+                    </span>
+                  </div>
+                </div>
               </td>
-              <td class="ta-r">
+              <td>
                 {% if row.status %}
-                  <span class="badge badge-{{ row.status_lower }}">{{ row.status }}</span>
+                  <span class="rd-status-tag">{{ row.status }}</span>
                 {% else %}
-                  <span class="badge">Registered</span>
+                  <span class="rd-status-tag active">● Registered</span>
                 {% endif %}
               </td>
-              <td class="ta-r" style="white-space:nowrap;">
-                <a href="{{ row.edit_url }}" class="btn btn-outline" style="padding:4px 12px; font-size:11px; font-weight:750; border-radius:8px; margin-right:6px;">
-                  {% if row.is_emergency %}✎ Continue details{% else %}✎ Edit{% endif %}
-                </a>
-                {% if row.delete_url %}
-                  <a href="{{ row.delete_url }}" class="btn btn-outline" style="padding:4px 12px; font-size:11px; font-weight:750; border-radius:8px; margin-right:6px; color:#b91c1c; border-color:#fecaca;" title="Delete patient (password required)">
-                    🗑 Delete
+              <td class="rd-actions-cell">
+                <div class="rd-actions-cluster">
+                  <a href="{{ row.edit_url }}" class="rd-action-btn" title="Edit patient details">
+                    {% if row.is_emergency %}✎ Continue{% else %}✎ Edit{% endif %}
                   </a>
-                {% endif %}
-                <a href="{{ row.view_url }}" class="link" style="font-size:13px;">View →</a>
+                  {% if row.delete_url %}
+                    <a href="{{ row.delete_url }}" class="rd-action-btn delete" title="Delete patient record (admin password required)">
+                      🗑 Delete
+                    </a>
+                  {% endif %}
+                  <a href="{{ row.view_url }}" class="rd-action-btn view" title="View full profile">
+                    View →
+                  </a>
+                </div>
               </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    <p class="rd-records-foot">Showing the {{ row_count }} most recent records.</p>
-  {% else %}
-    <div class="rd-empty">
-      <span class="rd-empty-icon">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      </span>
-      <p>{% if query %}No records match “{{ query }}”.{% else %}No patients registered yet.{% endif %}</p>
+
+    <div class="rd-card-footer">
+      <span>Showing {{ row_count }} most recent record{{ row_count|pluralize }}.</span>
       {% if can_register %}
-        <a href="{% url 'registration_desk_new' %}" class="btn rd-btn-lime rd-btn-lime-sm">+ Register a Patient</a>
+        <a href="{% url 'registration_desk_new' %}" style="color:#5b4a8a; font-weight:600; text-decoration:none;">+ Register another patient</a>
       {% endif %}
+    </div>
+
+  {% else %}
+    <div class="rd-empty-container">
+      <div class="rd-empty-bubble">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+        </svg>
+      </div>
+      <h3>No Records Found</h3>
+      <p>{% if query %}No registrations match “{{ query }}”. Check the spelling or reset filters.{% else %}No patients have been registered yet.{% endif %}</p>
+      
+      <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+        {% if query or date_str or status %}
+          <a href="{% url 'registration_desk' %}" class="btn rd-btn-outline">Clear Filters</a>
+        {% endif %}
+        {% if can_register %}
+          <a href="{% url 'registration_desk_new' %}" class="btn rd-btn-primary">+ Register a Patient</a>
+        {% endif %}
+      </div>
     </div>
   {% endif %}
 </section>

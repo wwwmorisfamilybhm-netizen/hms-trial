@@ -127,6 +127,7 @@
   }
   .dm-avatar img { width: 100%; height: 100%; object-fit: cover; }
   .dm-avatar.lime { background: linear-gradient(135deg, #eaf7b6, #d7f261); color: #3f4418; }
+  .dm-avatar.lav { background: linear-gradient(135deg, #e2dcfb, #c5b9f4); color: #3a3163; }
   .dm-avatar.green { background: linear-gradient(135deg, #d9f2e3, #a8dcc0); color: #1f5138; }
   .dm-avatar.gray { background: linear-gradient(135deg, #f0f0f2, #dcdce0); color: #56565c; }
   .dm-avatar.dark { background: linear-gradient(135deg, #3a3a40, #202024); color: var(--lime); }
@@ -143,6 +144,7 @@
   .dm-badge.doctor { background: var(--lav-soft); color: #665b9d; }
   .dm-badge.nurse { background: var(--green-soft); color: #245e42; }
   .dm-badge.registration_desk { background: var(--amber-soft); color: #89641b; }
+  .dm-badge.opd_assistant { background: #e6e1fb; color: #554a8f; }
   .dm-badge.admin { background: #eeeeef; color: #3a3a40; }
 
   .dm-edit {
@@ -241,6 +243,7 @@
         <a class="dm-tab{% if designation_filter == 'doctor' %} active{% endif %}" href="?designation=doctor">Doctors</a>
         <a class="dm-tab{% if designation_filter == 'nurse' %} active{% endif %}" href="?designation=nurse">Nurses</a>
         <a class="dm-tab{% if designation_filter == 'registration_desk' %} active{% endif %}" href="?designation=registration_desk">Front Desk</a>
+        <a class="dm-tab{% if designation_filter == 'opd_assistant' %} active{% endif %}" href="?designation=opd_assistant">OPD Assistants</a>
         <a class="dm-tab{% if designation_filter == 'admin' %} active{% endif %}" href="?designation=admin">Admins</a>
       </div>
     </div>
@@ -256,7 +259,7 @@
     <ul class="dm-list">
       {% for row in staff_list %}
       <li class="dm-row">
-        <span class="dm-avatar {% if row.designation == 'doctor' %}{% elif row.designation == 'nurse' %}green{% elif row.designation == 'admin' %}dark{% elif row.designation == 'registration_desk' %}lime{% else %}gray{% endif %}">
+        <span class="dm-avatar {% if row.designation == 'doctor' %}{% elif row.designation == 'nurse' %}green{% elif row.designation == 'admin' %}dark{% elif row.designation == 'registration_desk' %}lime{% elif row.designation == 'opd_assistant' %}lav{% else %}gray{% endif %}">
           {% if row.photo %}<img src="{{ row.photo.url }}" alt="{{ row.user.first_name }}">{% else %}{{ row.initials }}{% endif %}
         </span>
         <span class="dm-info">
