@@ -70,22 +70,6 @@
           <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="2" y="2" width="16" height="16" rx="3"/><path d="M6 6h8M6 10h5M6 14h3"/><circle cx="15" cy="14" r="2" fill="currentColor"/></svg></span>
           <span class="nav-label">Bill Command Center</span>
         </a>
-        <a href="{% url 'pharmacy_billing' %}" class="nav-item {% if request.resolver_match.url_name == 'pharmacy_billing' %}active{% endif %}">
-          <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M7 3h6v14H7zM4 6h3M13 14h3M10 7v6M7 10h6"/></svg></span>
-          <span class="nav-label">Pharmacy Billing</span>
-        </a>
-        <a href="{% url 'lab_billing' %}" class="nav-item {% if request.resolver_match.url_name == 'lab_billing' %}active{% endif %}">
-          <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M7 2h6M9 2v6l-5 8a1 1 0 0 0 1 2h10a1 1 0 0 0 1-2l-5-8V2M6 13h8"/></svg></span>
-          <span class="nav-label">Lab Billing</span>
-        </a>
-        <a href="{% url 'general_billing' %}" class="nav-item {% if request.resolver_match.url_name == 'general_billing' %}active{% endif %}">
-          <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M6 6h8M6 10h8M6 14h5"/></svg></span>
-          <span class="nav-label">General Billing</span>
-        </a>
-        <a href="{% url 'ip_billing' %}" class="nav-item {% if request.resolver_match.url_name == 'ip_billing' %}active{% endif %}">
-          <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 17h16M4 17V7l6-4 6 4v10M7 11h6M10 8v6"/><path d="M7 17v-3h6v3"/></svg></span>
-          <span class="nav-label">IP Billing</span>
-        </a>
       {% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}
         <!-- Admin branch -->
         <a href="{% url 'admin_dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">
