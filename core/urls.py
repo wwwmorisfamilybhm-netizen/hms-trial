@@ -30,6 +30,7 @@ urlpatterns = [
     # ── Doctor portal (placeholder pages — content to be filled later) ──
     path("doctor/initial-assessment/", views.initial_assessment, name="initial_assessment"),
     path("api/medgemma/draft/", views.medgemma_draft, name="medgemma_draft"),
+    path("api/initial-assessment/save/", views.save_initial_assessment, name="save_initial_assessment"),
     path("doctor/patient-queue/", views.doctor_placeholder, {"page": "patient_queue"}, name="patient_queue"),
     path("doctor/consultation/", views.doctor_placeholder, {"page": "doctor_consultation"}, name="doctor_consultation"),
     path("doctor/service-queues/", views.doctor_placeholder, {"page": "service_queues"}, name="service_queues"),

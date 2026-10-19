@@ -24,6 +24,10 @@
   var ALLERGIES = [];
   try { ALLERGIES = JSON.parse(configEl.textContent || "[]"); } catch (e) { ALLERGIES = []; }
 
+  var assessmentEl = document.getElementById("iaAssessment");
+  var ASSESSMENT = null;
+  try { ASSESSMENT = JSON.parse(assessmentEl.textContent || "null"); } catch (e) { ASSESSMENT = null; }
+
   /* ───────────────────────── Toast ───────────────────────── */
   var toast = $("#toast");
   var toastTimer = null;
@@ -520,10 +524,200 @@
     MedGemmaAssistant.onAcceptDraft();
   });
 
+  /* ───────────────────── Collect current form data ───────────────────── */
+  function collectAssessment() {
+    var v = vitalsSnapshot();
+    var conditions = [];
+    $$(".condition").forEach(function (row) {
+      var cb = row.querySelector(".cond-check");
+      var span = row.querySelector("span");
+      var dur = row.querySelector(".cond-duration");
+      if (cb && cb.checked) {
+        conditions.push({ name: span ? span.textContent.trim() : "", duration: dur ? dur.value.trim() : "", checked: true });
+      }
+    });
+    // other conditions added dynamically
+    if (otherConditionsList) {
+      $$("#otherConditionsList .condition").forEach(function (row) {
+        var cb = row.querySelector(".cond-check");
+        var span = row.querySelector("span");
+        var dur = row.querySelector(".cond-duration");
+        if (cb && cb.checked) {
+          conditions.push({ name: span ? span.textContent.trim() : "", duration: dur ? dur.value.trim() : "", checked: true });
+        }
+      });
+    }
+    var meds = [];
+    $$("#medTableBody tr").forEach(function (row) {
+      var name = $(".med-name", row), dose = $(".med-dose", row), freq = $(".med-freq", row);
+      if (name && name.value.trim()) {
+        meds.push({ name: name.value.trim(), dose: dose ? dose.value.trim() : "", freq: freq ? freq.value.trim() : "" });
+      }
+    });
+    var social = socialOthersItems.slice();
+    $$(".social-check").forEach(function (cb) {
+      if (cb.checked && cb.parentElement) {
+        var label = cb.parentElement.querySelector("span");
+        if (label) {
+          var txt = label.textContent.trim();
+          if (txt && txt !== "Others" && social.indexOf(txt) === -1) social.push(txt);
+        }
+      }
+    });
+
+    // patient id from URL
+    var params = new URLSearchParams(window.location.search);
+    var patientId = params.get("patient");
+
+    return {
+      patient_id: patientId,
+      temperature: (v.temp === null ? "" : v.temp),
+      pulse: (v.pulse === null ? "" : v.pulse),
+      respiratory_rate: (v.rr === null ? "" : v.rr),
+      bp_systolic: (v.bpSys === null ? "" : v.bpSys),
+      bp_diastolic: (v.bpDia === null ? "" : v.bpDia),
+      spo2: (v.spo2 === null ? "" : v.spo2),
+      height: (v.height === null ? "" : v.height),
+      weight: (v.weight === null ? "" : v.weight),
+      bmi: (v.bmi === "—" ? "" : v.bmi),
+      rbs: (v.rbs === null ? "" : v.rbs),
+      pain_score: $("#pain") ? $("#pain").value : "",
+      complaints: complaintsText() === "Not recorded" ? "" : complaintsText(),
+      hpi: $("#hpi") ? $("#hpi").value.trim() : "",
+      summary_note: $("#summaryNote") ? $("#summaryNote").value.trim() : "",
+      chronic_conditions: conditions,
+      allergies: ALLERGIES.slice(),
+      medications: meds,
+      social_history: social,
+      examination: {
+        general: $("#examGeneral") ? $("#examGeneral").value.trim() : "",
+        cvs: $("#examCvs") ? $("#examCvs").value.trim() : "",
+        respiratory: $("#examResp") ? $("#examResp").value.trim() : "",
+        abdomen: $("#examAbd") ? $("#examAbd").value.trim() : "",
+        cns: $("#examCns") ? $("#examCns").value.trim() : ""
+      }
+    };
+  }
+
+  /* ───────────────────── Populate form from saved assessment ───────────────────── */
+  function populateForm(data) {
+    if (!data) return;
+    function setVal(id, v) { var el = document.getElementById(id); if (el) el.value = (v === null || v === undefined) ? "" : v; }
+    setVal("temp", data.temperature);
+    setVal("pulse", data.pulse);
+    setVal("rr", data.respiratory_rate);
+    setVal("bpSys", data.bp_systolic);
+    setVal("bpDia", data.bp_diastolic);
+    setVal("spo2", data.spo2);
+    setVal("height", data.height);
+    setVal("weight", data.weight);
+    setVal("bmi", data.bmi);
+    setVal("rbs", data.rbs);
+    if (data.pain_score !== null && data.pain_score !== undefined && data.pain_score !== "") {
+      var pain = $("#pain"); if (pain) pain.value = data.pain_score;
+    }
+    var ct = $(".complaint-text");
+    if (ct && data.complaints) ct.value = data.complaints;
+    var hpiEl = $("#hpi");
+    if (hpiEl && data.hpi) hpiEl.value = data.hpi;
+    var noteEl = $("#summaryNote");
+    if (noteEl && data.summary_note) noteEl.value = data.summary_note;
+
+    // allergies
+    if (Array.isArray(data.allergies) && data.allergies.length) {
+      var at = $("#allergyTags");
+      if (at) at.innerHTML = "";
+      data.allergies.forEach(function (a) { addAllergyTag(a); });
+      ALLERGIES = data.allergies.slice();
+    }
+    // medications
+    if (Array.isArray(data.medications) && data.medications.length) {
+      var tb = $("#medTableBody");
+      if (tb) tb.innerHTML = "";
+      data.medications.forEach(function (m) {
+        var node = $("#medRowTemplate").content.cloneNode(true);
+        tb.appendChild(node);
+        var rows = $$("#medTableBody tr");
+        var last = rows[rows.length - 1];
+        wireRowDelete(last);
+        var name = $(".med-name", last); if (name) name.value = m.name || "";
+        var dose = $(".med-dose", last); if (dose) dose.value = m.dose || "";
+        var freq = $(".med-freq", last); if (freq) freq.value = m.freq || "";
+      });
+    }
+    // social history
+    if (Array.isArray(data.social_history)) {
+      socialOthersItems = data.social_history.slice();
+      renderSocialOthersTags();
+      var sc = $("#socialOthersCheck");
+      if (sc && socialOthersItems.length) sc.checked = true;
+    }
+    // chronic conditions
+    if (Array.isArray(data.chronic_conditions)) {
+      data.chronic_conditions.forEach(function (c) {
+        if (!c || !c.name) return;
+        var matched = false;
+        $$(".condition").forEach(function (row) {
+          var span = row.querySelector("span");
+          if (span && span.textContent.trim() === c.name.trim()) {
+            matched = true;
+            var cb = row.querySelector(".cond-check"); if (cb) cb.checked = !!c.checked;
+            var dur = row.querySelector(".cond-duration"); if (dur && c.duration) dur.value = c.duration;
+          }
+        });
+        if (!matched && otherConditionsList) {
+          // add as other condition row
+          var row = document.createElement("label");
+          row.className = "condition";
+          row.innerHTML = '<input type="checkbox" class="cond-check" checked><span></span><input type="text" class="cond-duration" placeholder="since"><button type="button" class="icon-btn" style="margin-left:6px;" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button>';
+          row.querySelector("span").textContent = c.name;
+          var cb = row.querySelector(".cond-check"); if (cb) cb.checked = !!c.checked;
+          var dur = row.querySelector(".cond-duration"); if (dur && c.duration) dur.value = c.duration;
+          var removeBtn = row.querySelector("button");
+          removeBtn.addEventListener("click", function () { row.remove(); });
+          otherConditionsList.appendChild(row);
+          if (condOthersCheck) { condOthersCheck.checked = true; toggleOtherConditionsPanel(); }
+        }
+      });
+    }
+    // examination
+    var exam = data.examination || {};
+    setVal("examGeneral", exam.general);
+    setVal("examCvs", exam.cvs);
+    setVal("examResp", exam.respiratory);
+    setVal("examAbd", exam.abdomen);
+    setVal("examCns", exam.cns);
+
+    calcBMI();
+    renderAlerts();
+    refreshSummary();
+  }
+
   /* ───────────────────── Save / Edit assessment ───────────────────── */
   var saveBtn = $("#btnSaveAssessment");
-  if (saveBtn) saveBtn.addEventListener("click", function () {
-    showToast("Assessment saved.");
+  if (saveBtn) saveBtn.addEventListener("click", async function () {
+    var payload = collectAssessment();
+    if (!payload.patient_id) {
+      showToast("Select a patient first.");
+      return;
+    }
+    var csrfInput = document.querySelector('input[name=csrfmiddlewaretoken]');
+    var csrf = csrfInput ? csrfInput.value : "";
+    saveBtn.disabled = true;
+    try {
+      var res = await fetch("/api/initial-assessment/save/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        body: JSON.stringify(payload),
+      });
+      var data = await res.json();
+      if (data && data.ok) showToast("Assessment saved.");
+      else showToast("Save failed: " + (data.error || "unknown error"));
+    } catch (err) {
+      showToast("Save failed (network error).");
+    } finally {
+      saveBtn.disabled = false;
+    }
   });
   var editBtn = $("#btnEditAssessment");
   if (editBtn) editBtn.addEventListener("click", function () {
@@ -550,6 +744,7 @@
   });
 
   /* ── Initial render ── */
+  populateForm(ASSESSMENT);
   calcBMI();
   renderAlerts();
   refreshSummary();

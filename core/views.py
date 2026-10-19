@@ -1227,6 +1227,60 @@ def medgemma_draft(request):
 
 
 @login_required(login_url="login")
+@require_POST
+def save_initial_assessment(request):
+    """Persist an OPD initial assessment for a patient (create or update)."""
+    try:
+        payload = _json.loads(request.body.decode("utf-8") or "{}")
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+
+    patient_id = payload.get("patient_id")
+    if not patient_id:
+        return JsonResponse({"ok": False, "error": "patient_id required"}, status=400)
+
+    from patients.models import InitialAssessment, Patient
+    patient = Patient.objects.filter(pk=patient_id).first()
+    if not patient:
+        return JsonResponse({"ok": False, "error": "Patient not found"}, status=404)
+
+    def _num(v, cast=int):
+        if v is None or v == "":
+            return None
+        try:
+            return cast(v)
+        except (TypeError, ValueError):
+            return None
+
+    assessment, _ = InitialAssessment.objects.get_or_create(patient=patient)
+
+    assessment.temperature = _num(payload.get("temperature"), float)
+    assessment.pulse = _num(payload.get("pulse"))
+    assessment.respiratory_rate = _num(payload.get("respiratory_rate"))
+    assessment.bp_systolic = _num(payload.get("bp_systolic"))
+    assessment.bp_diastolic = _num(payload.get("bp_diastolic"))
+    assessment.spo2 = _num(payload.get("spo2"))
+    assessment.height = _num(payload.get("height"), float)
+    assessment.weight = _num(payload.get("weight"), float)
+    assessment.bmi = _num(payload.get("bmi"), float)
+    assessment.rbs = _num(payload.get("rbs"))
+    assessment.pain_score = _num(payload.get("pain_score"))
+
+    assessment.complaints = payload.get("complaints", "") or ""
+    assessment.hpi = payload.get("hpi", "") or ""
+    assessment.summary_note = payload.get("summary_note", "") or ""
+
+    assessment.chronic_conditions = payload.get("chronic_conditions", []) or []
+    assessment.allergies = payload.get("allergies", []) or []
+    assessment.medications = payload.get("medications", []) or []
+    assessment.social_history = payload.get("social_history", []) or []
+    assessment.examination = payload.get("examination", {}) or {}
+
+    assessment.save()
+    return JsonResponse({"ok": True, "id": assessment.pk})
+
+
+@login_required(login_url="login")
 def initial_assessment(request):
     """OPD triage workstation — select a patient, then record vitals, complaints
     and history before consultation.
@@ -1272,6 +1326,7 @@ def initial_assessment(request):
 
     patient_ctx = None
     allergies_json = "[]"
+    assessment_json = "null"
     if patient:
         now = timezone.now()
         department = "General Medicine"
@@ -1311,9 +1366,38 @@ def initial_assessment(request):
         }
         allergies_json = json.dumps(patient_ctx["allergies"])
 
+        # Load any previously saved assessment for pre-filling the form
+        from patients.models import InitialAssessment
+        try:
+            a = patient.initial_assessment
+            assessment_json = _json.dumps({
+                "temperature": (str(a.temperature) if a.temperature is not None else ""),
+                "pulse": (a.pulse if a.pulse is not None else ""),
+                "respiratory_rate": (a.respiratory_rate if a.respiratory_rate is not None else ""),
+                "bp_systolic": (a.bp_systolic if a.bp_systolic is not None else ""),
+                "bp_diastolic": (a.bp_diastolic if a.bp_diastolic is not None else ""),
+                "spo2": (a.spo2 if a.spo2 is not None else ""),
+                "height": (str(a.height) if a.height is not None else ""),
+                "weight": (str(a.weight) if a.weight is not None else ""),
+                "bmi": (str(a.bmi) if a.bmi is not None else ""),
+                "rbs": (a.rbs if a.rbs is not None else ""),
+                "pain_score": (a.pain_score if a.pain_score is not None else ""),
+                "complaints": a.complaints or "",
+                "hpi": a.hpi or "",
+                "summary_note": a.summary_note or "",
+                "chronic_conditions": a.chronic_conditions or [],
+                "allergies": a.allergies or [],
+                "medications": a.medications or [],
+                "social_history": a.social_history or [],
+                "examination": a.examination or {},
+            })
+        except InitialAssessment.DoesNotExist:
+            assessment_json = "null"
+
     return render(request, "core/initial_assessment.html", {
         "patient_ctx": patient_ctx,
         "allergies_json": allergies_json,
+        "assessment_json": assessment_json,
         "has_patient": patient is not None,
         "selected_patient": patient,
         "patients": patients,

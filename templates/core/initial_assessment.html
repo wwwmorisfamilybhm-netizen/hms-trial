@@ -285,12 +285,12 @@
       <!-- Tab 4 · Examination -->
       <div class="panel" data-panel="exam" hidden>
         <div class="panel-head"><h3>Examination (if any)</h3><span class="panel-hint">Record only what was examined at triage.</span></div>
-        <textarea class="textarea" rows="3" placeholder="General examination — appearance, pallor, icterus, hydration…"></textarea>
+        <textarea id="examGeneral" class="textarea" rows="3" placeholder="General examination — appearance, pallor, icterus, hydration…"></textarea>
         <div class="system-grid">
-          <label class="system"><span>CVS</span><textarea rows="2" placeholder="e.g. S1 S2 normal, no murmurs"></textarea></label>
-          <label class="system"><span>Respiratory</span><textarea rows="2" placeholder="e.g. NVBS, clear"></textarea></label>
-          <label class="system"><span>Abdomen</span><textarea rows="2" placeholder="e.g. soft, non-tender"></textarea></label>
-          <label class="system"><span>CNS</span><textarea rows="2" placeholder="e.g. conscious, oriented"></textarea></label>
+          <label class="system"><span>CVS</span><textarea id="examCvs" rows="2" placeholder="e.g. S1 S2 normal, no murmurs"></textarea></label>
+          <label class="system"><span>Respiratory</span><textarea id="examResp" rows="2" placeholder="e.g. NVBS, clear"></textarea></label>
+          <label class="system"><span>Abdomen</span><textarea id="examAbd" rows="2" placeholder="e.g. soft, non-tender"></textarea></label>
+          <label class="system"><span>CNS</span><textarea id="examCns" rows="2" placeholder="e.g. conscious, oriented"></textarea></label>
         </div>
       </div>
 
@@ -488,5 +488,6 @@
 </template>
 
 <script type="application/json" id="iaConfig">{{ allergies_json|safe }}</script>
+<script type="application/json" id="iaAssessment">{{ assessment_json|safe }}</script>
 <script src="{% static 'js/initial_assessment.js' %}"></script>
 {% endblock %}

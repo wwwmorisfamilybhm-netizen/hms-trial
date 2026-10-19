@@ -254,3 +254,46 @@ class PatientBill(models.Model):
 
     def __str__(self):
         return f"{self.bill_number} — {self.patient.full_name}"
+
+
+class InitialAssessment(models.Model):
+    """OPD triage assessment recorded before doctor consultation."""
+
+    patient = models.OneToOneField(
+        Patient, on_delete=models.CASCADE, related_name="initial_assessment",
+        verbose_name="Patient",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # Vitals
+    temperature = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    pulse = models.PositiveIntegerField(null=True, blank=True)
+    respiratory_rate = models.PositiveIntegerField(null=True, blank=True)
+    bp_systolic = models.PositiveIntegerField(null=True, blank=True)
+    bp_diastolic = models.PositiveIntegerField(null=True, blank=True)
+    spo2 = models.PositiveIntegerField(null=True, blank=True)
+    height = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
+    weight = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
+    bmi = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    rbs = models.PositiveIntegerField(null=True, blank=True)
+    pain_score = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    # Narrative
+    complaints = models.TextField(blank=True, default="")
+    hpi = models.TextField(blank=True, default="")
+    summary_note = models.TextField(blank=True, default="")
+
+    # Structured (JSON)
+    chronic_conditions = models.JSONField(default=list, blank=True)
+    allergies = models.JSONField(default=list, blank=True)
+    medications = models.JSONField(default=list, blank=True)
+    social_history = models.JSONField(default=list, blank=True)
+    examination = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "Initial Assessment"
+        verbose_name_plural = "Initial Assessments"
+
+    def __str__(self):
+        return f"Initial Assessment — {self.patient.full_name}"
