@@ -265,9 +265,9 @@
     name = (name || "").trim();
     if (!name) return;
     if (!otherConditionsList) return;
-    var row = document.createElement("label");
+    var row = document.createElement("div");
     row.className = "condition";
-    row.innerHTML = '<input type="checkbox" class="cond-check" checked><span></span><input type="text" class="cond-duration" placeholder="since"><button type="button" class="icon-btn" style="margin-left:6px;" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button>';
+    row.innerHTML = '<label class="cond-head"><input type="checkbox" class="cond-check" checked><span></span></label><div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 1 yr"><button type="button" class="icon-btn" style="margin-left:6px;" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>';
     row.querySelector("span").textContent = name;
     var removeBtn = row.querySelector("button");
     removeBtn.addEventListener("click", function () { row.remove(); });
@@ -682,9 +682,9 @@
         });
         if (!matched && otherConditionsList) {
           // add as other condition row
-          var row = document.createElement("label");
+          var row = document.createElement("div");
           row.className = "condition";
-          row.innerHTML = '<input type="checkbox" class="cond-check" checked><span></span><input type="text" class="cond-duration" placeholder="since"><button type="button" class="icon-btn" style="margin-left:6px;" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button>';
+          row.innerHTML = '<label class="cond-head"><input type="checkbox" class="cond-check" checked><span></span></label><div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 1 yr"><button type="button" class="icon-btn" style="margin-left:6px;" aria-label="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>';
           row.querySelector("span").textContent = c.name;
           var cb = row.querySelector(".cond-check"); if (cb) cb.checked = !!c.checked;
           var dur = row.querySelector(".cond-duration"); if (dur && c.duration) dur.value = c.duration;

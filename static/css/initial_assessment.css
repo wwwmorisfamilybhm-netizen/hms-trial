@@ -358,27 +358,48 @@ body {
 .conditions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .condition {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
   border: 1px solid var(--ia-border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  cursor: pointer;
-  flex-wrap: wrap;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fbfdff;
+  transition: border-color 0.14s ease, background 0.14s ease;
 }
-.condition .cond-duration { flex: 1 1 120px; min-width: 120px; }
-.condition input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--ia-primary); cursor: pointer; }
-.condition span { flex: 1; font-size: 13px; font-weight: 500; color: var(--ia-ink-soft); }
+.condition:hover { border-color: var(--ia-border-strong); background: #fff; }
+.cond-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ia-ink-soft);
+}
+.cond-head input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--ia-primary); cursor: pointer; flex-shrink: 0; }
+.cond-since {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cond-since-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ia-faint);
+  min-width: 58px;
+}
 .condition .cond-duration {
-  flex: 1 1 140px;
-  min-width: 120px;
+  flex: 1;
+  width: 100%;
   border: 1px solid var(--ia-border-strong);
   border-radius: 10px;
   background: #fff;
   font: inherit;
   font-size: 13px;
   color: var(--ia-ink);
-  padding: 8px 12px;
+  padding: 9px 12px;
   transition: border-color 0.14s ease, box-shadow 0.14s ease;
 }
 .condition .cond-duration::placeholder { color: var(--ia-faint); }
@@ -387,6 +408,7 @@ body {
   border-color: var(--ia-primary);
   box-shadow: 0 0 0 3px var(--ia-primary-soft);
 }
+
 
 .tag-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .tag {

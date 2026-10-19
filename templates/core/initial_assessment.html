@@ -227,13 +227,34 @@
         <div class="subgroup">
           <span class="subgroup-title">Chronic conditions</span>
           <div class="conditions-grid">
-            <label class="condition"><input type="checkbox" class="cond-check"><span>Type 2 Diabetes Mellitus</span><input type="text" class="cond-duration" placeholder="since"></label>
-            <label class="condition"><input type="checkbox" class="cond-check"><span>Hypertension</span><input type="text" class="cond-duration" placeholder="since"></label>
-            <label class="condition"><input type="checkbox" class="cond-check"><span>Asthma / COPD</span><input type="text" class="cond-duration" placeholder="since"></label>
-            <label class="condition"><input type="checkbox" class="cond-check"><span>Coronary Artery Disease</span><input type="text" class="cond-duration" placeholder="since"></label>
-            <label class="condition"><input type="checkbox" class="cond-check"><span>Chronic Kidney Disease</span><input type="text" class="cond-duration" placeholder="since"></label>
-            <label class="condition"><input type="checkbox" class="cond-check"><span>Thyroid Disorder</span><input type="text" class="cond-duration" placeholder="since"></label>
-            <label class="condition"><input type="checkbox" class="cond-check" id="condOthersCheck"><span>Others</span><input type="text" class="cond-duration" placeholder="specify"></label>
+            <div class="condition">
+              <label class="cond-head"><input type="checkbox" class="cond-check"><span>Type 2 Diabetes Mellitus</span></label>
+              <div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 6 yrs"></div>
+            </div>
+            <div class="condition">
+              <label class="cond-head"><input type="checkbox" class="cond-check"><span>Hypertension</span></label>
+              <div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 4 yrs"></div>
+            </div>
+            <div class="condition">
+              <label class="cond-head"><input type="checkbox" class="cond-check"><span>Asthma / COPD</span></label>
+              <div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 2 yrs"></div>
+            </div>
+            <div class="condition">
+              <label class="cond-head"><input type="checkbox" class="cond-check"><span>Coronary Artery Disease</span></label>
+              <div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 3 yrs"></div>
+            </div>
+            <div class="condition">
+              <label class="cond-head"><input type="checkbox" class="cond-check"><span>Chronic Kidney Disease</span></label>
+              <div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 1 yr"></div>
+            </div>
+            <div class="condition">
+              <label class="cond-head"><input type="checkbox" class="cond-check"><span>Thyroid Disorder</span></label>
+              <div class="cond-since"><span class="cond-since-label">Since</span><input type="text" class="cond-duration" placeholder="e.g. 5 yrs"></div>
+            </div>
+            <div class="condition">
+              <label class="cond-head"><input type="checkbox" class="cond-check" id="condOthersCheck"><span>Others</span></label>
+              <div class="cond-since"><span class="cond-since-label">Specify</span><input type="text" class="cond-duration" placeholder="condition name"></div>
+            </div>
           </div>
           <div id="otherConditionsPanel" style="display:none; margin-top:10px;">
             <div style="display:flex; gap:8px; margin-bottom:8px;">
