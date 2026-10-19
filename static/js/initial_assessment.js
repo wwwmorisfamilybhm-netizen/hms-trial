@@ -520,10 +520,16 @@
     MedGemmaAssistant.onAcceptDraft();
   });
 
-  /* ───────────────────── Save assessment ───────────────────── */
+  /* ───────────────────── Save / Edit assessment ───────────────────── */
   var saveBtn = $("#btnSaveAssessment");
   if (saveBtn) saveBtn.addEventListener("click", function () {
     showToast("Assessment saved.");
+  });
+  var editBtn = $("#btnEditAssessment");
+  if (editBtn) editBtn.addEventListener("click", function () {
+    showToast("Edit mode enabled.");
+    var first = document.querySelector("#assessmentForm input, #assessmentForm textarea, #assessmentForm select");
+    if (first) first.focus();
   });
 
   /* ───────────────────── Next action buttons ───────────────────── */
