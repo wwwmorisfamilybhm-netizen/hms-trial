@@ -9,7 +9,7 @@
       <p class="page-sub">Master outpatient registration list · Complete records and history</p>
     </div>
     <div style="display:flex; gap:10px;">
-      <a href="{% url 'registration_desk' %}" class="btn" style="background:var(--lime); color:var(--ink); font-weight:750; border-radius:12px; padding:10px 20px;">
+      <a href="{% url 'registration_desk_new' %}" class="btn" style="background:var(--lime); color:var(--ink); font-weight:750; border-radius:12px; padding:10px 20px;">
         + Register New Patient
       </a>
     </div>
@@ -108,7 +108,7 @@
       <p style="color:var(--muted); font-size:15px; margin-bottom:16px;">
         {% if query %}No patients found matching “{{ query }}”.{% else %}No patients registered yet in the system.{% endif %}
       </p>
-      <a href="{% url 'registration_desk' %}" class="btn" style="background:var(--lime); color:var(--ink); font-weight:750; border-radius:12px; padding:10px 22px;">
+      <a href="{% url 'registration_desk_new' %}" class="btn" style="background:var(--lime); color:var(--ink); font-weight:750; border-radius:12px; padding:10px 22px;">
         Register First Patient →
       </a>
     </div>

@@ -50,21 +50,13 @@
           </span>
           <span class="nav-label">Dashboard</span>
         </a>
-        <a href="{% url 'registration_desk' %}" class="nav-item {% if request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'patient_print_card' %}active{% endif %}">
+        <a href="{% url 'registration_desk' %}" class="nav-item {% if request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'registration_desk_new' or request.resolver_match.url_name == 'patient_print_card' %}active{% endif %}">
           <span class="nav-icon">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
               <circle cx="8" cy="6" r="4"/><path d="M1 18c1-6 3.5-8 7-8s6 2 7 8M16 5a4 4 0 0 1 0 8"/>
             </svg>
           </span>
           <span class="nav-label">Patient Registration</span>
-        </a>
-        <a href="{% url 'history' %}" class="nav-item {% if request.resolver_match.url_name == 'history' %}active{% endif %}">
-          <span class="nav-icon">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
-              <circle cx="9" cy="9" r="7"/><path d="M9 5.5V9l2.8 1.8"/>
-            </svg>
-          </span>
-          <span class="nav-label">History</span>
         </a>
         <a href="{% url 'bill_command_center' %}" class="nav-item {% if request.resolver_match.url_name == 'bill_command_center' %}active{% endif %}">
           <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="2" y="2" width="16" height="16" rx="3"/><path d="M6 6h8M6 10h5M6 14h3"/><circle cx="15" cy="14" r="2" fill="currentColor"/></svg></span>
@@ -169,14 +161,6 @@
             </svg>
           </span>
           <span class="nav-label">Appointment</span>
-        </a>
-        <a href="{% url 'history' %}" class="nav-item {% if request.resolver_match.url_name == 'history' %}active{% endif %}">
-          <span class="nav-icon">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
-              <circle cx="9" cy="9" r="7"/><path d="M9 5.5V9l2.8 1.8"/>
-            </svg>
-          </span>
-          <span class="nav-label">History</span>
         </a>
       {% endif %}
     </nav>

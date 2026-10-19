@@ -744,12 +744,72 @@ def reception_dashboard(request):
 
 @login_required(login_url="login")
 def registration_desk(request):
-    """Registration desk landing — new patient registration form."""
+    """Registration desk hub — search the register, start a new registration and
+    review past records.
+
+    This page now carries the functionality that used to live on the separate
+    History screen: a search bar over the patient register, a shortcut to the
+    new-registration form, and the full record list (filter, edit, delete).
+    """
+    from datetime import datetime
+
+    designation = (
+        getattr(getattr(request.user, "profile", None), "designation", None)
+        or request.session.get("designation")
+    )
+    is_registration_desk = designation == UserProfile.Designation.REGISTRATION_DESK
+    can_register = is_registration_desk or request.user.is_superuser
+
+    query = request.GET.get("q", "").strip()
+    status = request.GET.get("status", "").strip()
+    date_str = request.GET.get("date", "").strip()
+    selected_date = None
+    if date_str:
+        try:
+            selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            selected_date = None
+
+    # The registration counter only deals with patient records; other staff
+    # also see booked appointments, exactly as the History screen did.
+    rows = _history_rows(
+        query=query,
+        status=status,
+        selected_date=selected_date,
+        include_appointments=not is_registration_desk,
+    )
+
+    last = Patient.objects.order_by("-id").first()
+    next_mr = (int(last.mr_number) + 1) if (last and last.mr_number and last.mr_number.isdigit()) else 100001
+    recent_registered = Patient.objects.order_by("-created_at")[:5]
+
+    return render(request, "core/registration_desk.html", {
+        "rows": rows,
+        "row_count": len(rows),
+        "query": query,
+        "status": status,
+        "selected_date": selected_date,
+        "date_str": date_str,
+        "status_choices": Appointment.Status.choices,
+        "is_registration_desk": is_registration_desk,
+        "can_register": can_register,
+        "next_mr": next_mr,
+        "recent_registered": recent_registered,
+        "last_registered": recent_registered[0] if recent_registered else None,
+        "user": request.user,
+    })
+
+
+@login_required(login_url="login")
+def registration_desk_new(request):
+    """New patient registration form — Registration Desk counter."""
     user_desig = getattr(getattr(request.user, "profile", None), "designation", None) or request.session.get("designation")
     if user_desig in ["doctor", "nurse"] and not request.user.is_superuser:
         from django.contrib import messages
         messages.warning(request, "Access restricted: Patient Registration counter is for Registration Desk staff only.")
         return redirect("dashboard")
+    from decimal import Decimal
+
     from patients.models import Patient
 
     # Compute next MR number (simple auto-increment)
@@ -811,7 +871,7 @@ def registration_desk(request):
     today = dt.today()
     recent_registered = Patient.objects.order_by("-created_at")[:5]
 
-    return render(request, "core/registration_desk.html", {
+    return render(request, "core/registration_desk_form.html", {
         "form": form,
         "next_mr": next_mr,
         "today": today,
@@ -965,6 +1025,84 @@ def patient_print_card(request, patient_id):
 
 # ── History ───────────────────────────────────────────────────────────────────
 
+def _history_rows(query="", status="", selected_date=None, include_appointments=False):
+    """Build the history rows (patient registrations and, optionally, appointments).
+
+    Shared by the History screen and the Registration Desk hub so both show the
+    exact same records, filters and row actions.
+    """
+    from django.db.models import Q
+    from django.urls import reverse
+
+    rows = []
+
+    patients = Patient.objects.all()
+    if query:
+        patients = patients.filter(
+            Q(first_name__icontains=query)
+            | Q(second_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(mr_number__icontains=query)
+            | Q(phone__icontains=query)
+            | Q(aadhar_no__icontains=query)
+            | Q(abha_no__icontains=query)
+        )
+    if selected_date:
+        patients = patients.filter(created_at__date=selected_date)
+    for patient in patients:
+        rows.append({
+            "kind": "patient",
+            "when": patient.created_at,
+            "badge": f"Patient · MR #{patient.mr_number or patient.id}",
+            "title": patient.full_name,
+            "detail": patient.phone or "—",
+            "status": None,
+            "status_lower": "",
+            "is_emergency": patient.is_emergency,
+            "view_url": reverse("patient_detail", args=[patient.pk]),
+            "edit_url": reverse("patient_edit", args=[patient.pk]),
+            "delete_url": reverse("patient_delete", args=[patient.pk]),
+        })
+
+    if include_appointments:
+        appointments = Appointment.objects.select_related("patient", "doctor")
+        if query:
+            appointments = appointments.filter(
+                Q(patient__first_name__icontains=query)
+                | Q(patient__second_name__icontains=query)
+                | Q(patient__last_name__icontains=query)
+                | Q(patient__mr_number__icontains=query)
+                | Q(doctor__first_name__icontains=query)
+                | Q(doctor__last_name__icontains=query)
+                | Q(reason__icontains=query)
+            )
+        if selected_date:
+            appointments = appointments.filter(date=selected_date)
+        if status:
+            appointments = appointments.filter(status=status)
+        from datetime import datetime
+
+        from django.utils import timezone
+        for appointment in appointments:
+            start = timezone.make_aware(
+                datetime.combine(appointment.date, appointment.start_time)
+            )
+            rows.append({
+                "kind": "appointment",
+                "when": start,
+                "badge": f"Appointment · {appointment.doctor}",
+                "title": appointment.patient.full_name,
+                "detail": appointment.reason or "—",
+                "status": appointment.get_status_display(),
+                "status_lower": appointment.status.lower(),
+                "view_url": reverse("patient_detail", args=[appointment.patient_id]),
+                "edit_url": reverse("appointment_edit", args=[appointment.pk]),
+            })
+
+    rows.sort(key=lambda row: (row["when"] is not None, row["when"]), reverse=True)
+    return rows[:200]
+
+
 @login_required(login_url="login")
 def history(request):
     """Combined history of patient registrations and booked appointments.
@@ -999,72 +1137,12 @@ def history(request):
     include_patients = item_type in ("all", "patients")
     include_appointments = not is_registration_desk and item_type in ("all", "appointments")
 
-    rows = []
-
-    if include_patients:
-        patients = Patient.objects.all()
-        if query:
-            patients = patients.filter(
-                Q(first_name__icontains=query)
-                | Q(second_name__icontains=query)
-                | Q(last_name__icontains=query)
-                | Q(mr_number__icontains=query)
-                | Q(phone__icontains=query)
-                | Q(aadhar_no__icontains=query)
-                | Q(abha_no__icontains=query)
-            )
-        if selected_date:
-            patients = patients.filter(created_at__date=selected_date)
-        for patient in patients:
-            rows.append({
-                "kind": "patient",
-                "when": patient.created_at,
-                "badge": f"Patient · MR #{patient.mr_number or patient.id}",
-                "title": patient.full_name,
-                "detail": patient.phone or "—",
-                "status": None,
-                "status_lower": "",
-                "is_emergency": patient.is_emergency,
-                "view_url": reverse("patient_detail", args=[patient.pk]),
-                "edit_url": reverse("patient_edit", args=[patient.pk]),
-                "delete_url": reverse("patient_delete", args=[patient.pk]),
-            })
-
-    if include_appointments:
-        appointments = Appointment.objects.select_related("patient", "doctor")
-        if query:
-            appointments = appointments.filter(
-                Q(patient__first_name__icontains=query)
-                | Q(patient__second_name__icontains=query)
-                | Q(patient__last_name__icontains=query)
-                | Q(patient__mr_number__icontains=query)
-                | Q(doctor__first_name__icontains=query)
-                | Q(doctor__last_name__icontains=query)
-                | Q(reason__icontains=query)
-            )
-        if selected_date:
-            appointments = appointments.filter(date=selected_date)
-        if status:
-            appointments = appointments.filter(status=status)
-        for appointment in appointments:
-            from django.utils import timezone
-            start = timezone.make_aware(
-                datetime.combine(appointment.date, appointment.start_time)
-            )
-            rows.append({
-                "kind": "appointment",
-                "when": start,
-                "badge": f"Appointment · {appointment.doctor}",
-                "title": appointment.patient.full_name,
-                "detail": appointment.reason or "—",
-                "status": appointment.get_status_display(),
-                "status_lower": appointment.status.lower(),
-                "view_url": reverse("patient_detail", args=[appointment.patient_id]),
-                "edit_url": reverse("appointment_edit", args=[appointment.pk]),
-            })
-
-    rows.sort(key=lambda row: (row["when"] is not None, row["when"]), reverse=True)
-    rows = rows[:200]
+    rows = _history_rows(
+        query=query,
+        status=status,
+        selected_date=selected_date,
+        include_appointments=include_appointments,
+    ) if include_patients or include_appointments else []
 
     return render(request, "core/history.html", {
         "rows": rows,

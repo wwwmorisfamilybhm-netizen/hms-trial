@@ -7,6 +7,7 @@ urlpatterns = [
     path("login/", views.login_view, name="login"),
     path("logout/", views.logout_view, name="logout"),
     path("registration-desk/", views.registration_desk, name="registration_desk"),
+    path("registration-desk/new/", views.registration_desk_new, name="registration_desk_new"),
     path("registration-desk/emergency/", views.emergency_registration, name="emergency_registration"),
     path("registration-desk/billing/command-center/", views.bill_command_center, name="bill_command_center"),
     path("registration-desk/billing/bill/<int:bill_id>/print/", views.patient_bill_slip, name="patient_bill_slip"),

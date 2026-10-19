@@ -6,15 +6,9 @@
   <div class="page-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:16px;">
     <div>
       <h1>Patient Registration</h1>
-      <p class="page-sub">Registration Desk Counter · Fill patient demographic and billing information</p>
+      <p class="page-sub">Registration Desk Counter · Search the register, start a new registration and review past records</p>
     </div>
     <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-      {% if last_registered %}
-        <a href="{% url 'patient_print_card' last_registered.pk %}" class="btn btn-outline" style="padding:8px 16px; font-size:13px; font-weight:700; border-radius:12px; display:inline-flex; align-items:center; gap:6px;">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          Print Last Card (#{{ last_registered.mr_number }})
-        </a>
-      {% endif %}
       <span class="badge" style="background:var(--lime); color:var(--ink); font-weight:800; padding:8px 16px; border-radius:99px; font-size:13px; letter-spacing:0.5px;">
         Next MR No: #{{ next_mr }}
       </span>
@@ -26,507 +20,151 @@
 {% endblock %}
 
 {% block content %}
-<div class="card" style="border-radius:24px; padding:36px 40px; margin-bottom:40px; box-shadow:0 6px 30px rgba(0,0,0,0.06);">
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert alert-{{ message.tags }}" style="margin-bottom:24px; border-radius:14px; padding:14px 20px; font-weight:600;">
-        {{ message }}
-      </div>
-    {% endfor %}
-  {% endif %}
-
-  {% if fee_configuration_missing %}
-    <div role="alert" style="margin-bottom:24px; border-radius:14px; padding:14px 20px; color:#92400e; background:#fef3c7; font-weight:650;">
-      Registration fees are not configured. An administrator must set a default fee or category fee before patients can be registered.
-    </div>
-  {% endif %}
-
-  {% if form.non_field_errors %}
-    <div role="alert" style="margin-bottom:24px; border-radius:14px; padding:14px 20px; color:#b91c1c; background:#fee2e2; font-weight:650;">
-      {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
-    </div>
-  {% endif %}
-
-  <form method="post" enctype="multipart/form-data" novalidate>
-    {% csrf_token %}
-
-    <!-- ── SECTION 1: Personal Information ── -->
-    <div style="margin-bottom:32px;">
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px; padding-bottom:8px; border-bottom:1.5px solid var(--line);">
-        <span style="display:inline-grid; place-items:center; width:28px; height:28px; background:var(--ink); color:#fff; border-radius:8px; font-size:13px; font-weight:700;">1</span>
-        <h2 style="font-size:17px; font-weight:750; color:var(--ink); margin:0;">Personal Details</h2>
-      </div>
-
-      <!-- Patient Photo Box with 2 insertion options -->
-      <div style="background:var(--lav-soft); padding:20px; border-radius:18px; margin-bottom:24px; display:flex; align-items:center; gap:24px; flex-wrap:wrap;">
-        <!-- Preview Box -->
-        <div style="position:relative; width:110px; height:110px; border-radius:18px; border:2px dashed var(--line); background:#fff; overflow:hidden; display:grid; place-items:center; flex-shrink:0; box-shadow:0 4px 12px rgba(0,0,0,0.04);">
-          <img id="patient-photo-preview" src="" alt="Patient Preview" style="display:none; width:100%; height:100%; object-fit:cover;">
-          <div id="photo-placeholder-view" style="text-align:center; color:var(--muted); padding:8px;">
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="margin-bottom:4px; display:block; margin-inline:auto;">
-              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>
-            </svg>
-            <span style="font-size:11px; font-weight:600; display:block;">No Photo</span>
-          </div>
-        </div>
-
-        <!-- Controls & Options -->
-        <div style="flex:1; min-width:260px;">
-          <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-            <span style="font-size:14px; font-weight:750; color:var(--ink);">Patient Photograph</span>
-            <span id="photo-status-badge" style="display:none; background:#dcfce7; color:#15803d; font-size:11px; font-weight:700; padding:3px 10px; border-radius:99px;">
-              ✓ Photo Selected
-            </span>
-          </div>
-          <p style="font-size:12px; color:var(--muted); margin:0 0 12px 0;">
-            Attach an outpatient photo via file upload or snap directly using device camera.
-          </p>
-
-          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-            <!-- Option 1: Insert Image from Files -->
-            <button type="button" class="btn btn-outline" onclick="document.getElementById('id_photo_file').click()" style="padding:8px 16px; font-size:13px; font-weight:650; display:inline-flex; align-items:center; gap:6px; background:#fff; border-radius:12px;">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-              <span>1. Insert Image from Files</span>
-            </button>
-            <input type="file" id="id_photo_file" name="photo" accept="image/*" style="display:none;" onchange="handleFileUpload(this)">
-
-            <!-- Option 2: Open Camera -->
-            <button type="button" class="btn" onclick="openCameraModal()" style="padding:8px 16px; font-size:13px; font-weight:700; display:inline-flex; align-items:center; gap:6px; background:var(--ink); color:#fff; border-radius:12px;">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
-              </svg>
-              <span>2. Open Camera</span>
-            </button>
-
-            <!-- Reset Button -->
-            <button type="button" id="btn-clear-photo" onclick="clearPhoto()" style="display:none; padding:8px 10px; font-size:12px; color:#b91c1c; background:none; border:none; cursor:pointer; text-decoration:underline;">
-              Remove Photo
-            </button>
-          </div>
-
-          <!-- Hidden storage for camera base64 data -->
-          <input type="hidden" id="photo_data" name="photo_data" value="">
-        </div>
-      </div>
-
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px;">
-        <div class="field">
-          <label for="id_first_name">First Name *</label>
-          {{ form.first_name }}
-          {% for error in form.first_name.errors %}<small class="error" style="color:#d32f2f;">{{ error }}</small>{% endfor %}
-        </div>
-
-        <div class="field">
-          <label for="id_second_name">Middle / Second Name</label>
-          {{ form.second_name }}
-        </div>
-
-        <div class="field">
-          <label for="id_last_name">Last Name</label>
-          {{ form.last_name }}
-          {% for error in form.last_name.errors %}<small class="error" style="color:#d32f2f;">{{ error }}</small>{% endfor %}
-        </div>
-
-        <div class="field">
-          <label for="id_date_of_birth">Date of Birth</label>
-          {{ form.date_of_birth }}
-        </div>
-
-        <div class="field">
-          <label for="id_age_years">Age — Years</label>
-          {{ form.age_years }}
-        </div>
-
-        <div class="field">
-          <label for="id_age_months">Months</label>
-          {{ form.age_months }}
-        </div>
-
-        <div class="field">
-          <label for="id_age_days">Days</label>
-          {{ form.age_days }}
-        </div>
-
-        <div class="field">
-          <label for="id_patient_category">Patient Category</label>
-          {{ form.patient_category }}
-        </div>
-
-        <div class="field">
-          <label for="id_gender">Gender</label>
-          {{ form.gender }}
-        </div>
-
-        <div class="field">
-          <label for="id_marital_status">Marital Status</label>
-          {{ form.marital_status }}
-        </div>
-
-        <div class="field">
-          <label for="id_centre">Centre</label>
-          {{ form.centre }}
-        </div>
-      </div>
-    </div>
-
-    <!-- ── SECTION 2: Contact & Identification ── -->
-    <div style="margin-bottom:32px;">
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px; padding-bottom:8px; border-bottom:1.5px solid var(--line);">
-        <span style="display:inline-grid; place-items:center; width:28px; height:28px; background:var(--ink); color:#fff; border-radius:8px; font-size:13px; font-weight:700;">2</span>
-        <h2 style="font-size:17px; font-weight:750; color:var(--ink); margin:0;">Contact & Identification</h2>
-      </div>
-
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px;">
-        <div class="field">
-          <label for="id_phone">Phone Number *</label>
-          {{ form.phone }}
-          {% for error in form.phone.errors %}<small class="error" style="color:#d32f2f;">{{ error }}</small>{% endfor %}
-        </div>
-
-        <div class="field">
-          <label for="id_email">Email</label>
-          {{ form.email }}
-        </div>
-
-        <div class="field">
-          <label for="id_care_of">Care Of (C/O)</label>
-          {{ form.care_of }}
-        </div>
-
-        <div class="field">
-          <label for="id_aadhar_no">Aadhar Card No.</label>
-          {{ form.aadhar_no }}
-        </div>
-
-        <div class="field">
-          <label for="id_abha_no">ABHA Number</label>
-          {{ form.abha_no }}
-        </div>
-
-        <div class="field">
-          <label for="id_nationality">Nationality</label>
-          {{ form.nationality }}
-        </div>
-
-        <div class="field">
-          <label for="id_pin_code">PIN Code</label>
-          {{ form.pin_code }}
-        </div>
-      </div>
-    </div>
-
-    <!-- ── SECTION 3: Address & Location ── -->
-    <div style="margin-bottom:32px;">
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px; padding-bottom:8px; border-bottom:1.5px solid var(--line);">
-        <span style="display:inline-grid; place-items:center; width:28px; height:28px; background:var(--ink); color:#fff; border-radius:8px; font-size:13px; font-weight:700;">3</span>
-        <h2 style="font-size:17px; font-weight:750; color:var(--ink); margin:0;">Address & Demographics</h2>
-      </div>
-
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:20px;">
-        <div class="field">
-          <label for="id_state">State</label>
-          {{ form.state }}
-        </div>
-
-        <div class="field">
-          <label for="id_district">District</label>
-          {{ form.district }}
-        </div>
-
-        <div class="field">
-          <label for="id_block">Block</label>
-          {{ form.block }}
-        </div>
-
-        <div class="field">
-          <label for="id_village">Village</label>
-          {{ form.village }}
-        </div>
-
-        <div class="field">
-          <label for="id_religion">Religion</label>
-          {{ form.religion }}
-        </div>
-
-        <div class="field" style="grid-column:1/-1;">
-          <label for="id_address">Residential Address</label>
-          {{ form.address }}
-        </div>
-
-        <div class="field">
-          <label for="id_zone">Zone</label>
-          {{ form.zone }}
-        </div>
-      </div>
-    </div>
-
-    <!-- ── SECTION 4: Billing & Category ── -->
-    <div style="margin-bottom:36px;">
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px; padding-bottom:8px; border-bottom:1.5px solid var(--line);">
-        <span style="display:inline-grid; place-items:center; width:28px; height:28px; background:var(--ink); color:#fff; border-radius:8px; font-size:13px; font-weight:700;">4</span>
-        <h2 style="font-size:17px; font-weight:750; color:var(--ink); margin:0;">Fees, Billing & Category</h2>
-      </div>
-
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:20px; margin-bottom:18px;">
-        <div class="field">
-          <label for="id_reg_fee">Registration Fee (₹)</label>
-          {{ form.reg_fee }}
-        </div>
-
-        <div class="field">
-          <label for="id_con_fee">Consultation Fee (₹)</label>
-          {{ form.con_fee }}
-        </div>
-
-        <div class="field">
-          <label for="id_discount">Discount (₹)</label>
-          {{ form.discount }}
-        </div>
-
-        <div class="field">
-          <label for="id_payment_type">Payment Method</label>
-          {{ form.payment_type }}
-        </div>
-
-        <div class="field">
-          <label for="id_billing_type">Billing Type</label>
-          {{ form.billing_type }}
-        </div>
-
-        <div class="field">
-          <label for="id_reference_no">Reference No.</label>
-          {{ form.reference_no }}
-        </div>
-
-      </div>
-
-      <div style="display:flex; align-items:center; gap:10px; margin-top:8px; background:var(--lav-soft); padding:14px 20px; border-radius:12px;">
-        {{ form.mlc }}
-        <label for="id_mlc" style="font-weight:700; font-size:13px; color:var(--ink); cursor:pointer; margin:0;">
-          MLC Registration (Medico-Legal Case)
-        </label>
-      </div>
-    </div>
-
-    <!-- ── FORM ACTIONS ── -->
-    <div style="display:flex; gap:16px; align-items:center; padding-top:12px; border-top:1.5px solid var(--line); flex-wrap:wrap;">
-      <button type="submit" class="btn" style="background:var(--lime); color:var(--ink); font-weight:800; font-size:1rem; padding:14px 28px; border-radius:14px; border:none; cursor:pointer; box-shadow:0 6px 18px rgba(214,242,95,0.35); display:inline-flex; align-items:center; gap:10px;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        <span>Register Patient & Print Card (MR #{{ next_mr }}) →</span>
-      </button>
-      <a href="{% url 'reception_dashboard' %}" class="btn btn-outline" style="padding:14px 24px; font-size:1rem; border-radius:14px;">
-        Cancel
-      </a>
-    </div>
-  </form>
-</div>
-
-<!-- ── Camera Capture Modal ── -->
-<div id="camera-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(5px); z-index:9999; align-items:center; justify-content:center; padding:16px;">
-  <div style="background:#fff; border-radius:24px; max-width:480px; width:100%; padding:24px; box-shadow:0 24px 60px rgba(0,0,0,0.3); position:relative;">
-    
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-      <div style="display:flex; align-items:center; gap:8px;">
-        <span style="display:grid; place-items:center; width:32px; height:32px; background:var(--ink); color:#fff; border-radius:10px;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
-          </svg>
-        </span>
-        <h3 style="margin:0; font-size:17px; font-weight:750;">Capture Patient Photo</h3>
-      </div>
-      <button type="button" onclick="closeCameraModal()" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--muted); line-height:1;">&times;</button>
-    </div>
-
-    <!-- Live Viewport / Canvas -->
-    <div style="position:relative; width:100%; aspect-ratio:4/3; background:#18181b; border-radius:16px; overflow:hidden; margin-bottom:16px; display:grid; place-items:center;">
-      <video id="camera-video" autoplay playsinline style="width:100%; height:100%; object-fit:cover;"></video>
-      <canvas id="camera-canvas" style="display:none; width:100%; height:100%; object-fit:cover;"></canvas>
-      
-      <!-- Frame Overlay Target -->
-      <div id="camera-target-guide" style="position:absolute; width:190px; height:190px; border:2px dashed rgba(255,255,255,0.7); border-radius:50%; pointer-events:none;"></div>
-      
-      <div id="camera-error-msg" style="display:none; position:absolute; inset:0; background:#18181b; color:#fff; padding:24px; text-align:center; flex-direction:column; justify-content:center; align-items:center;">
-        <p style="font-size:14px; margin-bottom:8px; color:#fca5a5; font-weight:600;">Unable to access camera.</p>
-        <small style="color:#a1a1aa; line-height:1.4;">Please allow camera permission in your browser or use "Insert Image from Files".</small>
-      </div>
-    </div>
-
-    <!-- Action buttons inside modal -->
-    <div id="camera-controls-live" style="display:flex; justify-content:center; gap:12px;">
-      <button type="button" class="btn btn-outline" onclick="closeCameraModal()" style="padding:10px 18px; border-radius:12px; font-size:13px;">
-        Cancel
-      </button>
-      <button type="button" class="btn" onclick="captureSnapshot()" style="background:var(--lime); color:var(--ink); font-weight:800; padding:10px 22px; border-radius:12px; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
-        📸 Capture Photo
-      </button>
-    </div>
-
-    <div id="camera-controls-captured" style="display:none; justify-content:center; gap:12px;">
-      <button type="button" class="btn btn-outline" onclick="retakeSnapshot()" style="padding:10px 18px; border-radius:12px; font-size:13px;">
-        🔄 Retake
-      </button>
-      <button type="button" class="btn" onclick="confirmSnapshot()" style="background:var(--lime); color:var(--ink); font-weight:800; padding:10px 22px; border-radius:12px; font-size:13px;">
-        ✓ Use This Photo
-      </button>
+<!-- ═══════════ 1. SEARCH BAR ═══════════ -->
+<form method="get" action="{% url 'registration_desk' %}" class="card rd-search" role="search">
+  <div class="rd-search-field rd-search-main">
+    <label for="rdSearchInput">SEARCH PATIENT REGISTER</label>
+    <div class="rd-search-input-wrap">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" id="rdSearchInput" name="q" value="{{ query }}" placeholder="Search by patient name, MR number, phone, Aadhaar or ABHA…" autocomplete="off">
     </div>
   </div>
-</div>
 
-{{ category_fees|json_script:"category-fees-data" }}
-{{ default_registration_fee|json_script:"default-registration-fee-data" }}
-<script>
-let cameraStream = null;
-let capturedDataUrl = null;
+  <div class="rd-search-field">
+    <label for="rdDateInput">REGISTERED ON</label>
+    <input type="date" id="rdDateInput" name="date" value="{{ date_str }}">
+  </div>
 
-const dobField = document.getElementById('id_date_of_birth');
-const ageFields = ['id_age_years', 'id_age_months', 'id_age_days'].map(id => document.getElementById(id));
-function updateAgeFromDob() {
-  if (!dobField.value) {
-    ageFields.forEach(field => field.readOnly = false);
-    return;
-  }
-  const birth = new Date(dobField.value + 'T00:00:00');
-  const today = new Date();
-  let years = today.getFullYear() - birth.getFullYear();
-  let months = today.getMonth() - birth.getMonth();
-  let days = today.getDate() - birth.getDate();
-  if (days < 0) {
-    months--;
-    const previousMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-    days += previousMonth.getDate();
-  }
-  if (months < 0) { years--; months += 12; }
-  [years, months, days].forEach((value, index) => {
-    ageFields[index].value = value;
-    ageFields[index].readOnly = true;
-  });
-}
-dobField.addEventListener('change', updateAgeFromDob);
-if (dobField.value) updateAgeFromDob();
+  {% if not is_registration_desk %}
+  <div class="rd-search-field">
+    <label for="rdStatusInput">APPOINTMENT STATUS</label>
+    <select id="rdStatusInput" name="status">
+      <option value="">Any status</option>
+      {% for value, label in status_choices %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
 
-ageFields.forEach(field => field.addEventListener('input', () => {
-  if (dobField.value || ageFields.some(item => item.value === '')) return;
-  const [years, months, days] = ageFields.map(item => Number(item.value || 0));
-  const today = new Date();
-  const monthIndex = today.getFullYear() * 12 + today.getMonth() - years * 12 - months;
-  const year = Math.floor(monthIndex / 12);
-  const month = monthIndex % 12;
-  const birth = new Date(year, month, Math.min(today.getDate(), new Date(year, month + 1, 0).getDate()));
-  birth.setDate(birth.getDate() - days);
-  dobField.value = birth.toISOString().slice(0, 10);
-}));
+  <div class="rd-search-actions">
+    <button type="submit" class="btn" style="padding:10px 20px; border-radius:12px;">Search</button>
+    <a href="{% url 'registration_desk' %}" class="btn btn-plain" style="padding:10px 16px; border-radius:12px;">Reset</a>
+  </div>
+</form>
 
-const categoryFees = JSON.parse(document.getElementById('category-fees-data').textContent);
-const defaultRegistrationFee = JSON.parse(document.getElementById('default-registration-fee-data').textContent);
-const categoryField = document.getElementById('id_patient_category');
-const registrationFeeField = document.getElementById('id_reg_fee');
-function updateRegistrationFee() {
-  const categoryFee = categoryFees[categoryField.value];
-  const fee = categoryFee !== null && categoryFee !== undefined ? categoryFee : defaultRegistrationFee;
-  registrationFeeField.value = fee === null ? '' : Number(fee).toFixed(2);
-}
-categoryField.addEventListener('change', updateRegistrationFee);
-updateRegistrationFee();
+<!-- ═══════════ 2. NEW REGISTRATION ═══════════ -->
+<section class="card rd-newreg">
+  <div class="rd-newreg-copy">
+    {% if can_register %}
+      <span class="rd-newreg-tag">PRIMARY DESK ACTION</span>
+      <h2>Register a New Patient</h2>
+      <p>Open the comprehensive registration form to enter personal, contact, address and billing details — a unique Medical Record (MR) Number is issued automatically.</p>
+    {% else %}
+      <span class="rd-newreg-tag rd-newreg-tag-muted">REFERENCE</span>
+      <h2>Patient Register</h2>
+      <p>Search and review every patient registered at this counter. New registrations are raised by the Registration Desk staff.</p>
+    {% endif %}
+  </div>
 
-function handleFileUpload(input) {
-  if (input.files && input.files[0]) {
-    const file = input.files[0];
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      document.getElementById('patient-photo-preview').src = e.target.result;
-      document.getElementById('patient-photo-preview').style.display = 'block';
-      document.getElementById('photo-placeholder-view').style.display = 'none';
-      document.getElementById('photo-status-badge').style.display = 'inline-block';
-      document.getElementById('photo-status-badge').textContent = '✓ File Attached (' + (file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name) + ')';
-      document.getElementById('btn-clear-photo').style.display = 'inline-block';
-      document.getElementById('photo_data').value = '';
-    };
-    reader.readAsDataURL(file);
-  }
-}
+  <div class="rd-newreg-actions">
+    {% if can_register %}
+      <a href="{% url 'registration_desk_new' %}" class="btn rd-btn-lime">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+          <circle cx="8" cy="6" r="4"/><path d="M1 18c1-6 3.5-8 7-8s6 2 7 8M16 5a4 4 0 0 1 0 8"/>
+        </svg>
+        <span>+ New Registration</span>
+      </a>
+    {% endif %}
+    {% if last_registered %}
+      <a href="{% url 'patient_print_card' last_registered.pk %}" class="btn btn-outline rd-btn-outline">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        <span>Print Last Card (#{{ last_registered.mr_number|default:last_registered.id }})</span>
+      </a>
+    {% endif %}
+  </div>
+</section>
 
-async function openCameraModal() {
-  const modal = document.getElementById('camera-modal');
-  modal.style.display = 'flex';
-  document.getElementById('camera-video').style.display = 'block';
-  document.getElementById('camera-canvas').style.display = 'none';
-  document.getElementById('camera-target-guide').style.display = 'block';
-  document.getElementById('camera-error-msg').style.display = 'none';
-  document.getElementById('camera-controls-live').style.display = 'flex';
-  document.getElementById('camera-controls-captured').style.display = 'none';
+<!-- ═══════════ 3. RECORDS (History functionality) ═══════════ -->
+<section class="card" style="border-radius:24px; padding:24px 28px;">
+  <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; gap:12px; flex-wrap:wrap;">
+    <div>
+      <h2 style="font-size:18px; font-weight:750; margin-bottom:4px;">Registration Records</h2>
+      <p style="font-size:13px; color:var(--muted); margin:0;">
+        {% if query %}Showing records matching “{{ query }}”{% else %}All patient registrations{% endif %}
+        {% if selected_date %} on {{ selected_date|date:"d M Y" }}{% endif %}
+      </p>
+    </div>
+    <span class="badge" style="background:var(--lav-soft); color:var(--ink); font-weight:700;">{{ row_count }} record{{ row_count|pluralize }}</span>
+  </div>
 
-  try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
-    });
-    document.getElementById('camera-video').srcObject = cameraStream;
-  } catch (err) {
-    console.error('Camera access error:', err);
-    document.getElementById('camera-error-msg').style.display = 'flex';
-    document.getElementById('camera-controls-live').style.display = 'none';
-  }
-}
+  {% if rows %}
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Date &amp; Time</th>
+            <th>Type</th>
+            <th>Record</th>
+            <th class="ta-r">Status</th>
+            <th class="ta-r">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td class="cell-strong">{{ row.when|date:"M j, Y" }}<br><small class="muted">{{ row.when|date:"H:i" }}</small></td>
+              <td>
+                {% if row.kind == 'patient' %}
+                  <span class="badge" style="background:var(--lav-soft); color:var(--ink); font-weight:700;">PATIENT</span>
+                  {% if row.is_emergency %}
+                    <span class="badge" style="background:var(--red); color:#fff; font-weight:800; margin-left:6px;">⚑ EMERGENCY</span>
+                  {% endif %}
+                {% else %}
+                  <span class="badge" style="background:var(--lime); color:var(--ink); font-weight:700;">APPOINTMENT</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{{ row.view_url }}" style="font-weight:600; color:var(--ink); text-decoration:none;">{{ row.title }}</a>
+                <br><small class="muted">{{ row.badge }} · {{ row.detail }}</small>
+              </td>
+              <td class="ta-r">
+                {% if row.status %}
+                  <span class="badge badge-{{ row.status_lower }}">{{ row.status }}</span>
+                {% else %}
+                  <span class="badge">Registered</span>
+                {% endif %}
+              </td>
+              <td class="ta-r" style="white-space:nowrap;">
+                <a href="{{ row.edit_url }}" class="btn btn-outline" style="padding:4px 12px; font-size:11px; font-weight:750; border-radius:8px; margin-right:6px;">
+                  {% if row.is_emergency %}✎ Continue details{% else %}✎ Edit{% endif %}
+                </a>
+                {% if row.delete_url %}
+                  <a href="{{ row.delete_url }}" class="btn btn-outline" style="padding:4px 12px; font-size:11px; font-weight:750; border-radius:8px; margin-right:6px; color:#b91c1c; border-color:#fecaca;" title="Delete patient (password required)">
+                    🗑 Delete
+                  </a>
+                {% endif %}
+                <a href="{{ row.view_url }}" class="link" style="font-size:13px;">View →</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:12px; color:var(--muted); margin:14px 4px 0;">Showing the {{ row_count }} most recent records.</p>
+  {% else %}
+    <div style="text-align:center; padding:48px 20px;">
+      <p style="color:var(--muted); font-size:15px; margin-bottom:16px;">
+        {% if query %}No records match “{{ query }}”.{% else %}No patients registered yet.{% endif %}
+      </p>
+      {% if can_register %}
+        <a href="{% url 'registration_desk_new' %}" class="btn" style="background:var(--lime); color:var(--ink); font-weight:700; padding:10px 20px; border-radius:12px; text-decoration:none;">
+          + Register a Patient
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
 
-function captureSnapshot() {
-  const video = document.getElementById('camera-video');
-  const canvas = document.getElementById('camera-canvas');
-  const ctx = canvas.getContext('2d');
-  
-  canvas.width = video.videoWidth || 640;
-  canvas.height = video.videoHeight || 480;
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  
-  capturedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
-  
-  video.style.display = 'none';
-  canvas.style.display = 'block';
-  document.getElementById('camera-target-guide').style.display = 'none';
-  document.getElementById('camera-controls-live').style.display = 'none';
-  document.getElementById('camera-controls-captured').style.display = 'flex';
-}
-
-function retakeSnapshot() {
-  document.getElementById('camera-video').style.display = 'block';
-  document.getElementById('camera-canvas').style.display = 'none';
-  document.getElementById('camera-target-guide').style.display = 'block';
-  document.getElementById('camera-controls-live').style.display = 'flex';
-  document.getElementById('camera-controls-captured').style.display = 'none';
-}
-
-function confirmSnapshot() {
-  if (capturedDataUrl) {
-    document.getElementById('patient-photo-preview').src = capturedDataUrl;
-    document.getElementById('patient-photo-preview').style.display = 'block';
-    document.getElementById('photo-placeholder-view').style.display = 'none';
-    document.getElementById('photo-status-badge').style.display = 'inline-block';
-    document.getElementById('photo-status-badge').textContent = '✓ Camera Photo Captured';
-    document.getElementById('btn-clear-photo').style.display = 'inline-block';
-    
-    document.getElementById('photo_data').value = capturedDataUrl;
-    document.getElementById('id_photo_file').value = '';
-  }
-  closeCameraModal();
-}
-
-function closeCameraModal() {
-  if (cameraStream) {
-    cameraStream.getTracks().forEach(track => track.stop());
-    cameraStream = null;
-  }
-  document.getElementById('camera-modal').style.display = 'none';
-}
-
-function clearPhoto() {
-  document.getElementById('patient-photo-preview').src = '';
-  document.getElementById('patient-photo-preview').style.display = 'none';
-  document.getElementById('photo-placeholder-view').style.display = 'block';
-  document.getElementById('photo-status-badge').style.display = 'none';
-  document.getElementById('btn-clear-photo').style.display = 'none';
-  document.getElementById('photo_data').value = '';
-  document.getElementById('id_photo_file').value = '';
-}
-</script>
 {% endblock %}

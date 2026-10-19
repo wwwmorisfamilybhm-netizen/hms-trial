@@ -378,6 +378,91 @@ h2 { font-size: 1.2rem; font-weight: 700; margin: 0 0 0.75rem; }
 .card-header h2 { margin: 0; }
 .link { color: #70659e; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 7px; }
 
+/* ---------------- Registration Desk hub ---------------- */
+.rd-search {
+  display: grid;
+  grid-template-columns: minmax(260px, 2fr) minmax(150px, 1fr) minmax(160px, 1fr) auto;
+  gap: 14px;
+  align-items: end;
+  padding: 18px 22px;
+  border-radius: 20px;
+  margin-bottom: 20px;
+}
+.rd-search-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.rd-search-field label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.05em; }
+.rd-search-field input, .rd-search-field select {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font: inherit;
+  font-size: 14px;
+  background: #fff;
+  width: 100%;
+}
+.rd-search-field input:focus, .rd-search-field select:focus { outline: 2px solid var(--lav-soft); border-color: var(--lav-deep); }
+.rd-search-input-wrap { position: relative; display: flex; align-items: center; }
+.rd-search-input-wrap svg { position: absolute; left: 12px; color: var(--muted); pointer-events: none; }
+.rd-search-input-wrap input { padding-left: 38px; }
+.rd-search-actions { display: flex; gap: 8px; align-items: center; }
+
+.rd-newreg {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  border-radius: 20px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #24242a 0%, #2f3037 100%);
+  border: none;
+  color: #fff;
+}
+.rd-newreg-copy { max-width: 640px; }
+.rd-newreg-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(214, 242, 95, 0.15);
+  color: var(--lime);
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+.rd-newreg-tag-muted { background: rgba(197, 185, 244, 0.18); color: var(--lav); }
+.rd-newreg-copy h2 { margin: 0 0 6px; font-size: 19px; font-weight: 750; color: #fff; letter-spacing: -0.3px; }
+.rd-newreg-copy p { margin: 0; color: #b2b2bc; font-size: 13.5px; line-height: 1.5; }
+.rd-newreg-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rd-btn-lime {
+  background: var(--lime);
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 1rem;
+  padding: 13px 24px;
+  border-radius: 14px;
+  border: 1px solid var(--lime);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  box-shadow: 0 6px 20px rgba(214, 242, 95, 0.3);
+}
+.rd-btn-lime:hover { filter: brightness(0.96); text-decoration: none; }
+.rd-newreg .rd-btn-outline { background: transparent; color: #e9e9ec; border-color: #55555f; padding: 12px 18px; border-radius: 14px; display: inline-flex; align-items: center; gap: 8px; }
+.rd-newreg .rd-btn-outline:hover { background: rgba(255, 255, 255, 0.08); text-decoration: none; filter: none; }
+
+@media (max-width: 1024px) {
+  .rd-search { grid-template-columns: 1fr 1fr; }
+  .rd-search-main { grid-column: 1 / -1; }
+  .rd-search-actions { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  .rd-search { grid-template-columns: 1fr; }
+}
+
 /* ---------------- Stats ---------------- */
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 18px; }
 /* Registration desk: five counter metrics in one responsive row */
