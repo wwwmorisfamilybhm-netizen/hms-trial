@@ -6,7 +6,7 @@
   <div class="page-head">
     <div>
       <h1>History</h1>
-      <p class="page-sub">{% if is_registration_desk %}Patient registration records · filter &amp; edit{% else %}All registered patients and booked appointments · filter &amp; edit{% endif %}</p>
+      <p class="page-sub">All registered patients and booked appointments · filter &amp; edit</p>
     </div>
   </div>
 {% endblock %}
@@ -20,18 +20,18 @@
     <select name="type" style="padding:8px 10px; border:1px solid var(--line); border-radius:10px; font:inherit; background:#fff; min-width:150px;">
       <option value="all" {% if item_type == 'all' %}selected{% endif %}>All records</option>
       <option value="patients" {% if item_type == 'patients' %}selected{% endif %}>Patients only</option>
-      {% if not is_registration_desk %}<option value="appointments" {% if item_type == 'appointments' %}selected{% endif %}>Appointments only</option>{% endif %}
+      <option value="appointments" {% if item_type == 'appointments' %}selected{% endif %}>Appointments only</option>
     </select>
   </div>
   <div style="display:flex; flex-direction:column; gap:4px; flex:1; min-width:220px;">
     <label style="font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.5px;">SEARCH</label>
-    <input type="search" name="q" value="{{ query }}" placeholder="{% if is_registration_desk %}Name, MR no., phone, C/O…{% else %}Name, MR no., phone, C/O, doctor, reason…{% endif %}" style="padding:8px 10px; border:1px solid var(--line); border-radius:10px; font:inherit; width:100%;">
+    <input type="search" name="q" value="{{ query }}" placeholder="Name, MR no., phone, C/O, doctor, reason…" style="padding:8px 10px; border:1px solid var(--line); border-radius:10px; font:inherit; width:100%;">
   </div>
   <div style="display:flex; flex-direction:column; gap:4px;">
     <label style="font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.5px;">DATE</label>
     <input type="date" name="date" value="{{ date_str }}" style="padding:8px 10px; border:1px solid var(--line); border-radius:10px; font:inherit; background:#fff;">
   </div>
-  {% if not is_registration_desk %}<div style="display:flex; flex-direction:column; gap:4px;">
+  <div style="display:flex; flex-direction:column; gap:4px;">
     <label style="font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.5px;">APPT. STATUS</label>
     <select name="status" {% if item_type == 'patients' %}disabled{% endif %} style="padding:8px 10px; border:1px solid var(--line); border-radius:10px; font:inherit; background:#fff; min-width:130px;">
       <option value="">Any status</option>
@@ -39,7 +39,7 @@
         <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
-  </div>{% endif %}
+  </div>
   <button type="submit" class="btn" style="padding:9px 18px;">Apply filters</button>
   <a href="{% url 'history' %}" class="btn btn-plain" style="padding:9px 14px;">Reset</a>
 </form>

@@ -38,16 +38,12 @@ def patient_detail(request, pk):
         getattr(getattr(request.user, "profile", None), "designation", None)
         or request.session.get("designation")
     )
-    can_view_appointments = designation != "registration_desk"
     can_push_bill = designation == "doctor"
-    appointments = (
-        patient.appointments.select_related("doctor").order_by("-date", "-start_time")
-        if can_view_appointments else []
-    )
+    appointments = patient.appointments.select_related("doctor").order_by("-date", "-start_time")
     context = {
         "patient": patient,
         "appointments": appointments,
-        "can_view_appointments": can_view_appointments,
+        "can_view_appointments": True,
         "can_push_bill": can_push_bill,
         "bill_form": PatientBillForm(),
     }

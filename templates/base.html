@@ -10,11 +10,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
-<body data-logout-url="{% url 'logout' %}">
+<body data-role="{{ request.session.designation|default:'' }}" data-compact-tables="{{ request.session.opd_preferences.compact_tables|yesno:'true,false' }}" data-logout-url="{% url 'logout' %}">
 <div class="app">
 
   <!-- ============ SIDEBAR ============ -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="appSidebar">
     <a class="brand" href="{% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}{% url 'reception_dashboard' %}{% elif request.session.designation == 'opd_assistant' or request.resolver_match.url_name == 'opd_assistant_dashboard' %}{% url 'opd_assistant_dashboard' %}{% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}{% url 'admin_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
       <span class="brand-mark">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -31,36 +31,66 @@
     <nav class="side-nav">
       {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}
         <!-- Registration Desk branch -->
-        <a href="{% url 'emergency_registration' %}" class="nav-item emergency {% if request.resolver_match.url_name == 'emergency_registration' %}active{% endif %}">
-          <span class="nav-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true">
-              <path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5"/><circle cx="12" cy="17.2" r="1.1" fill="currentColor" stroke="none"/>
-            </svg>
-          </span>
-          <span class="nav-label">Emergency Registration</span>
+        <!-- Registration Desk Hero Emergency Capsule -->
+        <a href="{% url 'emergency_registration' %}" class="rd-emergency-card {% if request.resolver_match.url_name == 'emergency_registration' %}active{% endif %}" title="Priority Emergency Registration & Immediate MR Number issuance">
+          <div class="rd-em-glow-sweep"></div>
+          <div class="rd-em-left">
+            <span class="rd-em-beacon">
+              <span class="rd-em-beacon-ping"></span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2v20M2 12h20"/>
+              </svg>
+            </span>
+            <div class="rd-em-content">
+              <div class="rd-em-title-row">
+                <span class="rd-em-title">Emergency</span>
+                <span class="rd-em-badge">
+                  <span class="rd-em-dot"></span>
+                  FAST TRACK
+                </span>
+              </div>
+              <div class="rd-em-sub">
+                <svg width="32" height="11" viewBox="0 0 32 11" fill="none" class="rd-em-ecg" aria-hidden="true">
+                  <path d="M0 5.5h7l2-4 3 9 2.5-7 1.5 3.5h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Zero-Wait Intake</span>
+              </div>
+            </div>
+          </div>
+          <span class="rd-em-arrow" aria-hidden="true">→</span>
         </a>
+
+        <div class="nav-section-label">Counter Command</div>
+
         <a href="{% url 'reception_dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'reception_dashboard' %}active{% endif %}">
           <span class="nav-icon">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-              <rect x="2" y="2" width="6" height="6" rx="1.5"/>
-              <rect x="10" y="2" width="6" height="6" rx="1.5"/>
-              <rect x="2" y="10" width="6" height="6" rx="1.5"/>
-              <rect x="10" y="10" width="6" height="6" rx="1.5"/>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+              <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+              <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+              <rect x="14" y="14" width="7" height="7" rx="1.5"/>
             </svg>
           </span>
           <span class="nav-label">Dashboard</span>
+          <span class="nav-subtag live">● Live</span>
         </a>
+
+        <a href="{% url 'appointment_list' %}" class="nav-item {% if request.resolver_match.url_name == 'appointment_list' or request.resolver_match.url_name == 'appointment_create' or request.resolver_match.url_name == 'appointment_edit' or request.resolver_match.url_name == 'doctor_appointments' or request.resolver_match.app_name == 'appointments' %}active{% endif %}">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
+          <span class="nav-label">Appointment</span>
+          <span class="nav-subtag">OPD</span>
+        </a>
+
         <a href="{% url 'registration_desk' %}" class="nav-item {% if request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'registration_desk_new' or request.resolver_match.url_name == 'patient_print_card' %}active{% endif %}">
-          <span class="nav-icon">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-              <circle cx="8" cy="6" r="4"/><path d="M1 18c1-6 3.5-8 7-8s6 2 7 8M16 5a4 4 0 0 1 0 8"/>
-            </svg>
-          </span>
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
           <span class="nav-label">Patient Registration</span>
+          <span class="nav-subtag">MR Records</span>
         </a>
-        <a href="{% url 'bill_command_center' %}" class="nav-item {% if request.resolver_match.url_name == 'bill_command_center' %}active{% endif %}">
-          <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="2" y="2" width="16" height="16" rx="3"/><path d="M6 6h8M6 10h5M6 14h3"/><circle cx="15" cy="14" r="2" fill="currentColor"/></svg></span>
+
+        <a href="{% url 'bill_command_center' %}" class="nav-item {% if request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}active{% endif %}">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span>
           <span class="nav-label">Bill Command Center</span>
+          <span class="nav-subtag">Billing</span>
         </a>
       {% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}
         <!-- Admin branch -->
@@ -72,11 +102,11 @@
           <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10" cy="10" r="3"/><path d="m16.2 12.5 1 1.7-1.8 1.8-1.7-1a6 6 0 0 1-1.6.7l-.5 1.9h-2.5l-.5-1.9a6 6 0 0 1-1.6-.7l-1.7 1-1.8-1.8 1-1.7a6 6 0 0 1-.7-1.6L2 10.4V7.9L3.9 7.4a6 6 0 0 1 .7-1.6l-1-1.7 1.8-1.8 1.7 1a6 6 0 0 1 1.6-.7L9.2.7h2.5l.5 1.9a6 6 0 0 1 1.6.7l1.7-1 1.8 1.8-1 1.7a6 6 0 0 1 .7 1.6l1.9.5v2.5l-1.9.5a6 6 0 0 1-.8 1.6Z" transform="translate(0 1) scale(.9)"/></svg></span>
           <span class="nav-label">Settings</span>
         </a>
-        <a href="{% url 'patient_list' %}" class="nav-item {% if request.resolver_match.app_name == 'patients' %}active{% endif %}">
+        <a href="{% url 'patient_list' %}" class="nav-item {% if request.resolver_match.url_name == 'patient_list' or request.resolver_match.url_name == 'patient_create' or request.resolver_match.url_name == 'patient_detail' or request.resolver_match.url_name == 'patient_edit' or request.resolver_match.url_name == 'patient_delete' or request.resolver_match.app_name == 'patients' %}active{% endif %}">
           <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="8" cy="6" r="4"/><path d="M1 18c1-6 3.5-8 7-8s6 2 7 8M16 5a4 4 0 0 1 0 8"/></svg></span>
           <span class="nav-label">Patients</span>
         </a>
-        <a href="{% url 'appointment_list' %}" class="nav-item {% if request.resolver_match.app_name == 'appointments' %}active{% endif %}">
+        <a href="{% url 'appointment_list' %}" class="nav-item {% if request.resolver_match.url_name == 'appointment_list' or request.resolver_match.url_name == 'appointment_create' or request.resolver_match.url_name == 'appointment_edit' or request.resolver_match.url_name == 'doctor_appointments' or request.resolver_match.app_name == 'appointments' %}active{% endif %}">
           <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="1" y="3" width="18" height="16" rx="3"/><path d="M1 8h18M6 1v4M14 1v4"/></svg></span>
           <span class="nav-label">Appointments</span>
         </a>
@@ -117,6 +147,10 @@
           <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7z"/></svg></span>
           <span class="nav-label">Pharmacy</span>
         </a>
+        <a href="{% url 'appointment_list' %}" class="nav-item {% if request.resolver_match.url_name == 'appointment_list' or request.resolver_match.url_name == 'appointment_create' or request.resolver_match.url_name == 'appointment_edit' or request.resolver_match.url_name == 'doctor_appointments' or request.resolver_match.app_name == 'appointments' %}active{% endif %}">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
+          <span class="nav-label">Appointments</span>
+        </a>
         <a href="{% url 'reports' %}" class="nav-item {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
           <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></span>
           <span class="nav-label">Reports</span>
@@ -134,10 +168,41 @@
           <span class="nav-label">Settings</span>
         </a>
       {% elif request.session.designation == 'opd_assistant' or request.resolver_match.url_name == 'opd_assistant_dashboard' %}
-        <!-- OPD Assistant branch -->
+        <!-- OPD Assistant Hero Triage Capsule -->
+        <a href="{% url 'initial_assessment' %}" class="opd-triage-card {% if request.resolver_match.url_name == 'initial_assessment' %}active{% endif %}" title="Fast Triage & Clinical Initial Assessment">
+          <div class="rd-em-glow-sweep"></div>
+          <div class="rd-em-left">
+            <span class="opd-tr-beacon">
+              <span class="opd-tr-beacon-ping"></span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="5" y="3" width="14" height="18" rx="2"/>
+                <path d="M9 8h6M9 12h6M9 16h4"/>
+              </svg>
+            </span>
+            <div class="rd-em-content">
+              <div class="rd-em-title-row">
+                <span class="rd-em-title">Initial Assessment</span>
+                <span class="rd-em-badge" style="background:#d4f150; color:#1b1c26;">
+                  <span class="rd-em-dot" style="background:#1b1c26;"></span>
+                  TRIAGE
+                </span>
+              </div>
+              <div class="rd-em-sub" style="color:#d6d0ea;">
+                <svg width="32" height="11" viewBox="0 0 32 11" fill="none" class="rd-em-ecg" style="color:#c5b9f4;" aria-hidden="true">
+                  <path d="M0 5.5h7l2-4 3 9 2.5-7 1.5 3.5h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Vitals &amp; Orders</span>
+              </div>
+            </div>
+          </div>
+          <span class="rd-em-arrow" aria-hidden="true">→</span>
+        </a>
+
+        <div class="nav-section-label">Flow &amp; Triage</div>
+
         <a href="{% url 'opd_assistant_dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'opd_assistant_dashboard' %}active{% endif %}">
           <span class="nav-icon">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="2" y="2" width="6" height="6" rx="1.5"/>
               <rect x="10" y="2" width="6" height="6" rx="1.5"/>
               <rect x="2" y="10" width="6" height="6" rx="1.5"/>
@@ -145,6 +210,76 @@
             </svg>
           </span>
           <span class="nav-label">Dashboard</span>
+          <span class="nav-subtag live">● Live</span>
+        </a>
+
+        <a href="{% url 'opd_patient_queue' %}" class="nav-item {% if request.resolver_match.url_name == 'opd_patient_queue' %}active{% endif %}">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M18 8h5M20.5 5.5v5"/></svg></span>
+          <span class="nav-label">Patient Queue</span>
+          <span class="nav-subtag">Pool</span>
+        </a>
+
+        <a href="{% url 'opd_referrals' %}" class="nav-item {% if request.resolver_match.url_name == 'opd_referrals' %}active{% endif %}">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="m9 11 6-4M9 13l6 4"/></svg></span>
+          <span class="nav-label">Cross-consultation</span>
+          <span class="nav-subtag">Referrals</span>
+        </a>
+
+        <a href="{% url 'appointment_list' %}" class="nav-item {% if request.resolver_match.url_name == 'appointment_list' or request.resolver_match.url_name == 'appointment_create' or request.resolver_match.url_name == 'appointment_edit' or request.resolver_match.url_name == 'doctor_appointments' or request.resolver_match.app_name == 'appointments' %}active{% endif %}">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="18" height="16" rx="3"/><path d="M1 8h18M6 1v4M14 1v4"/></svg></span>
+          <span class="nav-label">Appointments</span>
+          <span class="nav-subtag">OPD</span>
+        </a>
+
+        <div class="nav-section-label">Clinical Services</div>
+
+        <a href="{% url 'opd_service_queue' 'procedure-room' %}" class="nav-item {% if request.resolver_match.url_name == 'opd_service_queue' and request.resolver_match.kwargs.service == 'procedure-room' %}active{% endif %}">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 7 3 3M4 20l5-1 11-11-4-4L5 15l-1 5Z"/></svg></span>
+          <span class="nav-label">Procedures</span>
+          <span class="nav-subtag">Minor OT</span>
+        </a>
+
+        <a href="{% url 'opd_service_queue' 'pharmacy' %}" class="nav-item {% if request.resolver_match.url_name == 'opd_service_queue' and request.resolver_match.kwargs.service == 'pharmacy' %}active{% endif %}">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8v18H8zM4 8h4M16 16h4M12 7v10M9 12h6"/></svg></span>
+          <span class="nav-label">Pharmacy</span>
+          <span class="nav-subtag">Dispense</span>
+        </a>
+
+        <details class="nav-group" {% if request.resolver_match.url_name == 'opd_service_queue' and request.resolver_match.kwargs.service != 'procedure-room' and request.resolver_match.kwargs.service != 'pharmacy' %}open{% endif %}>
+          <summary class="nav-item">
+            <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="2" cy="6" r="1"/><circle cx="2" cy="12" r="1"/><circle cx="2" cy="18" r="1"/></svg></span>
+            <span class="nav-label">Other Queues</span>
+          </summary>
+          <div class="nav-subgroup">
+            <a href="{% url 'opd_service_queue' 'radiology' %}" class="nav-subitem">Radiology · X-Ray &amp; USG</a>
+            <a href="{% url 'opd_service_queue' 'laboratory' %}" class="nav-subitem">Laboratory</a>
+            <a href="{% url 'opd_service_queue' 'cardiology' %}" class="nav-subitem">Cardiology · ECG</a>
+            <a href="{% url 'opd_service_queue' 'physiotherapy' %}" class="nav-subitem">Physiotherapy</a>
+            <a href="{% url 'opd_service_queue' 'counselling' %}" class="nav-subitem">Counselling</a>
+          </div>
+        </details>
+
+        <div class="nav-section-label">Management</div>
+
+        <a href="{% url 'opd_module' 'reports' %}" class="nav-item {% if request.resolver_match.kwargs.module == 'reports' %}active{% endif %}">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg></span>
+          <span class="nav-label">Reports</span>
+          <span class="nav-subtag">Analytics</span>
+        </a>
+
+        <a href="{% url 'opd_module' 'master-data' %}" class="nav-item {% if request.resolver_match.kwargs.module == 'master-data' %}active{% endif %}">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg></span>
+          <span class="nav-label">Master Data</span>
+        </a>
+
+        <a href="{% url 'opd_module' 'audit-trail' %}" class="nav-item {% if request.resolver_match.kwargs.module == 'audit-trail' %}active{% endif %}">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+          <span class="nav-label">Audit Trail</span>
+        </a>
+
+        <a href="{% url 'opd_module' 'settings' %}" class="nav-item {% if request.resolver_match.kwargs.module == 'settings' %}active{% endif %}">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 13.5a7 7 0 0 0 0-3l2-1.5-2-3.5-2.4 1a8 8 0 0 0-2.6-1.5L13.5 2h-4L9 5a8 8 0 0 0-2.6 1.5L4 5.5 2 9l2 1.5a7 7 0 0 0 0 3L2 15l2 3.5 2.4-1A8 8 0 0 0 9 19l.5 3h4l.5-3a8 8 0 0 0 2.6-1.5l2.4 1 2-3.5z"/></svg></span>
+          <span class="nav-label">Settings</span>
         </a>
       {% else %}
         <!-- Default/Other branch (nurse, etc.) -->
@@ -159,7 +294,7 @@
           </span>
           <span class="nav-label">Dashboard</span>
         </a>
-        <a href="{% url 'patient_create' %}" class="nav-item {% if request.resolver_match.app_name == 'patients' %}active{% endif %}">
+        <a href="{% url 'patient_create' %}" class="nav-item {% if request.resolver_match.url_name == 'patient_list' or request.resolver_match.url_name == 'patient_create' or request.resolver_match.url_name == 'patient_detail' or request.resolver_match.url_name == 'patient_edit' or request.resolver_match.url_name == 'patient_delete' or request.resolver_match.app_name == 'patients' %}active{% endif %}">
           <span class="nav-icon">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
               <circle cx="8" cy="6" r="4"/><path d="M1 18c1-6 3.5-8 7-8s6 2 7 8M16 5a4 4 0 0 1 0 8"/>
@@ -167,7 +302,7 @@
           </span>
           <span class="nav-label">Patient Registration</span>
         </a>
-        <a href="{% url 'appointment_list' %}" class="nav-item {% if request.resolver_match.app_name == 'appointments' %}active{% endif %}">
+        <a href="{% url 'appointment_list' %}" class="nav-item {% if request.resolver_match.url_name == 'appointment_list' or request.resolver_match.url_name == 'appointment_create' or request.resolver_match.url_name == 'appointment_edit' or request.resolver_match.url_name == 'doctor_appointments' or request.resolver_match.app_name == 'appointments' %}active{% endif %}">
           <span class="nav-icon">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
               <rect x="1" y="3" width="18" height="16" rx="3"/><path d="M1 8h18M6 1v4M14 1v4"/>
@@ -178,67 +313,88 @@
       {% endif %}
     </nav>
 
-    {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' %}
-      <div class="side-status" style="margin-top:auto;">
-        <div class="status-head">
-          <span class="status-check">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#202024" stroke-width="2"><path d="M2 7l3.5 3.5L12 3.5"/></svg>
-          </span>
-          <span class="status-title">Registration Desk</span>
+    <div class="side-status-dock">
+      {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'registration_desk_new' or request.resolver_match.url_name == 'patient_print_card' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}
+        <div class="side-profile-tile rd-side-profile">
+          <div class="profile-avatar rd-avatar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            <span class="rd-online-beacon"></span>
+          </div>
+          <div class="profile-info">
+            <span class="profile-role">Registration Desk</span>
+            <span class="profile-status"><span class="status-pulse-dot"></span>Desk 01 · Active</span>
+          </div>
+          <a href="{% url 'logout' %}" class="side-logout-btn" title="Sign out" aria-label="Sign out">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </a>
         </div>
-        <p class="status-text">Counter Active</p>
-        <a href="{% url 'logout' %}" class="status-admin" style="color:#ff8e8e; margin-top:8px; display:inline-block;">Sign out →</a>
-      </div>
-    {% elif request.session.designation == 'opd_assistant' or request.resolver_match.url_name == 'opd_assistant_dashboard' %}
-      <div class="side-status" style="margin-top:auto;">
-        <div class="status-head">
-          <span class="status-check">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#202024" stroke-width="2"><path d="M2 7l3.5 3.5L12 3.5"/></svg>
-          </span>
-          <span class="status-title">OPD Desk</span>
+      {% elif request.session.designation == 'opd_assistant' or request.resolver_match.url_name == 'opd_assistant_dashboard' %}
+        <div class="side-profile-tile opd-side-profile">
+          <div class="profile-avatar opd-avatar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span class="rd-online-beacon"></span>
+          </div>
+          <div class="profile-info">
+            <span class="profile-role">OPD Central Desk</span>
+            <span class="profile-status"><span class="status-pulse-dot"></span>Triage Active</span>
+          </div>
+          <a href="{% url 'logout' %}" class="side-logout-btn" title="Sign out" aria-label="Sign out">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </a>
         </div>
-        <p class="status-text">Counter Active</p>
-        <a href="{% url 'logout' %}" class="status-admin" style="color:#ff8e8e; margin-top:8px; display:inline-block;">Sign out →</a>
-      </div>
-    {% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}
-      <div class="side-status" style="margin-top:auto;">
-        <div class="status-head">
-          <span class="status-check">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#202024" stroke-width="2"><path d="M2 7l3.5 3.5L12 3.5"/></svg>
-          </span>
-          <span class="status-title">Admin Portal</span>
+      {% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}
+        <div class="side-profile-tile">
+          <div class="profile-avatar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="profile-info">
+            <span class="profile-role">Admin Portal</span>
+            <span class="profile-status"><span class="status-pulse-dot"></span>Operational</span>
+          </div>
+          <a href="{% url 'logout' %}" class="side-logout-btn" title="Sign out" aria-label="Sign out">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </a>
         </div>
-        <p class="status-text">All systems operational</p>
-        <a href="/admin/" class="status-admin" style="margin-top:8px; display:inline-block;">Open admin →</a>
-      </div>
-    {% elif request.session.designation == 'doctor' %}
-      <div class="side-status" style="margin-top:auto;">
-        <div class="status-head">
-          <span class="status-check">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#202024" stroke-width="2"><path d="M2 7l3.5 3.5L12 3.5"/></svg>
-          </span>
-          <span class="status-title">Doctor Portal</span>
+      {% elif request.session.designation == 'doctor' %}
+        <div class="side-profile-tile">
+          <div class="profile-avatar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <div class="profile-info">
+            <span class="profile-role">Doctor Portal</span>
+            <span class="profile-status"><span class="status-pulse-dot"></span>Consultation Ready</span>
+          </div>
+          <a href="{% url 'logout' %}" class="side-logout-btn" title="Sign out" aria-label="Sign out">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </a>
         </div>
-        <p class="status-text">Ready for consultation</p>
-        <a href="{% url 'logout' %}" class="status-admin" style="color:#ff8e8e; margin-top:8px; display:inline-block;">Sign out →</a>
-      </div>
-    {% else %}
-      <div class="side-status" style="margin-top:auto;">
-        <div class="status-head">
-          <span class="status-check">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#202024" stroke-width="2"><path d="M2 7l3.5 3.5L12 3.5"/></svg>
-          </span>
-          <span class="status-title">Cams HMS</span>
+      {% else %}
+        <div class="side-profile-tile">
+          <div class="profile-avatar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          </div>
+          <div class="profile-info">
+            <span class="profile-role">Cams HMS</span>
+            <span class="profile-status"><span class="status-pulse-dot"></span>System Online</span>
+          </div>
+          <a href="{% url 'logout' %}" class="side-logout-btn" title="Sign out" aria-label="Sign out">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </a>
         </div>
-        <p class="status-text">All systems operational</p>
-        <a href="{% url 'logout' %}" class="status-admin" style="color:#ff8e8e; margin-top:8px; display:inline-block;">Sign out →</a>
+      {% endif %}
+      <div class="sidebar-footer">
+        <span>Cams HMS</span>
+        <span class="foot-dot">·</span>
+        <span>v2.4</span>
       </div>
-    {% endif %}
+    </div>
   </aside>
 
   <!-- ============ MAIN ============ -->
   <div class="main">
     <header class="topbar">
+      {% if request.session.designation == 'opd_assistant' %}<button type="button" class="opd-mobile-menu" id="opdMenuToggle" aria-label="Open navigation" aria-expanded="false" aria-controls="appSidebar"><span></span><span></span><span></span></button>{% endif %}
+      {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}<button type="button" class="nav-mobile-toggle" id="receptionNavToggle" aria-label="Open navigation" aria-expanded="false" aria-controls="appSidebar"><span></span><span></span><span></span></button>{% endif %}
       <div class="doctor">
         <div class="avatar lav reception-avatar">
           {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}
@@ -288,6 +444,7 @@
         </div>
       </div>
 
+      {% if request.session.designation == 'opd_assistant' %}<div class="opd-top-context"><strong>OPD Management</strong><span>{% now "D, j M Y · H:i" %}</span></div>{% if not request.session.opd_preferences or request.session.opd_preferences.notifications %}<a class="opd-notifications" href="{% url 'opd_patient_queue' %}" aria-label="Open patient queue and alerts"><span aria-hidden="true">!</span><span>Queue alerts</span></a>{% endif %}{% endif %}
       <div class="topbar-right">
         <div class="user-menu">
           <button type="button" class="user-trigger" id="userTrigger" aria-haspopup="true" aria-expanded="false">
@@ -302,6 +459,7 @@
               <span class="user-name">{{ request.user.get_full_name|default:request.user.username }}</span>
               <span class="user-role">
                 {% if request.user.profile.specialty %}{{ request.user.profile.get_specialty_display }}
+                {% elif request.user.profile.designation == 'opd_assistant' %}OPD Assistant
                 {% else %}{{ request.user.profile.designation|default:"Staff"|title }}{% endif %}
               </span>
             </span>
@@ -321,6 +479,7 @@
                 <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
                 <small>
                   {% if request.user.profile.specialty %}{{ request.user.profile.get_specialty_display }}
+                  {% elif request.user.profile.designation == 'opd_assistant' %}OPD Assistant
                   {% else %}{{ request.user.profile.designation|default:"Staff"|title }}{% endif %}
                 </small>
               </span>
@@ -356,6 +515,56 @@
 </div>
 
 <script src="{% static 'js/refresh-logout.js' %}"></script>
+{% if request.session.designation == 'opd_assistant' %}<script>
+  (function () {
+    var toggle = document.getElementById("opdMenuToggle");
+    var sidebar = document.getElementById("appSidebar");
+    if (!toggle || !sidebar) return;
+    function setOpen(open) {
+      document.body.classList.toggle("opd-nav-open", open);
+      toggle.setAttribute("aria-expanded", String(open));
+      toggle.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
+    }
+    toggle.addEventListener("click", function () { setOpen(!document.body.classList.contains("opd-nav-open")); });
+    sidebar.addEventListener("click", function (event) {
+      if (event.target.closest("a")) setOpen(false);
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && document.body.classList.contains("opd-nav-open")) {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+    document.addEventListener("click", function (event) {
+      if (document.body.classList.contains("opd-nav-open") && !sidebar.contains(event.target) && !toggle.contains(event.target)) setOpen(false);
+    });
+  })();
+</script>{% endif %}
+{% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}<script>
+  (function () {
+    var toggle = document.getElementById("receptionNavToggle");
+    var sidebar = document.getElementById("appSidebar");
+    if (!toggle || !sidebar) return;
+    function setOpen(open) {
+      document.body.classList.toggle("reception-nav-open", open);
+      toggle.setAttribute("aria-expanded", String(open));
+      toggle.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
+    }
+    toggle.addEventListener("click", function () { setOpen(!document.body.classList.contains("reception-nav-open")); });
+    sidebar.addEventListener("click", function (event) {
+      if (event.target.closest("a")) setOpen(false);
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && document.body.classList.contains("reception-nav-open")) {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+    document.addEventListener("click", function (event) {
+      if (document.body.classList.contains("reception-nav-open") && !sidebar.contains(event.target) && !toggle.contains(event.target)) setOpen(false);
+    });
+  })();
+</script>{% endif %}
 {% block tail_scripts %}{% endblock %}
 <script>
   (function () {

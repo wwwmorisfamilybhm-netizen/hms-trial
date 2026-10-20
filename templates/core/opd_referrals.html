@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ page_title }} · OPD Management{% endblock %}
+{% block heading %}<div class="opd-page-head"><div><p class="opd-eyebrow">OPD MANAGEMENT</p><h1>{{ page_title }}</h1><p class="page-sub">Route a patient to another specialty and track the referral status.</p></div><a class="opd-action secondary" href="{% url 'opd_patient_queue' %}">Back to patient queue</a></div>{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/opd_dashboard.css' %}">
+<div class="opd-referral-grid">
+  <section class="opd-panel">
+    <h2>New referral</h2>
+    <form method="get" class="opd-queue-search"><label class="opd-search">Find patient<input type="search" name="q" value="{{ query }}" placeholder="Name or UHID"></label><button class="opd-button" type="submit">Search</button></form>
+    {% if not selected_patient %}<div class="opd-queue-list">{% for patient in patients %}<a class="opd-queue-item" href="?patient={{ patient.pk }}"><span class="opd-queue-person"><strong>{{ patient.full_name }}</strong><small>{{ patient.uhid }} · {{ patient.created_at|date:"j M Y" }}</small></span></a>{% empty %}<p class="opd-empty">No patients found.</p>{% endfor %}</div>{% else %}
+    <div class="opd-patient-heading"><span class="opd-queue-avatar large">{{ selected_patient.first_name|slice:":1"|upper }}{{ selected_patient.last_name|slice:":1"|upper }}</span><div><h2>{{ selected_patient.full_name }}</h2><p>{{ selected_patient.uhid }} · {{ selected_patient.age|default:"—" }} / {{ selected_patient.get_gender_display|default:"—" }}</p></div></div>
+    {% if selected_patient.allergies %}<div class="opd-alert-box"><strong>Allergies on file</strong><span>{{ selected_patient.allergies }}</span></div>{% endif %}
+    <form method="post" enctype="multipart/form-data" class="opd-order-form" id="referralForm">{% csrf_token %}<input type="hidden" name="patient_id" value="{{ selected_patient.pk }}">
+      <label>Referral type<select name="referral_type" required>{% for value,label in referral_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
+      <label>Department / specialty<input name="department" maxlength="100" required placeholder="e.g. Cardiology"></label>
+      <label>Doctor<select name="doctor_id"><option value="">Select a doctor (optional)</option>{% for doctor in doctors %}<option value="{{ doctor.pk }}">{{ doctor.get_full_name|default:doctor.username }} · {{ doctor.profile.get_specialty_display|default:"General Medicine" }}</option>{% endfor %}</select></label>
+      <label>Reason for referral<input name="reason" maxlength="255" required></label>
+      <label>Urgency<select name="urgency"><option value="routine">Routine</option><option value="urgent">Urgent</option></select></label>
+      <label>Clinical / handover notes<textarea name="notes" rows="4" maxlength="4000"></textarea></label>
+      <label>Attachment<input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg"><small>PDF, PNG, or JPG · maximum 5 MB</small></label>
+      <div class="opd-detail-actions"><button class="opd-button secondary" type="submit" name="action" value="draft">Save draft</button><button class="opd-button" type="submit" name="action" value="send" onclick="return confirm('Send this referral to the destination queue?')">Send referral</button></div>
+    </form>{% endif %}
+  </section>
+  <section class="opd-panel"><div class="opd-panel-head"><div><h2>Referral status</h2><p>Destination queue and visit history</p></div></div>
+    <div class="opd-table-wrap"><table class="opd-flow-table"><thead><tr><th>Patient</th><th>Destination</th><th>Reason</th><th>Priority</th><th>Status</th><th>Sent by / at</th><th>Attachment</th></tr></thead><tbody>{% for referral in referrals %}<tr><td>{{ referral.patient.full_name }}<small>{{ referral.patient.uhid }}</small></td><td>{{ referral.department }}{% if referral.doctor %}<small>{{ referral.doctor.get_full_name|default:referral.doctor.username }}</small>{% endif %}</td><td>{{ referral.reason }}</td><td>{{ referral.get_urgency_display }}</td><td><span class="opd-status status-{{ referral.status }}">{{ referral.get_status_display }}</span></td><td>{% if referral.created_by %}{{ referral.created_by.get_full_name|default:referral.created_by.username }}{% else %}Former user{% endif %}<small>{{ referral.created_at|date:"j M Y, H:i" }}</small></td><td>{% if referral.attachment %}<a href="{{ referral.attachment.url }}">View file</a>{% else %}—{% endif %}</td></tr>{% empty %}<tr><td colspan="7">No referrals for this patient.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+</div>
+{% endblock %}

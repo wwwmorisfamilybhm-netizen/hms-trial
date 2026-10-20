@@ -34,6 +34,7 @@ class Patient(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_demo = models.BooleanField(default=False, help_text="Synthetic demonstration record; never use as real patient data.")
 
     # ── Registration-desk extended fields ──────────────────────────────────
     mr_number = models.CharField(max_length=20, blank=True, verbose_name="MR Number")
@@ -188,6 +189,51 @@ class RegistrationFeeSettings(models.Model):
         return "Default registration fees"
 
 
+class AppointmentFeeSettings(models.Model):
+    """Default pricing applied to every appointment booking.
+
+    Kept separate from the registration fees so appointment pricing can be
+    tuned independently — e.g. Appointment ₹20 + Consultation ₹100 −
+    Discount ₹100 = ₹20 due per appointment.
+    """
+
+    appointment_fee = models.DecimalField(max_digits=8, decimal_places=2, default=20, verbose_name="Appointment Fee (₹)")
+    consultation_fee = models.DecimalField(max_digits=8, decimal_places=2, default=100, verbose_name="Consultation Fee (₹)")
+    discount = models.DecimalField(max_digits=8, decimal_places=2, default=100, verbose_name="Discount (₹)")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Appointment Fee Settings"
+        verbose_name_plural = "Appointment Fee Settings"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        for field_name in ("appointment_fee", "consultation_fee", "discount"):
+            value = getattr(self, field_name)
+            if value is not None and value < Decimal("0"):
+                raise ValidationError({field_name: "Amount cannot be negative."})
+
+    @property
+    def gross(self):
+        return (self.appointment_fee or Decimal("0")) + (self.consultation_fee or Decimal("0"))
+
+    @property
+    def net_due(self):
+        """Amount actually charged per appointment, never below zero."""
+        return max(self.gross - (self.discount or Decimal("0")), Decimal("0"))
+
+    @classmethod
+    def current(cls):
+        """Return the singleton row, creating it with defaults on first use."""
+        settings = cls.objects.order_by("pk").first()
+        if settings is None:
+            settings = cls.objects.create()
+        return settings
+
+    def __str__(self):
+        return "Appointment fee settings"
+
+
 class RegistrationOption(models.Model):
     class OptionType(models.TextChoices):
         STATE = "state", "State"
@@ -211,6 +257,7 @@ class PatientBill(models.Model):
     class Source(models.TextChoices):
         REGISTRATION = "registration", "Registration"
         DOCTOR = "doctor", "Doctor"
+        APPOINTMENT = "appointment", "Appointment"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -263,6 +310,16 @@ class InitialAssessment(models.Model):
         Patient, on_delete=models.CASCADE, related_name="initial_assessment",
         verbose_name="Patient",
     )
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        COMPLETED = "completed", "Completed"
+
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.COMPLETED)
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="completed_initial_assessments",
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -380,6 +437,26 @@ class PrescriptionItem(models.Model):
     frequency = models.CharField(max_length=50, default="OD", verbose_name="Frequency")
     duration = models.CharField(max_length=50, default="5 days", verbose_name="Duration")
     instructions = models.CharField(max_length=255, blank=True, default="", verbose_name="Instructions")
+    class DispenseStatus(models.TextChoices):
+        ORDERED = "ordered", "Ordered"
+        PARTIAL = "partial", "Partially dispensed"
+        DISPENSED = "dispensed", "Dispensed"
+        UNAVAILABLE = "unavailable", "Unavailable"
+        CANCELLED = "cancelled", "Cancelled"
+
+    class StockStatus(models.TextChoices):
+        AVAILABLE = "available", "Available"
+        LOW = "low", "Low stock"
+        UNAVAILABLE = "unavailable", "Unavailable"
+
+    dispense_status = models.CharField(max_length=12, choices=DispenseStatus.choices, default=DispenseStatus.ORDERED)
+    stock_status = models.CharField(max_length=12, choices=StockStatus.choices, default=StockStatus.AVAILABLE)
+    dispensed_quantity = models.PositiveSmallIntegerField(default=0)
+    dispensed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="opd_prescriptions_dispensed",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
     order_index = models.PositiveSmallIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -407,6 +484,12 @@ class ClinicalOrder(models.Model):
     name = models.CharField(max_length=255, verbose_name="Service / Test")
     status = models.CharField(max_length=30, default="Ordered", verbose_name="Status")
     result_summary = models.CharField(max_length=255, blank=True, default="", verbose_name="Result Summary")
+    operational_details = models.JSONField(default=dict, blank=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="opd_orders_updated",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -416,6 +499,84 @@ class ClinicalOrder(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.status})"
+
+
+class OPDAuditEvent(models.Model):
+    """Append-only event record for changes made during an OPD visit."""
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="opd_audit_events")
+    order = models.ForeignKey(
+        ClinicalOrder, on_delete=models.SET_NULL, null=True, blank=True, related_name="audit_events"
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="opd_audit_events",
+    )
+    action = models.CharField(max_length=60)
+    summary = models.CharField(max_length=255)
+    details = models.JSONField(default=dict, blank=True)
+    occurred_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-occurred_at"]
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        if self.pk:
+            raise ValidationError("OPD audit events cannot be changed after creation.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("OPD audit events cannot be deleted.")
+
+    def __str__(self):
+        return f"{self.action}: {self.patient.uhid}"
+
+
+class OPDReferral(models.Model):
+    class ReferralType(models.TextChoices):
+        INTERNAL = "internal", "Internal cross-consultation"
+        EXTERNAL = "external", "External referral"
+
+    class Urgency(models.TextChoices):
+        ROUTINE = "routine", "Routine"
+        URGENT = "urgent", "Urgent"
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SENT = "sent", "Sent to destination queue"
+        ACCEPTED = "accepted", "Accepted"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="opd_referrals")
+    consultation = models.ForeignKey(
+        ConsultationSession, on_delete=models.SET_NULL, null=True, blank=True, related_name="opd_referrals"
+    )
+    referral_type = models.CharField(max_length=12, choices=ReferralType.choices, default=ReferralType.INTERNAL)
+    department = models.CharField(max_length=100)
+    doctor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="opd_referrals_received",
+    )
+    reason = models.CharField(max_length=255)
+    urgency = models.CharField(max_length=10, choices=Urgency.choices, default=Urgency.ROUTINE)
+    notes = models.TextField(blank=True)
+    attachment = models.FileField(upload_to="opd_referrals/", blank=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.DRAFT)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="opd_referrals_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.patient.uhid} · {self.department} referral"
 
 
 class DiagnosticReport(models.Model):

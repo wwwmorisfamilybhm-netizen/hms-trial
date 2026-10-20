@@ -3,7 +3,7 @@ from django.utils import timezone
 
 from appointments.models import Appointment
 
-from .models import Patient, PatientBill, PatientCategoryConfig, RegistrationFeeSettings, RegistrationOption
+from .models import Patient, PatientBill, PatientCategoryConfig, RegistrationFeeSettings, RegistrationOption, AppointmentFeeSettings
 
 
 class AppointmentInline(admin.TabularInline):
@@ -36,6 +36,22 @@ class RegistrationFeeSettingsAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return not RegistrationFeeSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        obj.pk = 1
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(AppointmentFeeSettings)
+class AppointmentFeeSettingsAdmin(admin.ModelAdmin):
+    list_display = ["appointment_fee", "consultation_fee", "discount", "updated_at"]
+    readonly_fields = ["updated_at"]
+
+    def has_add_permission(self, request):
+        return not AppointmentFeeSettings.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         return False

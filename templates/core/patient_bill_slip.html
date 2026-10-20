@@ -52,7 +52,7 @@
     <div class="slip-line"><span>Discount</span><strong>− ₹{{ bill.discount|floatformat:2 }}</strong></div>
     <div class="slip-total"><span>Amount due</span><strong>₹{{ bill.amount_due|floatformat:2 }}</strong></div>
   </section>
-  <footer class="slip-footer"><span>Created by {{ bill.created_by.get_full_name|default:bill.created_by.username|default:"Registration Desk" }}</span><span>Thank you</span></footer>
+  <footer class="slip-footer"><span>Created by {% if bill.created_by %}{{ bill.created_by.get_full_name|default:bill.created_by.username }}{% else %}Registration Desk{% endif %}</span><span>Thank you</span></footer>
 </article>
 <style>
   .payment-slip{max-width:720px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:24px;padding:34px;box-shadow:0 12px 40px rgba(25,25,35,.08);color:#202024}

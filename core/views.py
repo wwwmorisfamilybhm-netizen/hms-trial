@@ -1,14 +1,14 @@
 from datetime import date, timedelta
-
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
 from django.http import FileResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -30,7 +30,7 @@ def home(request):
     return redirect("login")
 
 from appointments.models import Appointment, Doctor
-from patients.models import Patient, PatientBill
+from patients.models import Patient, OPDAuditEvent, PatientBill
 
 
 # ── Login / logout ────────────────────────────────────────────────────────────
@@ -195,22 +195,53 @@ def assign_doctor(request, patient_id):
         getattr(getattr(request.user, "profile", None), "designation", None)
         or request.session.get("designation")
     )
-    if designation not in (UserProfile.Designation.DOCTOR, UserProfile.Designation.ADMIN) \
-            and not request.user.is_superuser:
-        messages.warning(request, "Access restricted: only doctors can assign a patient.")
+    if designation not in (
+        UserProfile.Designation.DOCTOR,
+        UserProfile.Designation.ADMIN,
+        UserProfile.Designation.OPD_ASSISTANT,
+    ) and not request.user.is_superuser:
+        messages.warning(
+            request,
+            "Access restricted: only OPD assistants, doctors, or administrators can assign a patient.",
+        )
         return redirect("dashboard")
 
     if request.method != "POST":
         return redirect("dashboard")
 
+    # Send the user back to the page the assignment was made from, when safe.
+    next_url = request.POST.get("next", "")
+    if not next_url.startswith("/") or next_url.startswith("//"):
+        next_url = ""
+    fallback = (
+        "opd_assistant_dashboard"
+        if designation == UserProfile.Designation.OPD_ASSISTANT
+        else "dashboard"
+    )
+
+    def _finish():
+        if next_url:
+            return redirect(next_url)
+        return redirect(fallback)
+
     doctor_id = request.POST.get("doctor_id", "").strip()
     if not doctor_id:
+        previous_doctor = patient.assigned_doctor
         patient.assigned_doctor = None
         patient.save(update_fields=["assigned_doctor"])
-        messages.success(
-            request, f"{patient.full_name} is now unassigned."
-        )
-        return redirect("dashboard")
+        if previous_doctor:
+            OPDAuditEvent.objects.create(
+                patient=patient,
+                actor=request.user,
+                action="doctor_unassigned",
+                summary=(
+                    "Doctor assignment cleared: "
+                    f"{previous_doctor.get_full_name() or previous_doctor.username}"
+                ),
+                details={"doctor_id": previous_doctor.pk},
+            )
+        messages.success(request, f"{patient.full_name} is now unassigned.")
+        return _finish()
 
     doctor = get_object_or_404(
         get_user_model(),
@@ -220,11 +251,20 @@ def assign_doctor(request, patient_id):
     patient.assigned_doctor = doctor
     patient.save(update_fields=["assigned_doctor"])
     specialty = doctor.profile.get_specialty_display() if doctor.profile.specialty else "General Medicine"
+    OPDAuditEvent.objects.create(
+        patient=patient,
+        actor=request.user,
+        action="doctor_assigned",
+        summary=(
+            f"Assigned to Dr. {doctor.get_full_name() or doctor.username} ({specialty})"
+        ),
+        details={"doctor_id": doctor.pk},
+    )
     messages.success(
         request,
         f"{patient.full_name} assigned to {doctor.get_full_name() or doctor.username} — {specialty}.",
     )
-    return redirect("dashboard")
+    return _finish()
 
 
 @login_required(login_url="login")
@@ -294,6 +334,8 @@ def admin_dashboard(request):
 
 
 def _require_admin(request):
+    if getattr(request.user, "is_superuser", False):
+        return None
     profile = getattr(request.user, "profile", None)
     user_desig = getattr(profile, "designation", None)
     if user_desig == UserProfile.Designation.ADMIN:
@@ -305,15 +347,15 @@ def _require_admin(request):
 
 
 def _require_registration_desk(request):
+    if getattr(request.user, "is_superuser", False):
+        return None
     designation = (
         getattr(getattr(request.user, "profile", None), "designation", None)
         or request.session.get("designation")
     )
-    if designation == UserProfile.Designation.REGISTRATION_DESK:
+    if designation in (UserProfile.Designation.REGISTRATION_DESK, UserProfile.Designation.ADMIN):
         return None
     messages.warning(request, "This console is available to Registration Desk staff only.")
-    if designation == UserProfile.Designation.ADMIN:
-        return redirect("admin_dashboard")
     return redirect("dashboard")
 
 
@@ -324,7 +366,7 @@ def bill_command_center(request):
     if denied:
         return denied
 
-    from django.db.models import Q
+    from django.db.models import Exists, OuterRef, Q
 
     query = request.GET.get("q", "").strip()
     pending_bills = PatientBill.objects.filter(
@@ -714,22 +756,19 @@ def admin_backup_export(request):
 
 @login_required(login_url="login")
 def opd_assistant_dashboard(request):
-    """OPD Desk — the home portal for OPD Assistants.
-
-    Shows the counter numbers for the day and the patients still waiting for
-    their initial assessment, so the desk can pick the next one and open the
-    assessment workstation.
-    """
-    from django.db.models import Exists, OuterRef
-
-    from patients.models import InitialAssessment
+    """OPD Central Dashboard with live counts and patient-flow filters."""
+    import csv
+    from django.http import HttpResponse
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+    from django.utils import timezone
+    from patients.models import ClinicalOrder, ConsultationSession, InitialAssessment
 
     user_desig = (
         getattr(getattr(request.user, "profile", None), "designation", None)
         or request.session.get("designation")
     )
-    if user_desig not in (UserProfile.Designation.OPD_ASSISTANT, UserProfile.Designation.ADMIN) \
-            and not request.user.is_superuser:
+    if user_desig != UserProfile.Designation.OPD_ASSISTANT:
         from django.contrib import messages
         messages.warning(request, "Access restricted: the OPD Desk is for OPD Assistants.")
         if user_desig == UserProfile.Designation.REGISTRATION_DESK:
@@ -738,46 +777,577 @@ def opd_assistant_dashboard(request):
             return redirect("admin_dashboard")
         return redirect("dashboard")
 
-    today = date.today()
-
-    # Patients registered today and whether their triage is still outstanding.
-    todays_patients = (
-        Patient.objects
-        .annotate(
-            has_assessment=Exists(
-                InitialAssessment.objects.filter(patient=OuterRef("pk"))
-            )
-        )
-        .filter(created_at__date=today)
-        .order_by("-created_at")
+    today = timezone.localdate()
+    all_patients = list(
+        Patient.objects.filter(
+            Q(created_at__date=today)
+            | Q(appointments__date=today)
+            | Q(appointments__created_at__date=today)
+        ).distinct()
+        .select_related("assigned_doctor", "assigned_doctor__profile")
+        .prefetch_related("consultations__orders", "bills", "appointments")
+        .order_by("-is_emergency", "created_at")[:500]
     )
-    todays_patients = list(todays_patients)
-    waiting = [p for p in todays_patients if not p.has_assessment]
-    assessed_today = sum(1 for p in todays_patients if p.has_assessment)
+    rows = _opd_patient_flow(all_patients)
+    counts = {
+        "waiting": sum(row["status"] == "Waiting" for row in rows),
+        "central_pool": sum(row["status"] == "In Central Pool" for row in rows),
+        "pending_assignment": sum(row["status"] == "Pending Assignment" for row in rows),
+        "with_doctors": sum(row["status"] == "With Doctor" for row in rows),
+        "investigations": sum(row["status"] == "Investigations" for row in rows),
+        "procedures": sum(row["status"] == "Procedures" for row in rows),
+        "pharmacy": sum(row["status"] == "Pharmacy" for row in rows),
+        "review_required": sum(row["status"] == "Review Required" for row in rows),
+        "completed": sum(row["status"] == "Completed" for row in rows),
+        "total": len(rows),
+    }
 
-    # Most recent completed assessments, for quick reference.
-    recent_assessments = (
-        InitialAssessment.objects
-        .select_related("patient")
-        .order_by("-updated_at")[:6]
-    )
+    query = request.GET.get("q", "").strip()
+    status_filter = request.GET.get("status", "")
+    priority_filter = request.GET.get("priority", "")
+    doctor_filter = request.GET.get("doctor", "")
+    department_filter = request.GET.get("department", "")
+    queue_filter = request.GET.get("queue", "")
+    if query:
+        rows = [row for row in rows if query.casefold() in " ".join((
+            row["patient"].full_name, row["patient"].uhid, row["visit_number"],
+        )).casefold()]
+    if status_filter:
+        rows = [row for row in rows if row["status"] == status_filter]
+    if priority_filter:
+        rows = [row for row in rows if row["priority"] == priority_filter]
+    if doctor_filter:
+        rows = [row for row in rows if str(row["doctor_id"] or "") == doctor_filter]
+    if department_filter:
+        rows = [row for row in rows if row["department"] == department_filter]
+    if queue_filter:
+        rows = [row for row in rows if queue_filter.casefold() in row["location"].casefold()]
 
-    appointments_today = (
-        Appointment.objects
-        .filter(date=today)
-        .exclude(status=Appointment.Status.CANCELLED)
-        .count()
-    )
+    sort_key = request.GET.get("sort", "arrival")
+    sort_fields = {
+        "patient": lambda row: row["patient"].full_name.casefold(),
+        "status": lambda row: row["status"],
+        "arrival": lambda row: row["patient"].created_at,
+    }
+    rows.sort(key=sort_fields.get(sort_key, sort_fields["arrival"]), reverse=sort_key == "arrival")
+    if request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="opd-patient-flow.csv"'
+        writer = csv.writer(response)
+        writer.writerow(["UHID", "Visit", "Patient", "Age", "Sex", "Arrival", "Location", "Status", "Doctor", "Pending services", "Alerts", "Billing", "Last update"])
+        for row in rows:
+            writer.writerow([
+                row["patient"].uhid, row["visit_number"], row["patient"].full_name,
+                row["patient"].age or "", row["patient"].get_gender_display(),
+                row["patient"].created_at.isoformat(), row["location"], row["status"],
+                row["doctor"].get_full_name() if row["doctor"] else "",
+                ", ".join(row["pending_services"]), row["alert"], row["billing"],
+                row["updated_at"].isoformat(),
+            ])
+        return response
+    page_obj = Paginator(rows, 20).get_page(request.GET.get("page"))
+    doctors = get_user_model().objects.filter(
+        profile__designation=UserProfile.Designation.DOCTOR
+    ).order_by("first_name", "username")
+    departments = sorted({row["department"] for row in _opd_patient_flow(all_patients) if row["department"]})
+
+    from appointments.models import Appointment
+    todays_appointments_qs = Appointment.objects.filter(date=today).exclude(
+        status=Appointment.Status.CANCELLED
+    ).select_related("patient", "doctor").order_by("start_time")
+    upcoming_appointments = list(todays_appointments_qs[:5])
 
     return render(request, "core/opd_assistant_dashboard.html", {
         "today": today,
-        "registered_today": len(todays_patients),
-        "assessed_today": assessed_today,
-        "waiting_count": len(waiting),
-        "appointments_today": appointments_today,
-        "waiting_patients": waiting[:12],
-        "recent_assessments": recent_assessments,
+        "counts": counts,
+        "page_obj": page_obj,
+        "doctors": doctors,
+        "departments": departments,
+        "query": query,
+        "status_filter": status_filter,
+        "priority_filter": priority_filter,
+        "doctor_filter": doctor_filter,
+        "department_filter": department_filter,
+        "queue_filter": queue_filter,
+        "upcoming_appointments": upcoming_appointments,
         "user": request.user,
+    })
+
+
+def _opd_patient_flow(patients):
+    """Build patient-flow rows from the existing persisted OPD records."""
+    from appointments.models import Appointment
+    from patients.models import ConsultationSession, InitialAssessment
+
+    today = timezone.localdate()
+    rows = []
+    for patient in patients:
+        assessment = getattr(patient, "initial_assessment", None)
+        consultations = list(patient.consultations.all())
+        consultation = consultations[0] if consultations else None
+        assigned_doctor = patient.assigned_doctor or (consultation.doctor if consultation else None)
+        orders = [order for item in consultations for order in item.orders.all()]
+        prescriptions = [prescription for item in consultations for prescription in item.prescriptions.all()]
+        pending_orders = [order for order in orders if order.status.casefold() not in ("completed", "cancelled")]
+        latest_bill = patient.bills.all().order_by("-created_at").first()
+        # Booked appointments surface as pending-assignment pool entries so the
+        # OPD assistant can route them to a doctor before the visit.
+        next_appointment = next(
+            (
+                appt
+                for appt in patient.appointments.all()
+                if appt.status == Appointment.Status.SCHEDULED and appt.date >= today
+            ),
+            None,
+        )
+        if consultation and consultation.status == ConsultationSession.Status.CANCELLED:
+            status, location = "Cancelled", "Visit cancelled"
+        elif consultation and consultation.status == ConsultationSession.Status.COMPLETED:
+            status, location = "Completed", "Completed"
+        elif not assigned_doctor and not consultation and next_appointment and (
+            next_appointment.date == today or next_appointment.created_at.date() == today
+        ):
+            status, location = "Pending Assignment", "Central Pool"
+        elif any(order.status.casefold() in ("review required", "review") for order in orders):
+            status, location = "Review Required", "Doctor Review"
+        elif any(order.order_type == "laboratory" for order in pending_orders):
+            status, location = "Investigations", "Laboratory"
+        elif any(order.order_type == "radiology" for order in pending_orders):
+            status, location = "Investigations", "Radiology"
+        elif any(order.order_type == "other" for order in pending_orders):
+            status, location = "Procedures", "Service Queue"
+        elif latest_bill and latest_bill.status == "pending" and any(
+            item.dispense_status != "dispensed" for item in prescriptions
+        ):
+            status, location = "Awaiting Payment", "Pharmacy"
+        elif any(item.dispense_status != "dispensed" for item in prescriptions):
+            status, location = "Pharmacy", "Pharmacy"
+        elif consultation and consultation.status == ConsultationSession.Status.IN_PROGRESS:
+            status, location = "With Doctor", "Doctor Consultation"
+        elif assessment and assessment.status == InitialAssessment.Status.COMPLETED:
+            status, location = "In Central Pool", "Doctor Queue"
+        else:
+            status, location = "Waiting", "Initial Assessment"
+        allergies = bool(patient.allergies or (assessment and assessment.allergies))
+        rows.append({
+            "patient": patient,
+            "assessment": assessment,
+            "consultation": consultation,
+            "appointment": next_appointment,
+            "visit_number": consultation.visit_token if consultation else f"OPD-{patient.created_at:%y%m%d}-{patient.pk:04d}",
+            "status": status,
+            "location": location,
+            "priority": "Urgent" if patient.is_emergency else "Routine",
+            "doctor": assigned_doctor,
+            "doctor_id": assigned_doctor.pk if assigned_doctor else None,
+            "department": (
+                assigned_doctor.profile.get_specialty_display()
+                if assigned_doctor and assigned_doctor.profile.specialty
+                else "General Medicine"
+            ),
+            "pending_services": [order.name for order in pending_orders] + [
+                item.medicine_name for item in prescriptions if item.dispense_status != "dispensed"
+            ],
+            "alert": "Emergency" if patient.is_emergency else ("Allergy on file" if allergies else ""),
+            "billing": latest_bill.get_status_display() if latest_bill else "Unbilled",
+            "updated_at": max(
+                [patient.updated_at] + ([assessment.updated_at] if assessment else [])
+                + ([consultation.updated_at] if consultation else [])
+            ),
+        })
+    return rows
+
+
+@login_required(login_url="login")
+def opd_patient_queue(request):
+    """Central patient queue with a selected visit summary."""
+    designation = getattr(getattr(request.user, "profile", None), "designation", None)
+    if designation != UserProfile.Designation.OPD_ASSISTANT:
+        messages.warning(request, "Access restricted: the Patient Queue is for OPD Assistants.")
+        return redirect("home")
+    from django.utils import timezone
+    today = timezone.localdate()
+    patients = list(
+        Patient.objects.filter(
+            Q(created_at__date=today)
+            | Q(appointments__date=today)
+            | Q(appointments__created_at__date=today)
+        ).distinct()
+        .select_related("assigned_doctor", "assigned_doctor__profile")
+        .prefetch_related("consultations__orders", "bills", "appointments")
+        .order_by("-is_emergency", "created_at")
+    )
+    rows = _opd_patient_flow(patients)
+    query = request.GET.get("q", "").strip()
+    if query:
+        rows = [row for row in rows if query.casefold() in " ".join((
+            row["patient"].full_name, row["patient"].uhid, row["visit_number"],
+        )).casefold()]
+    selected_id = request.GET.get("patient", "")
+    selected = next((row for row in rows if str(row["patient"].pk) == selected_id), None)
+    from django.core.paginator import Paginator
+    page_obj = Paginator(rows, 20).get_page(request.GET.get("page"))
+    doctors = get_user_model().objects.filter(
+        profile__designation=UserProfile.Designation.DOCTOR
+    ).order_by("first_name", "username")
+    return render(request, "core/opd_workspace.html", {
+        "page_title": "Patient Queue",
+        "page_kind": "patient_queue",
+        "rows": page_obj,
+        "selected": selected,
+        "query": query,
+        "doctors": doctors,
+        "today": today,
+    })
+
+
+@login_required(login_url="login")
+@require_POST
+def opd_order_update(request, order_id):
+    """Update a service order from the OPD service desk and persist the result."""
+    from patients.models import ClinicalOrder, OPDAuditEvent
+    designation = getattr(getattr(request.user, "profile", None), "designation", None)
+    if designation != UserProfile.Designation.OPD_ASSISTANT:
+        return HttpResponseForbidden("OPD Assistant access required.")
+    order = get_object_or_404(ClinicalOrder, pk=order_id)
+    new_status = request.POST.get("status", "").strip()
+    allowed_statuses = {"Ordered", "In Progress", "Completed", "Review Required", "Cancelled"}
+    if new_status not in allowed_statuses:
+        messages.error(request, "Choose a valid service status.")
+    else:
+        previous_status = order.status
+        order.status = new_status
+        if "result_summary" in request.POST:
+            order.result_summary = request.POST.get("result_summary", "").strip()[:255]
+        details = dict(order.operational_details or {})
+        for field in (
+            "body_part", "preparation_status", "preparation_note", "specimen_status",
+            "acquisition_status", "session_datetime", "room", "assigned_staff",
+            "post_instructions",
+        ):
+            if field in request.POST:
+                details[field] = request.POST.get(field, "").strip()[:255]
+        if request.POST.get("service") == "procedure-room":
+            details["consent_confirmed"] = request.POST.get("consent_confirmed") == "on"
+            details["preparation_complete"] = request.POST.get("preparation_complete") == "on"
+        order.operational_details = details
+        order.updated_by = request.user
+        order.save(update_fields=["status", "result_summary", "operational_details", "updated_by", "updated_at"])
+        OPDAuditEvent.objects.create(
+            patient=order.consultation.patient,
+            order=order,
+            actor=request.user,
+            action="service_order_updated",
+            summary=f"{order.name}: {previous_status} to {new_status}",
+            details={"previous_status": previous_status, "status": new_status, **details},
+        )
+        messages.success(request, f"{order.name} updated to {new_status}.")
+    return_service = request.POST.get("service", "")
+    if return_service not in {"laboratory", "radiology", "cardiology", "pharmacy", "physiotherapy", "counselling", "procedure-room", "procedures"}:
+        return_service = "laboratory" if order.order_type == "laboratory" else "radiology" if order.order_type == "radiology" else "procedures"
+    return redirect("opd_service_queue", service=return_service)
+
+
+@login_required(login_url="login")
+def opd_service_queue(request, service):
+    """Searchable service-order queue for OPD-assistant operations."""
+    from django.db.models import Exists, OuterRef, Q
+    from patients.models import ClinicalOrder, PrescriptionItem, PatientBill
+    designation = getattr(getattr(request.user, "profile", None), "designation", None)
+    if designation != UserProfile.Designation.OPD_ASSISTANT:
+        messages.warning(request, "Access restricted: service queues are for OPD Assistants.")
+        return redirect("home")
+    service_map = {
+        "laboratory": ("Laboratory", ["laboratory"]),
+        "radiology": ("Radiology · X-Ray & USG", ["radiology"]),
+        "cardiology": ("Cardiology · ECG", ["other"]),
+        "pharmacy": ("Pharmacy", ["other"]),
+        "physiotherapy": ("Physiotherapy", ["other"]),
+        "counselling": ("Counselling", ["other"]),
+        "procedure-room": ("Procedure Room", ["other"]),
+        "procedures": ("Procedures", ["other"]),
+    }
+    if service not in service_map:
+        from django.http import Http404
+        raise Http404
+    title, order_types = service_map[service]
+    prescriptions = PrescriptionItem.objects.none()
+    if service == "pharmacy":
+        prescriptions = PrescriptionItem.objects.annotate(
+            payment_pending=Exists(PatientBill.objects.filter(
+                patient_id=OuterRef("consultation__patient_id"), status=PatientBill.Status.PENDING
+            ))
+        ).select_related(
+            "consultation__patient", "consultation__doctor", "dispensed_by"
+        ).exclude(dispense_status=PrescriptionItem.DispenseStatus.CANCELLED).order_by("created_at")
+    orders = ClinicalOrder.objects.filter(order_type__in=order_types).select_related(
+        "consultation__patient", "consultation__doctor"
+    ).order_by("created_at")
+    if service in {"cardiology", "pharmacy", "physiotherapy", "counselling", "procedure-room"}:
+        keyword = {"cardiology": "ecg", "pharmacy": "pharm", "physiotherapy": "physio", "counselling": "counsel", "procedure-room": "procedure"}.get(service, "")
+        orders = orders.filter(name__icontains=keyword)
+    query = request.GET.get("q", "").strip()
+    status_filter = request.GET.get("status", "")
+    if query:
+        orders = orders.filter(
+            Q(name__icontains=query) | Q(consultation__patient__first_name__icontains=query)
+            | Q(consultation__patient__last_name__icontains=query)
+            | Q(consultation__patient__mr_number__icontains=query)
+            | Q(consultation__visit_token__icontains=query)
+        )
+        prescriptions = prescriptions.filter(
+            Q(medicine_name__icontains=query)
+            | Q(consultation__patient__first_name__icontains=query)
+            | Q(consultation__patient__last_name__icontains=query)
+            | Q(consultation__patient__mr_number__icontains=query)
+            | Q(consultation__visit_token__icontains=query)
+        )
+    if status_filter:
+        orders = orders.filter(status=status_filter)
+        prescriptions = prescriptions.filter(dispense_status=status_filter.lower().replace(" ", "_"))
+    from django.core.paginator import Paginator
+    page_obj = Paginator(orders, 25).get_page(request.GET.get("page"))
+    selected_id = request.GET.get("order", "")
+    selected = ClinicalOrder.objects.filter(pk=selected_id, order_type__in=order_types).select_related(
+        "consultation__patient", "consultation__doctor"
+    ).first() if selected_id.isdigit() else None
+    selected_prescription_id = request.GET.get("prescription", "")
+    selected_prescription = prescriptions.filter(pk=selected_prescription_id).first() if selected_prescription_id.isdigit() else None
+    if service == "pharmacy":
+        orders = ClinicalOrder.objects.none()
+        selected = None
+        if status_filter:
+            prescriptions = prescriptions.filter(dispense_status=status_filter.lower().replace(" ", "_"))
+        from django.core.paginator import Paginator
+        page_obj = Paginator(prescriptions, 25).get_page(request.GET.get("page"))
+    else:
+        page_obj = Paginator(orders, 25).get_page(request.GET.get("page"))
+    return render(request, "core/opd_workspace.html", {
+        "page_title": title,
+        "page_kind": "service_queue",
+        "service": service,
+        "orders": page_obj if service != "pharmacy" else None,
+        "prescriptions": page_obj if service == "pharmacy" else None,
+        "selected_order": selected,
+        "selected_prescription": selected_prescription,
+        "query": query,
+        "status_filter": status_filter,
+    })
+
+
+@login_required(login_url="login")
+@require_POST
+def opd_prescription_update(request, item_id):
+    """Record pharmacy stock and dispense updates with payment safeguards."""
+    from patients.models import OPDAuditEvent, PatientBill, PrescriptionItem
+    designation = getattr(getattr(request.user, "profile", None), "designation", None)
+    if designation != UserProfile.Designation.OPD_ASSISTANT:
+        return HttpResponseForbidden("OPD Assistant access required.")
+    item = get_object_or_404(PrescriptionItem.objects.select_related("consultation__patient"), pk=item_id)
+    dispense_status = request.POST.get("dispense_status", "")
+    stock_status = request.POST.get("stock_status", "")
+    if dispense_status not in PrescriptionItem.DispenseStatus.values or stock_status not in PrescriptionItem.StockStatus.values:
+        messages.error(request, "Choose valid stock and dispense states.")
+    else:
+        try:
+            quantity = int(request.POST.get("dispensed_quantity", "0"))
+        except (TypeError, ValueError):
+            quantity = -1
+        if quantity < 0 or quantity > 999:
+            messages.error(request, "Dispensed quantity must be between 0 and 999.")
+        elif dispense_status in (PrescriptionItem.DispenseStatus.PARTIAL, PrescriptionItem.DispenseStatus.DISPENSED) and quantity < 1:
+            messages.error(request, "Enter the quantity dispensed.")
+        elif dispense_status == PrescriptionItem.DispenseStatus.DISPENSED and PatientBill.objects.filter(
+            patient=item.consultation.patient, status=PatientBill.Status.PENDING
+        ).exists():
+            messages.error(request, "Dispensing is blocked while this patient has a pending bill.")
+        else:
+            previous_status = item.dispense_status
+            item.dispense_status = dispense_status
+            item.stock_status = stock_status
+            item.dispensed_quantity = quantity
+            item.dispensed_by = request.user
+            item.save(update_fields=["dispense_status", "stock_status", "dispensed_quantity", "dispensed_by", "updated_at"])
+            OPDAuditEvent.objects.create(
+                patient=item.consultation.patient,
+                actor=request.user,
+                action="pharmacy_dispense_updated",
+                summary=f"{item.medicine_name}: {previous_status} to {dispense_status}",
+                details={"prescription_id": item.pk, "stock_status": stock_status, "quantity": quantity},
+            )
+            messages.success(request, f"{item.medicine_name} dispense status updated.")
+    return redirect("opd_service_queue", service="pharmacy")
+
+
+@login_required(login_url="login")
+def opd_module_page(request, module):
+    """Role-scoped supporting pages for the OPD Assistant portal."""
+    import csv
+    from django.http import HttpResponse
+    from patients.models import ClinicalOrder, OPDAuditEvent
+
+    designation = getattr(getattr(request.user, "profile", None), "designation", None)
+    if designation != UserProfile.Designation.OPD_ASSISTANT:
+        messages.warning(request, "Access restricted: this page is for OPD Assistants.")
+        return redirect("home")
+    titles = {
+        "reports": "OPD Reports",
+        "master-data": "Master Data",
+        "audit-trail": "Audit Trail",
+        "settings": "OPD Settings",
+    }
+    if module not in titles:
+        from django.http import Http404
+        raise Http404
+
+    if module == "settings" and request.method == "POST":
+        request.session["opd_preferences"] = {
+            "notifications": request.POST.get("notifications") == "on",
+            "compact_tables": request.POST.get("compact_tables") == "on",
+        }
+        messages.success(request, "OPD display preferences saved for this signed-in session.")
+        return redirect("opd_module", module="settings")
+
+    patients = Patient.objects.all().select_related("assigned_doctor", "assigned_doctor__profile")
+    orders = ClinicalOrder.objects.select_related("consultation__patient", "consultation__doctor")
+    start_date = request.GET.get("from", "")
+    end_date = request.GET.get("to", "")
+    doctor_id = request.GET.get("doctor", "")
+    service = request.GET.get("service", "")
+    if start_date:
+        patients = patients.filter(created_at__date__gte=start_date)
+        orders = orders.filter(created_at__date__gte=start_date)
+    if end_date:
+        patients = patients.filter(created_at__date__lte=end_date)
+        orders = orders.filter(created_at__date__lte=end_date)
+    if doctor_id.isdigit():
+        patients = patients.filter(assigned_doctor_id=doctor_id)
+        orders = orders.filter(consultation__doctor_id=doctor_id)
+    if service:
+        orders = orders.filter(order_type=service)
+
+    if module == "reports" and request.GET.get("export") == "csv":
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="opd-report.csv"'
+        writer = csv.writer(response)
+        writer.writerow(["Patient", "UHID", "Visit", "Service", "Status", "Doctor", "Ordered at"])
+        for order in orders.order_by("-created_at")[:1000]:
+            writer.writerow([
+                order.consultation.patient.full_name,
+                order.consultation.patient.uhid,
+                order.consultation.visit_token,
+                order.name,
+                order.status,
+                order.consultation.doctor.get_full_name() if order.consultation.doctor else "",
+                order.created_at.isoformat(),
+            ])
+        return response
+
+    context = {
+        "page_title": titles[module],
+        "module": module,
+        "doctors": get_user_model().objects.filter(profile__designation=UserProfile.Designation.DOCTOR).order_by("first_name", "username"),
+        "patients": patients.order_by("-created_at")[:100],
+        "orders": orders.order_by("-created_at")[:100],
+        "start_date": start_date,
+        "end_date": end_date,
+        "doctor_filter": doctor_id,
+        "service_filter": service,
+        "services": ClinicalOrder.OrderType.choices,
+        "audit_events": OPDAuditEvent.objects.select_related("patient", "actor", "order").order_by("-occurred_at")[:200],
+        "opd_preferences": request.session.get("opd_preferences", {"notifications": True, "compact_tables": False}),
+    }
+    return render(request, "core/opd_module.html", context)
+
+
+@login_required(login_url="login")
+def opd_referrals(request):
+    """Create and review internal or external OPD referrals."""
+    import os
+    from django.db.models import Q
+    from django.urls import reverse
+    from patients.models import OPDAuditEvent, OPDReferral, ConsultationSession
+
+    designation = getattr(getattr(request.user, "profile", None), "designation", None)
+    if designation != UserProfile.Designation.OPD_ASSISTANT:
+        messages.warning(request, "Access restricted: referrals are for OPD Assistants.")
+        return redirect("home")
+
+    if request.method == "POST":
+        patient = Patient.objects.filter(pk=request.POST.get("patient_id", "")).first()
+        department = request.POST.get("department", "").strip()[:100]
+        reason = request.POST.get("reason", "").strip()[:255]
+        referral_type = request.POST.get("referral_type", OPDReferral.ReferralType.INTERNAL)
+        urgency = request.POST.get("urgency", OPDReferral.Urgency.ROUTINE)
+        action = request.POST.get("action", "draft")
+        attachment = request.FILES.get("attachment")
+        doctor_id = request.POST.get("doctor_id", "").strip()
+        doctor = get_user_model().objects.filter(
+            pk=doctor_id, profile__designation=UserProfile.Designation.DOCTOR
+        ).first() if doctor_id.isdigit() else None
+        allowed_extensions = {".pdf", ".png", ".jpg", ".jpeg"}
+        if not patient or not department or not reason:
+            messages.error(request, "Select a patient, destination department, and referral reason.")
+        elif referral_type not in OPDReferral.ReferralType.values or urgency not in OPDReferral.Urgency.values:
+            messages.error(request, "Choose a valid referral type and urgency.")
+        elif action not in ("draft", "send"):
+            messages.error(request, "Choose save draft or send referral.")
+        elif doctor_id and not doctor:
+            messages.error(request, "Select an available doctor account.")
+        elif attachment and (
+            attachment.size > 5 * 1024 * 1024
+            or os.path.splitext(attachment.name)[1].lower() not in allowed_extensions
+        ):
+            messages.error(request, "Attachment must be PDF, PNG, or JPG and no larger than 5 MB.")
+        else:
+            consultation = ConsultationSession.objects.filter(
+                patient=patient,
+                status__in=[ConsultationSession.Status.DRAFT, ConsultationSession.Status.IN_PROGRESS],
+            ).first()
+            referral = OPDReferral.objects.create(
+                patient=patient,
+                consultation=consultation,
+                referral_type=referral_type,
+                department=department,
+                doctor=doctor,
+                reason=reason,
+                urgency=urgency,
+                notes=request.POST.get("notes", "").strip(),
+                attachment=attachment,
+                status=OPDReferral.Status.SENT if action == "send" else OPDReferral.Status.DRAFT,
+                created_by=request.user,
+            )
+            OPDAuditEvent.objects.create(
+                patient=patient,
+                actor=request.user,
+                action="referral_sent" if action == "send" else "referral_draft_saved",
+                summary=f"{referral.get_status_display()}: {referral.department} referral ({referral.urgency})",
+                details={"referral_id": referral.pk, "department": department, "urgency": urgency},
+            )
+            messages.success(request, "Referral sent to the destination queue." if action == "send" else "Referral draft saved.")
+            return redirect(f"{reverse('opd_referrals')}?patient={patient.pk}")
+
+    query = request.GET.get("q", "").strip()
+    patients = Patient.objects.all().order_by("-created_at")
+    if query:
+        patients = patients.filter(
+            Q(first_name__icontains=query) | Q(last_name__icontains=query)
+            | Q(second_name__icontains=query) | Q(mr_number__icontains=query)
+        )
+    patient_id = request.GET.get("patient", "")
+    selected_patient = Patient.objects.filter(pk=patient_id).first() if patient_id.isdigit() else None
+    referrals = OPDReferral.objects.select_related("patient", "doctor", "created_by")
+    if selected_patient:
+        referrals = referrals.filter(patient=selected_patient)
+    return render(request, "core/opd_referrals.html", {
+        "page_title": "Cross-consultation / Referral",
+        "patients": patients[:30],
+        "selected_patient": selected_patient,
+        "referrals": referrals[:100],
+        "doctors": get_user_model().objects.filter(profile__designation=UserProfile.Designation.DOCTOR).select_related("profile").order_by("first_name", "username"),
+        "query": query,
+        "referral_types": OPDReferral.ReferralType.choices,
+        "urgencies": OPDReferral.Urgency.choices,
     })
 
 
@@ -798,7 +1368,9 @@ def reception_dashboard(request):
 
     today = date.today()
     todays_patients = Patient.objects.filter(created_at__date=today).order_by("-created_at")
-    recent_patients = Patient.objects.order_by("-created_at")[:8]
+    recent_patients = Patient.objects.order_by("-created_at")[:12]
+    total_patients = Patient.objects.count()
+    emergency_today = Patient.objects.filter(created_at__date=today, is_emergency=True).count()
 
     # Billing: bills still awaiting payment.
     from decimal import Decimal
@@ -808,20 +1380,34 @@ def reception_dashboard(request):
     pending_count = pending_bills.count()
     pending_due = sum((b.amount_due for b in pending_bills), Decimal("0"))
 
+    paid_today_bills = PatientBill.objects.filter(created_at__date=today, status=PatientBill.Status.PAID)
+    paid_count = paid_today_bills.count()
+    paid_today_amount = sum((b.amount_due for b in paid_today_bills), Decimal("0"))
+
     # Appointments expected at the counter today (cancelled slots excluded).
-    appointments_today = Appointment.objects.filter(date=today).exclude(
+    todays_appointments_qs = Appointment.objects.filter(date=today).exclude(
         status=Appointment.Status.CANCELLED
-    ).count()
+    ).select_related("patient", "doctor").order_by("start_time")
+    appointments_today = todays_appointments_qs.count()
+    upcoming_appointments = list(todays_appointments_qs[:5])
+
+    # Available doctors for counter triage and allocation
+    available_doctors = Doctor.objects.all().order_by("first_name", "last_name")[:6]
 
     return render(request, "core/reception_dashboard.html", {
         "today": today,
-        "total_patients": Patient.objects.count(),
+        "total_patients": total_patients,
         "today_count": todays_patients.count(),
         "todays_patients": todays_patients,
         "recent_patients": recent_patients,
         "pending_payments": pending_count,
         "pending_amount": pending_due,
+        "paid_count": paid_count,
+        "paid_today_amount": paid_today_amount,
+        "emergency_today": emergency_today,
         "appointments_today": appointments_today,
+        "upcoming_appointments": upcoming_appointments,
+        "available_doctors": available_doctors,
         "user": request.user,
     })
 
@@ -854,13 +1440,11 @@ def registration_desk(request):
         except ValueError:
             selected_date = None
 
-    # The registration counter only deals with patient records; other staff
-    # also see booked appointments, exactly as the History screen did.
     rows = _history_rows(
         query=query,
         status=status,
         selected_date=selected_date,
-        include_appointments=not is_registration_desk,
+        include_appointments=True,
     )
 
     recent_registered = Patient.objects.order_by("-created_at")[:5]
@@ -1205,7 +1789,7 @@ def history(request):
         or request.session.get("designation")
     ) == UserProfile.Designation.REGISTRATION_DESK
 
-    item_type = "patients" if is_registration_desk else request.GET.get("type", "all")
+    item_type = request.GET.get("type", "all")
     if item_type not in ("all", "patients", "appointments"):
         item_type = "all"
     query = request.GET.get("q", "").strip()
@@ -1219,7 +1803,7 @@ def history(request):
             selected_date = None
 
     include_patients = item_type in ("all", "patients")
-    include_appointments = not is_registration_desk and item_type in ("all", "appointments")
+    include_appointments = item_type in ("all", "appointments")
 
     rows = _history_rows(
         query=query,
@@ -1550,6 +2134,18 @@ def _normalise_orders(raw):
 @require_POST
 def save_initial_assessment(request):
     """Persist an OPD initial assessment for a patient (create or update)."""
+    from django.utils import timezone
+    from patients.models import InitialAssessment, OPDAuditEvent, Patient
+
+    designation = getattr(getattr(request.user, "profile", None), "designation", None)
+    allowed = {
+        UserProfile.Designation.OPD_ASSISTANT,
+        UserProfile.Designation.DOCTOR,
+        UserProfile.Designation.NURSE,
+        UserProfile.Designation.ADMIN,
+    }
+    if designation not in allowed:
+        return JsonResponse({"ok": False, "error": "Clinical staff access required."}, status=403)
     try:
         payload = _json.loads(request.body.decode("utf-8") or "{}")
     except (ValueError, UnicodeDecodeError):
@@ -1561,7 +2157,6 @@ def save_initial_assessment(request):
     if not patient_id:
         return JsonResponse({"ok": False, "error": "patient_id required"}, status=400)
 
-    from patients.models import InitialAssessment, Patient
     patient = Patient.objects.filter(pk=patient_id).first()
     if not patient:
         return JsonResponse({"ok": False, "error": "Patient not found"}, status=404)
@@ -1584,19 +2179,46 @@ def save_initial_assessment(request):
         except (TypeError, ValueError):
             return None
 
-    assessment, _ = InitialAssessment.objects.get_or_create(patient=patient)
+    numeric_fields = {
+        "temperature": (float, 25, 45),
+        "pulse": (int, 1, 300),
+        "respiratory_rate": (int, 1, 100),
+        "bp_systolic": (int, 1, 350),
+        "bp_diastolic": (int, 1, 250),
+        "spo2": (int, 1, 100),
+        "height": (float, 20, 250),
+        "weight": (float, 0.2, 500),
+        "bmi": (float, 1, 150),
+        "rbs": (int, 1, 2000),
+        "pain_score": (int, 0, 10),
+    }
+    values = {}
+    for field, (cast, lower, upper) in numeric_fields.items():
+        raw_value = _value(field)
+        values[field] = _num(raw_value, cast)
+        if raw_value not in (None, "") and values[field] is None:
+            return JsonResponse({"ok": False, "error": f"{field.replace('_', ' ').title()} must be numeric."}, status=400)
+        if values[field] is not None and not lower <= values[field] <= upper:
+            return JsonResponse({"ok": False, "error": f"{field.replace('_', ' ').title()} is outside the accepted entry range ({lower}-{upper})."}, status=400)
 
-    assessment.temperature = _num(_value("temperature"), float)
-    assessment.pulse = _num(_value("pulse"))
-    assessment.respiratory_rate = _num(_value("respiratory_rate"))
-    assessment.bp_systolic = _num(_value("bp_systolic"))
-    assessment.bp_diastolic = _num(_value("bp_diastolic"))
-    assessment.spo2 = _num(_value("spo2"))
-    assessment.height = _num(_value("height"), float)
-    assessment.weight = _num(_value("weight"), float)
-    assessment.bmi = _num(_value("bmi"), float)
-    assessment.rbs = _num(_value("rbs"))
-    assessment.pain_score = _num(_value("pain_score"))
+    action = payload.get("action", "draft")
+    if action not in ("draft", "complete"):
+        return JsonResponse({"ok": False, "error": "Choose draft or complete."}, status=400)
+    complaint_payload = payload.get("complaints") or []
+    has_complaint = (
+        bool(complaint_payload.strip()) if isinstance(complaint_payload, str)
+        else any(
+            str(item.get("text", "") if isinstance(item, dict) else item).strip()
+            for item in complaint_payload
+        )
+    )
+    if action == "complete" and not has_complaint:
+        return JsonResponse({"ok": False, "error": "A chief complaint is required to complete the assessment."}, status=400)
+    assessment, _ = InitialAssessment.objects.get_or_create(
+        patient=patient, defaults={"status": InitialAssessment.Status.DRAFT}
+    )
+    for field, value in values.items():
+        setattr(assessment, field, value)
 
     complaints = payload.get("complaints")
     if isinstance(complaints, str):
@@ -1621,8 +2243,21 @@ def save_initial_assessment(request):
     assessment.social_history = _normalise_social_history(payload.get("social_history"))
     assessment.examination = payload.get("examination") or {}
     assessment.orders = _normalise_orders(payload.get("orders"))
+    assessment.status = (
+        InitialAssessment.Status.COMPLETED if action == "complete" else InitialAssessment.Status.DRAFT
+    )
+    assessment.completed_by = request.user if action == "complete" else None
+    assessment.completed_at = timezone.now() if action == "complete" else None
 
     assessment.save()
+
+    OPDAuditEvent.objects.create(
+        patient=patient,
+        actor=request.user,
+        action="assessment_completed" if action == "complete" else "assessment_draft_saved",
+        summary="Initial assessment completed and routed to doctor queue" if action == "complete" else "Initial assessment draft saved",
+        details={"status": assessment.status, "urgent": bool(payload.get("urgent"))},
+    )
 
     if payload.get("urgent") and not patient.is_emergency:
         patient.is_emergency = True
@@ -1763,7 +2398,7 @@ def initial_assessment(request):
                 "examination": a.examination or {},
                 "orders": _normalise_orders(a.orders),
                 "chronic_conditions": _normalise_conditions(a.chronic_conditions),
-                "saved": True,
+                "saved": a.status == InitialAssessment.Status.COMPLETED,
             })
 
         # Split the conditions into the quick-pick cards and any free-text
@@ -1818,6 +2453,15 @@ def initial_assessment_patients(request):
     from django.urls import reverse
 
     from patients.models import InitialAssessment
+
+    designation = getattr(getattr(request.user, "profile", None), "designation", None)
+    if designation not in (
+        UserProfile.Designation.OPD_ASSISTANT,
+        UserProfile.Designation.DOCTOR,
+        UserProfile.Designation.NURSE,
+        UserProfile.Designation.ADMIN,
+    ):
+        return JsonResponse({"ok": False, "error": "Clinical staff access required."}, status=403)
 
     query = request.GET.get("q", "").strip()
     patients = Patient.objects.annotate(
@@ -1970,7 +2614,7 @@ def doctor_consultation(request):
         getattr(getattr(request.user, "profile", None), "designation", None)
         or request.session.get("designation")
     )
-    if user_desig not in (UserProfile.Designation.DOCTOR, UserProfile.Designation.ADMIN) and not request.user.is_superuser:
+    if user_desig not in (UserProfile.Designation.DOCTOR, UserProfile.Designation.ADMIN):
         messages.warning(request, "Access restricted: Doctor portal only.")
         if user_desig == UserProfile.Designation.REGISTRATION_DESK:
             return redirect("reception_dashboard")
@@ -2142,8 +2786,12 @@ def save_consultation(request):
     import json
     from django.utils import timezone
     from patients.models import (
-        Patient, ConsultationSession, PrescriptionItem, ClinicalOrder
+        Patient, ConsultationSession, PrescriptionItem, ClinicalOrder, OPDAuditEvent
     )
+
+    designation = getattr(getattr(request.user, "profile", None), "designation", None)
+    if designation not in (UserProfile.Designation.DOCTOR, UserProfile.Designation.ADMIN):
+        return JsonResponse({"ok": False, "error": "Doctor or administrator access required."}, status=403)
 
     try:
         payload = json.loads(request.body.decode("utf-8"))
@@ -2197,35 +2845,96 @@ def save_consultation(request):
     # Update prescriptions
     prescription_list = payload.get("prescriptions", [])
     if isinstance(prescription_list, list):
-        consultation.prescriptions.all().delete()
+        existing_prescriptions = list(consultation.prescriptions.order_by("order_index", "id"))
+        retained_prescriptions = set()
         for idx, item in enumerate(prescription_list):
             med_name = item.get("medicine_name", "").strip()
             if med_name:
-                PrescriptionItem.objects.create(
-                    consultation=consultation,
-                    medicine_name=med_name,
-                    dose=item.get("dose", "").strip(),
-                    route=item.get("route", "Oral").strip(),
-                    frequency=item.get("frequency", "OD").strip(),
-                    duration=item.get("duration", "5 days").strip(),
-                    instructions=item.get("instructions", "").strip(),
-                    order_index=idx,
-                )
+                match = next((existing for existing in existing_prescriptions
+                              if existing.pk not in retained_prescriptions
+                              and existing.medicine_name.casefold() == med_name.casefold()), None)
+                if match:
+                    retained_prescriptions.add(match.pk)
+                    match.dose = item.get("dose", "").strip()
+                    match.route = item.get("route", "Oral").strip()
+                    match.frequency = item.get("frequency", "OD").strip()
+                    match.duration = item.get("duration", "5 days").strip()
+                    match.instructions = item.get("instructions", "").strip()
+                    match.order_index = idx
+                    if match.dispense_status == PrescriptionItem.DispenseStatus.CANCELLED:
+                        match.dispense_status = PrescriptionItem.DispenseStatus.ORDERED
+                    match.save()
+                else:
+                    created = PrescriptionItem.objects.create(
+                        consultation=consultation,
+                        medicine_name=med_name,
+                        dose=item.get("dose", "").strip(),
+                        route=item.get("route", "Oral").strip(),
+                        frequency=item.get("frequency", "OD").strip(),
+                        duration=item.get("duration", "5 days").strip(),
+                        instructions=item.get("instructions", "").strip(),
+                        order_index=idx,
+                    )
+                    retained_prescriptions.add(created.pk)
+        for existing in existing_prescriptions:
+            if existing.pk not in retained_prescriptions and existing.dispense_status not in (
+                PrescriptionItem.DispenseStatus.DISPENSED,
+                PrescriptionItem.DispenseStatus.CANCELLED,
+            ):
+                existing.dispense_status = PrescriptionItem.DispenseStatus.CANCELLED
+                existing.save(update_fields=["dispense_status", "updated_at"])
 
     # Update orders
     orders_list = payload.get("orders", [])
     if isinstance(orders_list, list):
-        consultation.orders.all().delete()
+        existing_orders = list(consultation.orders.all())
+        retained_orders = set()
         for ord_item in orders_list:
             ord_name = ord_item.get("name", "").strip()
             if ord_name:
-                ClinicalOrder.objects.create(
-                    consultation=consultation,
-                    order_type=ord_item.get("order_type", "laboratory"),
-                    name=ord_name,
-                    status=ord_item.get("status", "Ordered"),
-                    result_summary=ord_item.get("result_summary", ""),
+                ord_type = ord_item.get("order_type", "laboratory")
+                match = next((existing for existing in existing_orders
+                              if existing.pk not in retained_orders
+                              and existing.order_type == ord_type
+                              and existing.name.casefold() == ord_name.casefold()), None)
+                if match:
+                    retained_orders.add(match.pk)
+                    if match.status == "Cancelled":
+                        match.status = "Ordered"
+                        match.updated_by = request.user
+                        match.save(update_fields=["status", "updated_by", "updated_at"])
+                else:
+                    created = ClinicalOrder.objects.create(
+                        consultation=consultation,
+                        order_type=ord_type,
+                        name=ord_name,
+                        status=ord_item.get("status", "Ordered"),
+                        result_summary=ord_item.get("result_summary", ""),
+                        updated_by=request.user,
+                    )
+                    retained_orders.add(created.pk)
+        for existing in existing_orders:
+            if existing.pk not in retained_orders and existing.status != "Cancelled":
+                previous_status = existing.status
+                existing.status = "Cancelled"
+                existing.updated_by = request.user
+                existing.save(update_fields=["status", "updated_by", "updated_at"])
+                OPDAuditEvent.objects.create(
+                    patient=patient,
+                    order=existing,
+                    actor=request.user,
+                    action="service_order_cancelled",
+                    summary=f"{existing.name}: {previous_status} to Cancelled",
+                    details={"previous_status": previous_status, "status": "Cancelled"},
                 )
+
+    OPDAuditEvent.objects.create(
+        patient=patient,
+        actor=request.user,
+        action=f"consultation_{consultation.status}",
+        summary=f"Consultation {consultation.get_status_display().lower()} by {request.user.get_full_name() or request.user.username}",
+        details={"consultation_id": consultation.pk, "status": consultation.status},
+    )
 
     return JsonResponse({
         "ok": True,
@@ -2268,6 +2977,10 @@ def safety_check_api(request):
     """Real-time clinical safety engine checking drug-allergy and drug-drug interactions."""
     import json
     from patients.models import Patient
+
+    designation = getattr(getattr(request.user, "profile", None), "designation", None)
+    if designation not in (UserProfile.Designation.DOCTOR, UserProfile.Designation.ADMIN):
+        return JsonResponse({"ok": False, "error": "Doctor access required."}, status=403)
 
     try:
         payload = json.loads(request.body.decode("utf-8"))

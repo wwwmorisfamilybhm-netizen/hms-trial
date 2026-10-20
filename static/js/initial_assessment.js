@@ -745,6 +745,7 @@
 
     var payload = collectPayload();
     if (options.urgent) { payload.urgent = true; }
+    payload.action = options.complete ? "complete" : "draft";
 
     var buttons = $$("#btnSaveAssessment, #saveAssessmentBtn, #saveDraftBtn, #markUrgentBtn");
     buttons.forEach(function (btn) { btn.disabled = true; });
@@ -755,11 +756,13 @@
       headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
       body: JSON.stringify(payload)
     }).then(function (response) {
-      if (!response.ok) { throw new Error("HTTP " + response.status); }
-      return response.json();
+      return response.json().catch(function () { return {}; }).then(function (data) {
+        if (!response.ok || !data.ok) { throw new Error(data.error || ("HTTP " + response.status)); }
+        return data;
+      });
     }).then(function (data) {
       if (!data || !data.ok) { throw new Error((data && data.error) || "Save failed"); }
-      showToast(options.urgent ? "Assessment saved and marked urgent." : "Assessment saved.");
+      showToast(options.complete ? "Assessment completed and routed to the doctor queue." : (options.urgent ? "Assessment draft saved and marked urgent." : "Assessment draft saved."));
       if (options.redirect && BASE_URL) {
         window.setTimeout(function () { window.location.href = BASE_URL; }, 700);
       }
@@ -775,7 +778,11 @@
     if (saveBtn) { saveBtn.addEventListener("click", function () { saveAssessment({}); }); }
 
     var saveAndQueue = document.getElementById("saveAssessmentBtn");
-    if (saveAndQueue) { saveAndQueue.addEventListener("click", function () { saveAssessment({ redirect: true }); }); }
+    if (saveAndQueue) { saveAndQueue.addEventListener("click", function () {
+      if (window.confirm("Complete this assessment and route the visit to the doctor queue?")) {
+        saveAssessment({ redirect: true, complete: true });
+      }
+    }); }
 
     var draftBtn = document.getElementById("saveDraftBtn");
     if (draftBtn) { draftBtn.addEventListener("click", function () { saveAssessment({}); }); }

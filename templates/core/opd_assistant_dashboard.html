@@ -4,177 +4,1931 @@
 {% block title %}OPD Desk — Cams HMS{% endblock %}
 
 {% block heading %}
-  <div class="page-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:16px;">
-    <div>
-      <h1>OPD Desk</h1>
-      <p class="page-sub">Outpatient assistant counter · triage, vitals and handover to the doctor</p>
-    </div>
-    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-      <span class="badge" style="background:var(--lime); color:var(--ink); font-weight:750; padding:6px 14px; border-radius:99px; font-size:12px; letter-spacing:0.5px;">
-        ● COUNTER ACTIVE
-      </span>
-      <span style="font-size:13px; color:var(--muted); font-weight:500;">
-        {{ today|date:"l, F j, Y" }}
-      </span>
-    </div>
+<style>
+  /* ── MindBloom Bento Theme for OPD Central Desk ── */
+  :root {
+    --mb-bg: #f4f3fb;
+    --mb-purple-hero: #9b87f8;
+    --mb-purple-mid: #a899fb;
+    --mb-dark-card: #20232a;
+    --mb-dark-sub: #2d313a;
+    --mb-lime: #d4f150;
+    --mb-lime-hover: #c8e742;
+    --mb-text-dark: #1b1c26;
+    --mb-text-muted: #787886;
+    --mb-card-radius: 28px;
+    --mb-pill-radius: 9999px;
+  }
+
+  /* Canvas styling */
+  .container {
+    max-width: 1520px;
+    padding: 20px 24px 60px;
+    background: var(--mb-bg);
+    min-height: 100vh;
+  }
+
+  /* ── Greeting Header ── */
+  .mb-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 22px;
+    padding: 0 4px;
+  }
+  .mb-welcome {
+    font-size: 14.5px;
+    color: var(--mb-text-muted);
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .mb-desk-name {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--mb-text-dark);
+    letter-spacing: -0.8px;
+    margin: 0;
+    line-height: 1.15;
+  }
+  .mb-header-tools {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* Cute Widgets Button in Header */
+  .mb-widget-trigger-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #9b87f8 0%, #7660ea 100%);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    padding: 9px 18px;
+    border-radius: var(--mb-pill-radius);
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(155, 135, 248, 0.35);
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    user-select: none;
+  }
+  .mb-widget-trigger-btn:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 8px 24px rgba(155, 135, 248, 0.5);
+    background: linear-gradient(135deg, #a899fb 0%, #8570f0 100%);
+  }
+  .mb-widget-sparkle {
+    font-size: 14px;
+    animation: mbSparkle 2.5s infinite ease-in-out;
+  }
+  @keyframes mbSparkle {
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(15deg) scale(1.15); }
+  }
+  .mb-widget-pill-count {
+    background: var(--mb-lime);
+    color: #1b1c26;
+    font-size: 10.5px;
+    font-weight: 850;
+    padding: 2px 7px;
+    border-radius: 9999px;
+  }
+
+  .mb-search-box {
+    display: flex;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid rgba(155, 135, 248, 0.22);
+    border-radius: var(--mb-pill-radius);
+    padding: 6px 16px;
+    box-shadow: 0 4px 16px rgba(155, 135, 248, 0.06);
+    transition: all 0.15s ease;
+  }
+  .mb-search-box:focus-within {
+    border-color: var(--mb-purple-hero);
+    box-shadow: 0 6px 20px rgba(155, 135, 248, 0.15);
+  }
+  .mb-search-box input {
+    border: none;
+    background: transparent;
+    padding: 6px 8px;
+    font-size: 13.5px;
+    font-family: inherit;
+    color: var(--mb-text-dark);
+    outline: none;
+    min-width: 220px;
+  }
+  .mb-search-box input::placeholder { color: #a4a4b0; }
+  .mb-search-box button {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #71717a;
+    display: grid;
+    place-items: center;
+    padding: 0;
+  }
+  .mb-date-pill {
+    background: #ffffff;
+    border: 1px solid rgba(155, 135, 248, 0.2);
+    border-radius: var(--mb-pill-radius);
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #4b4b58;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 16px rgba(155, 135, 248, 0.05);
+  }
+  .mb-status-pill {
+    background: var(--mb-lime);
+    color: #1b1c26;
+    border-radius: var(--mb-pill-radius);
+    padding: 10px 18px;
+    font-size: 12.5px;
+    font-weight: 750;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: 0.3px;
+    box-shadow: 0 4px 14px rgba(212, 241, 80, 0.35);
+  }
+  .mb-pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #1b1c26;
+    animation: mbPulse 2s infinite;
+  }
+  @keyframes mbPulse {
+    0% { transform: scale(0.95); opacity: 0.7; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(0.95); opacity: 0.7; }
+  }
+
+  /* ── Quick KPI Ribbon on Main Page ── */
+  .mb-kpi-ribbon {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 14px 22px;
+    margin-bottom: 22px;
+    border: 1px solid rgba(155, 135, 248, 0.16);
+    box-shadow: 0 4px 20px rgba(155, 135, 248, 0.06);
+    flex-wrap: wrap;
+  }
+  .mb-kpi-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .mb-kpi-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #f7f6fc;
+    border: 1px solid rgba(155, 135, 248, 0.12);
+    padding: 6px 14px;
+    border-radius: var(--mb-pill-radius);
+    font-size: 12.5px;
+    color: var(--mb-text-dark);
+  }
+  .mb-kpi-num {
+    font-weight: 850;
+    font-size: 14px;
+    color: #6352b5;
+  }
+  .mb-kpi-num.warn {
+    color: #ea580c;
+  }
+  .mb-kpi-open-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    color: #6352b5;
+    border: 1px solid rgba(155, 135, 248, 0.25);
+    padding: 6px 14px;
+    border-radius: var(--mb-pill-radius);
+    font-size: 12px;
+    font-weight: 750;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .mb-kpi-open-btn:hover {
+    background: #f1effc;
+    border-color: var(--mb-purple-hero);
+  }
+
+  /* ── Cute Widgets Popup Modal ── */
+  .mb-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .mb-modal-overlay.is-open {
+    display: flex;
+    opacity: 1;
+  }
+  .mb-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(18, 19, 26, 0.65);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  .mb-modal-window {
+    position: relative;
+    background: #f4f3fb;
+    border-radius: 36px;
+    max-width: 1400px;
+    width: 100%;
+    max-height: 88vh;
+    overflow-y: auto;
+    padding: 26px 30px 32px;
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(155, 135, 248, 0.25);
+    transform: scale(0.94) translateY(12px);
+    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .mb-modal-overlay.is-open .mb-modal-window {
+    transform: scale(1) translateY(0);
+  }
+  .mb-modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 22px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(155, 135, 248, 0.14);
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .mb-modal-titles h2 {
+    margin: 4px 0 2px;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--mb-text-dark);
+    letter-spacing: -0.5px;
+  }
+  .mb-modal-titles p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--mb-text-muted);
+  }
+  .mb-modal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #20232a;
+    color: var(--mb-lime);
+    font-size: 10.5px;
+    font-weight: 850;
+    letter-spacing: 0.6px;
+    padding: 3px 10px;
+    border-radius: 9999px;
+  }
+  .mb-modal-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .mb-modal-chip {
+    background: #ffffff;
+    border: 1px solid rgba(155, 135, 248, 0.22);
+    padding: 6px 14px;
+    border-radius: var(--mb-pill-radius);
+    font-size: 12px;
+    font-weight: 750;
+    color: #6352b5;
+  }
+  .mb-modal-close {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 1px solid rgba(155, 135, 248, 0.25);
+    display: grid;
+    place-items: center;
+    font-size: 16px;
+    cursor: pointer;
+    color: #1b1c26;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: all 0.18s ease;
+  }
+  .mb-modal-close:hover {
+    background: #fee2e2;
+    color: #dc2626;
+    border-color: #fca5a5;
+    transform: rotate(90deg);
+  }
+
+  /* ── Bento Grid Layout inside Modal ── */
+  .mb-bento {
+    display: grid;
+    grid-template-columns: minmax(0, 1.8fr) minmax(320px, 0.85fr);
+    gap: 20px;
+    align-items: start;
+  }
+  .mb-main-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .mb-side-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ── Arrow action button (↗) ── */
+  .mb-arrow-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+    flex-shrink: 0;
+  }
+  .mb-arrow-btn:hover {
+    transform: scale(1.06);
+    text-decoration: none;
+  }
+  .mb-arrow-btn.white {
+    background: #ffffff;
+    color: #1b1c26;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+  .mb-arrow-btn.soft-gray {
+    background: #f0eff8;
+    color: #1b1c26;
+  }
+
+  /* ── 1. Top Hero Card (Lavender #9b87f8) ── */
+  .mb-hero-card {
+    background: var(--mb-purple-hero);
+    border-radius: var(--mb-card-radius);
+    padding: 28px 30px 30px;
+    color: #ffffff;
+    box-shadow: 0 16px 36px rgba(155, 135, 248, 0.28);
+  }
+  .mb-hero-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 22px;
+  }
+  .mb-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: var(--mb-pill-radius);
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .mb-hero-title {
+    font-size: 26px;
+    font-weight: 800;
+    margin: 0 0 4px 0;
+    letter-spacing: -0.5px;
+    color: #ffffff;
+  }
+  .mb-hero-sub {
+    font-size: 13.5px;
+    color: rgba(255, 255, 255, 0.88);
+    margin: 0;
+    font-weight: 450;
+  }
+
+  /* Floating capsules inside hero */
+  .mb-hero-capsules {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .mb-capsule {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 18px 20px;
+    color: var(--mb-text-dark);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 16px;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.05);
+  }
+  .mb-capsule-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .mb-capsule-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #272733;
+  }
+  .mb-capsule-body {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .mb-capsule-num {
+    font-size: 32px;
+    font-weight: 850;
+    line-height: 1;
+    color: var(--mb-text-dark);
+    letter-spacing: -0.8px;
+  }
+  .mb-capsule-desc {
+    font-size: 12px;
+    color: var(--mb-text-muted);
+    margin-top: 4px;
+  }
+  .mb-capsule-btn {
+    border-radius: var(--mb-pill-radius);
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 10px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s ease, filter 0.15s ease;
+  }
+  .mb-capsule-btn.lime {
+    background: var(--mb-lime);
+    color: #1b1c26;
+  }
+  .mb-capsule-btn.lime:hover {
+    background: var(--mb-lime-hover);
+    transform: translateY(-1px);
+    text-decoration: none;
+  }
+  .mb-capsule-btn.dark {
+    background: var(--mb-dark-card);
+    color: #ffffff;
+  }
+  .mb-capsule-btn.dark:hover {
+    background: #2e323c;
+    transform: translateY(-1px);
+    text-decoration: none;
+  }
+
+  /* ── 2. Middle Row: 2-Columns ── */
+  .mb-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  /* Left card: Clinical Service Queues Matrix (#a899fb) */
+  .mb-matrix-card {
+    background: var(--mb-purple-mid);
+    border-radius: var(--mb-card-radius);
+    padding: 26px 28px;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 18px;
+    box-shadow: 0 12px 28px rgba(168, 153, 251, 0.28);
+  }
+  .mb-card-header-clean {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .mb-card-header-clean h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+  }
+  .mb-service-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .mb-service-tile {
+    background: rgba(255, 255, 255, 0.22);
+    border-radius: 18px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-decoration: none;
+    color: #ffffff;
+    backdrop-filter: blur(8px);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .mb-service-tile:hover {
+    background: rgba(255, 255, 255, 0.32);
+    transform: translateY(-1px);
+    text-decoration: none;
+  }
+  .mb-service-name {
+    font-size: 12.5px;
+    font-weight: 750;
+  }
+  .mb-service-count {
+    background: #ffffff;
+    color: #1b1c26;
+    font-weight: 800;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: var(--mb-pill-radius);
+  }
+
+  /* Right card: Patient Flow Activity (White card) */
+  .mb-activity-card {
+    background: #ffffff;
+    border-radius: var(--mb-card-radius);
+    padding: 26px 28px;
+    color: var(--mb-text-dark);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 16px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(155, 135, 248, 0.12);
+  }
+  .mb-activity-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .mb-activity-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--mb-text-dark);
+    margin: 0;
+  }
+  .mb-badge-soft {
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: var(--mb-pill-radius);
+    background: #f1effc;
+    color: #6352b5;
+  }
+
+  /* Bar chart visualization */
+  .mb-bars {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    height: 120px;
+    padding: 10px 4px 0;
+    gap: 8px;
+  }
+  .mb-bar-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    height: 100%;
+    justify-content: flex-end;
+    position: relative;
+  }
+  .mb-bar {
+    width: 100%;
+    max-width: 28px;
+    border-radius: 8px;
+    transition: height 0.3s ease;
+  }
+  .mb-bar.muted {
+    background: #eae9f2;
+  }
+  .mb-bar.accent {
+    background: var(--mb-lime);
+    box-shadow: 0 6px 14px rgba(212, 241, 80, 0.45);
+    position: relative;
+  }
+  .mb-bar-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--mb-text-muted);
+  }
+  .mb-bar-badge {
+    position: absolute;
+    top: -26px;
+    background: #1b1c26;
+    color: #ffffff;
+    font-size: 10.5px;
+    font-weight: 750;
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  }
+
+  /* ── 3. Lower Row: 2-Columns ── */
+  /* Left card: Obsidian Triage & Queue Card (#20232a) */
+  .mb-dark-box {
+    background: var(--mb-dark-card);
+    border-radius: var(--mb-card-radius);
+    padding: 26px 28px;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 18px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22);
+  }
+  .mb-dark-box h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    color: #ffffff;
+  }
+  .mb-queue-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: 16px;
+    background: var(--mb-dark-sub);
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .mb-queue-row:last-child { margin-bottom: 0; }
+  .mb-queue-row.active {
+    background: var(--mb-lime);
+    color: #1b1c26;
+  }
+  .mb-queue-row.active .mb-q-patient,
+  .mb-queue-row.active .mb-q-doc {
+    color: #1b1c26 !important;
+  }
+  .mb-queue-row.active .mb-q-idx {
+    background: #1b1c26 !important;
+    color: #ffffff !important;
+  }
+  .mb-q-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .mb-q-idx {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 11px;
+    font-weight: 800;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    color: #ffffff;
+  }
+  .mb-q-info {
+    min-width: 0;
+  }
+  .mb-q-patient {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mb-q-doc {
+    font-size: 11.5px;
+    color: #9d9da8;
+  }
+
+  /* Right card: OPD Clinical Team (White card) */
+  .mb-clinical-card {
+    background: #ffffff;
+    border-radius: var(--mb-card-radius);
+    padding: 26px 28px;
+    color: var(--mb-text-dark);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(155, 135, 248, 0.12);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .mb-doc-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0eff6;
+  }
+  .mb-doc-item:last-child { border-bottom: none; }
+  .mb-doc-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .mb-doc-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e9e5fc;
+    color: #6352b5;
+    font-weight: 800;
+    font-size: 13px;
+    display: grid;
+    place-items: center;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .mb-online-dot {
+    position: absolute;
+    bottom: 1px;
+    right: 1px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #22c55e;
+    border: 2px solid #ffffff;
+  }
+  .mb-doc-name {
+    font-size: 13.5px;
+    font-weight: 750;
+    color: var(--mb-text-dark);
+    line-height: 1.25;
+  }
+  .mb-doc-spec {
+    font-size: 11.5px;
+    color: var(--mb-text-muted);
+  }
+
+  /* ── 4. Right Rail: Counter Quick Actions & Daily Schedule ── */
+  .mb-side-card-white {
+    background: #ffffff;
+    border-radius: var(--mb-card-radius);
+    padding: 26px 24px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(155, 135, 248, 0.12);
+  }
+  .mb-action-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .mb-action-tile {
+    background: #f7f6fc;
+    border: 1px solid rgba(155, 135, 248, 0.16);
+    border-radius: 18px;
+    padding: 14px 12px;
+    text-align: center;
+    text-decoration: none;
+    color: var(--mb-text-dark);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s ease;
+  }
+  .mb-action-tile:hover {
+    background: #ffffff;
+    border-color: var(--mb-purple-hero);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(155, 135, 248, 0.18);
+    text-decoration: none;
+  }
+  .mb-action-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: #ffffff;
+    color: #4b4b58;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.04);
+  }
+  .mb-action-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  /* Snapshot in Right Rail */
+  .mb-snapshot-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border-radius: 20px;
+    background: #f5f4fb;
+    border: 1px solid rgba(155, 135, 248, 0.14);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .mb-snap-label {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--mb-text-muted);
+  }
+  .mb-snap-val {
+    font-size: 16px;
+    font-weight: 850;
+    color: var(--mb-text-dark);
+  }
+
+  /* Schedule Obsidian Card (#20232a) */
+  .mb-schedule-card {
+    background: var(--mb-dark-card);
+    border-radius: var(--mb-card-radius);
+    padding: 26px 24px;
+    color: #ffffff;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22);
+  }
+  .mb-schedule-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+  .mb-cal-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mb-cal-arrow {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--mb-dark-sub);
+    border: none;
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .mb-cal-week {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .mb-cal-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #9d9da8;
+  }
+  .mb-cal-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 12px;
+    color: #ffffff;
+  }
+  .mb-cal-num.today {
+    background: var(--mb-lime);
+    color: #1b1c26;
+    font-weight: 850;
+  }
+  .mb-slot-item {
+    background: var(--mb-dark-sub);
+    border-radius: 16px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .mb-slot-item:last-child { margin-bottom: 0; }
+  .mb-slot-time {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--mb-lime);
+  }
+  .mb-slot-name {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.2;
+  }
+  .mb-slot-doc {
+    font-size: 11px;
+    color: #9d9da8;
+  }
+
+  /* ── 5. Full Patient Flow Register & Filter Form ── */
+  .mb-table-section {
+    background: #ffffff;
+    border-radius: var(--mb-card-radius);
+    padding: 28px 32px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(155, 135, 248, 0.12);
+  }
+  .mb-table-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .mb-table-head h2 {
+    margin: 0 0 4px 0;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--mb-text-dark);
+    letter-spacing: -0.4px;
+  }
+  .mb-table-head p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--mb-text-muted);
+  }
+  /* Horizontal space-saving filter toolbar */
+  .mb-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    padding: 10px 16px;
+    border-radius: var(--mb-pill-radius);
+    background: #ffffff;
+    border: 1px solid rgba(155, 135, 248, 0.18);
+    box-shadow: 0 4px 18px rgba(155, 135, 248, 0.05);
+    margin-bottom: 20px;
+    align-items: center;
+  }
+  .mb-filter-search-wrap {
+    position: relative;
+    flex: 1 1 200px;
+    min-width: 170px;
+    display: flex;
+    align-items: center;
+  }
+  .mb-filter-search-icon {
+    position: absolute;
+    left: 12px;
+    pointer-events: none;
+    color: #8b8b98;
+    display: flex;
+    align-items: center;
+  }
+  .mb-filter-search-wrap input[type="search"] {
+    width: 100% !important;
+    height: 36px;
+    padding: 6px 14px 6px 34px !important;
+    border-radius: var(--mb-pill-radius);
+    border: 1px solid #dcdce2;
+    background: #fbfbfd;
+    font-size: 12.5px;
+    font-family: inherit;
+    color: var(--mb-text-dark);
+    outline: none;
+    box-sizing: border-box;
+    transition: all 0.15s ease;
+  }
+  .mb-filter-search-wrap input[type="search"]:focus {
+    background: #ffffff;
+    border-color: var(--mb-purple-hero);
+    box-shadow: 0 0 0 3px rgba(155, 135, 248, 0.15);
+  }
+  .mb-filter-bar select {
+    width: auto !important;
+    max-width: 155px;
+    flex: 0 1 auto;
+    height: 36px;
+    padding: 6px 28px 6px 12px !important;
+    border-radius: var(--mb-pill-radius);
+    border: 1px solid #dcdce2;
+    background-color: #ffffff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    appearance: none;
+    -webkit-appearance: none;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--mb-text-dark);
+    outline: none;
+    cursor: pointer;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    box-sizing: border-box;
+    transition: all 0.15s ease;
+  }
+  .mb-filter-bar select:hover {
+    border-color: #b8b8c5;
+  }
+  .mb-filter-bar select:focus {
+    border-color: var(--mb-purple-hero);
+    box-shadow: 0 0 0 3px rgba(155, 135, 248, 0.15);
+  }
+  .mb-filter-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+  .mb-filter-bar .mb-btn-action {
+    height: 36px;
+    padding: 0 16px;
+    font-size: 12px;
+    box-sizing: border-box;
+    white-space: nowrap;
+  }
+  @media (max-width: 768px) {
+    .mb-filter-bar {
+      border-radius: 20px;
+    }
+    .mb-filter-bar select {
+      flex: 1 1 calc(50% - 6px);
+      max-width: none;
+    }
+    .mb-filter-actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
+  }
+  .mb-btn-action {
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 9px 18px;
+    border-radius: var(--mb-pill-radius);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .mb-btn-action.lime {
+    background: var(--mb-lime);
+    color: #1b1c26;
+    box-shadow: 0 4px 14px rgba(212, 241, 80, 0.35);
+  }
+  .mb-btn-action.lime:hover {
+    background: var(--mb-lime-hover);
+    transform: translateY(-1px);
+    text-decoration: none;
+  }
+  .mb-btn-action.ghost {
+    background: #f4f3fb;
+    color: #4b4b58;
+    border: 1px solid rgba(155, 135, 248, 0.18);
+  }
+  .mb-btn-action.ghost:hover {
+    background: #eae8f7;
+    text-decoration: none;
+  }
+
+  /* Table Styling */
+  .mb-styled-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .mb-styled-table th {
+    background: #fbfbfd;
+    padding: 12px 14px;
+    font-size: 11.5px;
+    font-weight: 750;
+    color: #6c6c78;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #ebebf0;
+  }
+  .mb-styled-table th:first-child { border-top-left-radius: 12px; }
+  .mb-styled-table th:last-child { border-top-right-radius: 12px; }
+  .mb-styled-table td {
+    padding: 14px 14px;
+    font-size: 13px;
+    color: var(--mb-text-dark);
+    border-bottom: 1px solid #f2f2f5;
+    vertical-align: middle;
+  }
+  .mb-styled-table tr:last-child td { border-bottom: none; }
+  .mb-styled-table tr:hover td {
+    background: #faf9fe;
+  }
+  .mb-uhid-badge {
+    background: #eef2ff;
+    color: #3b5bdb;
+    font-weight: 800;
+    font-size: 11.5px;
+    padding: 4px 10px;
+    border-radius: var(--mb-pill-radius);
+    letter-spacing: 0.3px;
+    display: inline-block;
+  }
+  .mb-status-tag {
+    font-weight: 700;
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: var(--mb-pill-radius);
+    display: inline-block;
+  }
+  .mb-status-tag.waiting { background: #fef3c7; color: #92400e; }
+  .mb-status-tag.in-central-pool { background: #e0e7ff; color: #3730a3; }
+  .mb-status-tag.with-doctor { background: #dcfce7; color: #166534; }
+  .mb-status-tag.pending-assignment { background: #fee2e2; color: #991b1b; }
+  .mb-status-tag.investigations { background: #f3e8ff; color: #6b21a8; }
+  .mb-status-tag.procedures { background: #ccfbf1; color: #115e59; }
+  .mb-status-tag.completed { background: #f3f4f6; color: #374151; }
+
+  /* Responsive breakpoints */
+  @media (max-width: 1080px) {
+    .mb-bento { grid-template-columns: 1fr; }
+    .mb-hero-capsules { grid-template-columns: 1fr; }
+    .mb-two-col { grid-template-columns: 1fr; }
+    .mb-kpi-ribbon { flex-direction: column; align-items: stretch; }
+  }
+</style>
+
+<div class="mb-header">
+  <div>
+    <div class="mb-welcome">OPD Central Management · Outpatient Portal</div>
+    <h1 class="mb-desk-name">
+      {% if user.get_full_name %}{{ user.get_full_name }}{% else %}OPD Central Desk{% endif %}
+    </h1>
   </div>
+  <div class="mb-header-tools">
+    <!-- CUTE WIDGETS POPUP BUTTON -->
+    <button type="button" class="mb-widget-trigger-btn" id="openWidgetsBtn" aria-haspopup="dialog" aria-controls="widgetsModal" aria-expanded="false" title="Open OPD Central Widgets Window">
+      <span class="mb-widget-sparkle">✨</span>
+      <span>Widgets</span>
+      <span class="mb-widget-pill-count">6</span>
+    </button>
+
+    <div class="mb-status-pill">
+      <span class="mb-pulse-dot"></span>
+      OPD ACTIVE · CENTRAL DESK
+    </div>
+    <div class="mb-date-pill">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      {{ today|date:"l, F j, Y" }}
+    </div>
+    <form action="{% url 'opd_assistant_dashboard' %}" method="get" class="mb-search-box">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" name="q" value="{{ query }}" placeholder="Search patient, UHID..." aria-label="Search patient register">
+      <button type="submit" aria-label="Submit search">↵</button>
+    </form>
+  </div>
+</div>
 {% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/opd_dashboard.css' %}">
 
-<!-- ═══════════ Counter metrics ═══════════ -->
-<div class="opd-stats">
-  <div class="opd-stat">
-    <span class="opd-stat-icon lime">
-      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#27272b" stroke-width="1.8" aria-hidden="true">
-        <circle cx="8" cy="6" r="3.5"/><path d="M2 17c.8-5 3-6.5 6-6.5s5.2 1.5 6 6.5M15 5a3.5 3.5 0 0 1 0 7"/>
-      </svg>
-    </span>
-    <div>
-      <div class="opd-stat-value">{{ registered_today }}</div>
-      <div class="opd-stat-label">Registered Today</div>
+<!-- ── Quick KPI Ribbon on Main Screen ── -->
+<div class="mb-kpi-ribbon">
+  <div class="mb-kpi-group">
+    <div class="mb-kpi-pill">
+      <span>Total OPD Visits Today:</span>
+      <span class="mb-kpi-num">{{ counts.total|default:"0" }}</span>
+    </div>
+    <div class="mb-kpi-pill">
+      <span>In Central Pool:</span>
+      <span class="mb-kpi-num">{{ counts.central_pool|default:"0" }}</span>
+    </div>
+    <div class="mb-kpi-pill">
+      <span>Active with Doctors:</span>
+      <span class="mb-kpi-num">{{ counts.with_doctors|default:"0" }}</span>
+    </div>
+    <div class="mb-kpi-pill">
+      <span>Needs Allocation:</span>
+      <span class="mb-kpi-num {% if counts.pending_assignment %}warn{% endif %}">{{ counts.pending_assignment|default:"0" }}</span>
     </div>
   </div>
-
-  <div class="opd-stat">
-    <span class="opd-stat-icon lav">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#29272f" stroke-width="1.8" aria-hidden="true">
-        <path d="M9 3h6v4H9z"/><path d="M7 5H5v16h14V5h-2"/><path d="M9 12h6M12 9v6"/>
-      </svg>
-    </span>
-    <div>
-      <div class="opd-stat-value">{{ assessed_today }}</div>
-      <div class="opd-stat-label">Assessed Today</div>
-    </div>
-  </div>
-
-  <div class="opd-stat">
-    <span class="opd-stat-icon amber">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#27272b" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
-      </svg>
-    </span>
-    <div>
-      <div class="opd-stat-value">{{ waiting_count }}</div>
-      <div class="opd-stat-label">Waiting for Assessment</div>
-    </div>
-  </div>
-
-  <div class="opd-stat">
-    <span class="opd-stat-icon lav-soft">
-      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#70659e" stroke-width="1.7" aria-hidden="true">
-        <rect x="1" y="3" width="18" height="16" rx="3"/><path d="M1 8h18M6 1v4M14 1v4"/>
-      </svg>
-    </span>
-    <div>
-      <div class="opd-stat-value">{{ appointments_today }}</div>
-      <div class="opd-stat-label">Appointments Today</div>
-    </div>
-  </div>
-</div>
-
-<div class="opd-grid">
-
-  <!-- ═══════════ Waiting for assessment ═══════════ -->
-  <section class="opd-card">
-    <div class="opd-card-head">
-      <div>
-        <h2>Waiting for Assessment</h2>
-        <p>Patients registered today whose triage is still outstanding.</p>
-      </div>
-      <span class="opd-pill">{{ waiting_count }} waiting</span>
-    </div>
-
-    {% if waiting_patients %}
-      <div class="opd-table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>MR Number</th>
-              <th>Patient</th>
-              <th>Age / Gender</th>
-              <th>Registered</th>
-              <th class="ta-r">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for p in waiting_patients %}
-              <tr>
-                <td class="cell-strong">#{{ p.mr_number|default:p.id }}</td>
-                <td>
-                  <a href="{% url 'patient_detail' p.pk %}" class="opd-name">{{ p.full_name }}</a>
-                  {% if p.is_emergency %}<span class="badge" style="background:var(--red); color:#fff; font-weight:800; margin-left:6px;">⚑</span>{% endif %}
-                  <br><small class="muted">{{ p.phone|default:"—" }}</small>
-                </td>
-                <td>{{ p.age|default:"—" }} yrs · {{ p.get_gender_display|default:"—" }}</td>
-                <td class="muted">{{ p.created_at|date:"h:i A" }}</td>
-                <td class="ta-r">
-                  <a href="{% url 'initial_assessment' %}?patient={{ p.pk }}" class="opd-btn primary">Start Assessment →</a>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <div class="opd-empty">
-        <span class="opd-empty-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M20 6 9 17l-5-5"/>
-          </svg>
-        </span>
-        <p>Every patient registered today has been assessed.</p>
-      </div>
-    {% endif %}
-  </section>
-
-  <!-- ═══════════ Recently assessed ═══════════ -->
-  <section class="opd-card">
-    <div class="opd-card-head">
-      <div>
-        <h2>Recently Assessed</h2>
-        <p>Latest triage records recorded at the counter.</p>
-      </div>
-    </div>
-
-    {% if recent_assessments %}
-      <ul class="opd-list">
-        {% for a in recent_assessments %}
-          <li>
-            <span class="opd-list-avatar">{{ a.patient.first_name|slice:":1"|upper }}{% if a.patient.last_name %}{{ a.patient.last_name|slice:":1"|upper }}{% endif %}</span>
-            <span class="opd-list-info">
-              <a href="{% url 'patient_detail' a.patient.pk %}" class="opd-name">{{ a.patient.full_name }}</a>
-              <span class="opd-list-meta">
-                {% if a.temperature %}{{ a.temperature }}°C{% else %}—{% endif %}
-                {% if a.pulse %} · {{ a.pulse }}/min{% endif %}
-                {% if a.bp_systolic and a.bp_diastolic %} · {{ a.bp_systolic }}/{{ a.bp_diastolic }}{% endif %}
-                · {{ a.updated_at|date:"d M, h:i A" }}
-              </span>
-            </span>
-            <a href="{% url 'initial_assessment' %}?patient={{ a.patient.pk }}" class="opd-link">Open →</a>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <div class="opd-empty">
-        <p>No assessments recorded yet.</p>
-      </div>
-    {% endif %}
-  </section>
-</div>
-
-<!-- ═══════════ Extension point ═══════════ -->
-<section class="opd-card opd-coming">
-  <span class="opd-coming-icon">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
-      <path d="M12 5v14M5 12h14"/>
-    </svg>
-  </span>
   <div>
-    <h3>More OPD tools are on the way</h3>
-    <p>This portal is ready for additional OPD Assistant features — appointments, handover lists and counters will be added here as they are built.</p>
+    <button type="button" class="mb-kpi-open-btn" id="openWidgetsRibbonBtn">
+      <span>✨ View All Live Widgets (6)</span>
+      <span>→</span>
+    </button>
   </div>
+</div>
+
+<!-- ============ CUTE POPUP WINDOW FOR ALL WIDGETS ============ -->
+<div class="mb-modal-overlay" id="widgetsModal" role="dialog" aria-modal="true" aria-labelledby="widgetsModalTitle" hidden>
+  <div class="mb-modal-backdrop" id="widgetsBackdrop"></div>
+  <div class="mb-modal-window">
+    <div class="mb-modal-head">
+      <div class="mb-modal-titles">
+        <div class="mb-modal-badge">
+          <span class="mb-pulse-dot" style="background:#d4f150;"></span>
+          <span>LIVE COMMAND CENTER</span>
+        </div>
+        <h2 id="widgetsModalTitle">OPD Central Widgets</h2>
+        <p>Real-time patient flow, chamber allocations, service queues, and consultation schedules.</p>
+      </div>
+      <div class="mb-modal-head-actions">
+        <span class="mb-modal-chip">6 Active Modules</span>
+        <button type="button" class="mb-modal-close" id="closeWidgetsBtn" aria-label="Close widgets window">✕</button>
+      </div>
+    </div>
+
+    <div class="mb-modal-body">
+      <!-- ALL BENTO CARDS MOVED INSIDE THIS CUTE POPUP WINDOW -->
+      <div class="mb-bento">
+
+        <!-- ============ LEFT MAIN COLUMN ============ -->
+        <div class="mb-main-col">
+
+          <!-- 1. Top Hero Card (#9b87f8) -->
+          <section class="mb-hero-card" aria-label="OPD Central flow overview">
+            <div class="mb-hero-top">
+              <div>
+                <span class="mb-hero-badge">Central Flow &amp; Triage Control</span>
+                <h2 class="mb-hero-title">Outpatient Flow &amp; Capacity Overview</h2>
+                <p class="mb-hero-sub">Real-time patient intake, physician triage, vital assessments, and department service queues.</p>
+              </div>
+              <a href="{% url 'opd_patient_queue' %}" class="mb-arrow-btn white" title="Open patient queue" aria-label="Open patient queue">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 17L17 7M7 7h10v10"/></svg>
+              </a>
+            </div>
+
+            <!-- 3 Floating Capsules with SVG Rings -->
+            <div class="mb-hero-capsules">
+
+              <!-- Capsule 1: Central Waiting Pool -->
+              <div class="mb-capsule">
+                <div class="mb-capsule-head">
+                  <span class="mb-capsule-title">Central Pool</span>
+                  <span class="badge" style="background:#eef8f2; color:#1e7048; font-weight:750; font-size:11px; padding:3px 8px; border-radius:99px;">
+                    Live Pool
+                  </span>
+                </div>
+                <div class="mb-capsule-body">
+                  <div>
+                    <div class="mb-capsule-num">{{ counts.central_pool|default:"0" }}</div>
+                    <div class="mb-capsule-desc">Patients in Waiting Pool</div>
+                  </div>
+                  <!-- Circular Progress Gauge -->
+                  <svg width="54" height="54" viewBox="0 0 44 44" aria-hidden="true">
+                    <circle cx="22" cy="22" r="17" fill="none" stroke="#f0eff8" stroke-width="4.5"/>
+                    <circle cx="22" cy="22" r="17" fill="none" stroke="#9b87f8" stroke-width="4.5" stroke-dasharray="106.8" stroke-dashoffset="36" stroke-linecap="round" transform="rotate(-90 22 22)"/>
+                    <text x="22" y="26" text-anchor="middle" font-size="11" font-weight="800" fill="#20232a">{{ counts.central_pool|default:"0" }}</text>
+                  </svg>
+                </div>
+                <a href="{% url 'opd_patient_queue' %}" class="mb-capsule-btn lime">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+                  <span>Open Patient Queue</span>
+                </a>
+              </div>
+
+              <!-- Capsule 2: With Doctors / Active Consultations -->
+              <div class="mb-capsule">
+                <div class="mb-capsule-head">
+                  <span class="mb-capsule-title">With Doctors</span>
+                  <span class="badge" style="background:#f0eefb; color:#6352b5; font-weight:750; font-size:11px; padding:3px 8px; border-radius:99px;">
+                    In Consult
+                  </span>
+                </div>
+                <div class="mb-capsule-body">
+                  <div>
+                    <div class="mb-capsule-num">{{ counts.with_doctors|default:"0" }}</div>
+                    <div class="mb-capsule-desc">Active in Chambers</div>
+                  </div>
+                  <!-- Circular Progress Gauge -->
+                  <svg width="54" height="54" viewBox="0 0 44 44" aria-hidden="true">
+                    <circle cx="22" cy="22" r="17" fill="none" stroke="#f0eff8" stroke-width="4.5"/>
+                    <circle cx="22" cy="22" r="17" fill="none" stroke="#6352b5" stroke-width="4.5" stroke-dasharray="106.8" stroke-dashoffset="45" stroke-linecap="round" transform="rotate(-90 22 22)"/>
+                    <text x="22" y="26" text-anchor="middle" font-size="11" font-weight="800" fill="#20232a">{{ counts.with_doctors|default:"0" }}</text>
+                  </svg>
+                </div>
+                <a href="{% url 'initial_assessment' %}" class="mb-capsule-btn lime">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+                  <span>Initial Assessment</span>
+                </a>
+              </div>
+
+              <!-- Capsule 3: Pending Doctor Allocation -->
+              <div class="mb-capsule">
+                <div class="mb-capsule-head">
+                  <span class="mb-capsule-title">Triage Allocation</span>
+                  <span class="badge" style="background:#fff7ed; color:#9a3412; font-weight:750; font-size:11px; padding:3px 8px; border-radius:99px;">
+                    {{ counts.pending_assignment|default:"0" }} Pending
+                  </span>
+                </div>
+                <div class="mb-capsule-body">
+                  <div>
+                    <div class="mb-capsule-num">{{ counts.pending_assignment|default:"0" }}</div>
+                    <div class="mb-capsule-desc">Needs Doctor Assignment</div>
+                  </div>
+                  <!-- Circular Progress Gauge -->
+                  <svg width="54" height="54" viewBox="0 0 44 44" aria-hidden="true">
+                    <circle cx="22" cy="22" r="17" fill="none" stroke="#f0eff8" stroke-width="4.5"/>
+                    <circle cx="22" cy="22" r="17" fill="none" stroke="#eab308" stroke-width="4.5" stroke-dasharray="106.8" stroke-dashoffset="55" stroke-linecap="round" transform="rotate(-90 22 22)"/>
+                    <text x="22" y="26" text-anchor="middle" font-size="11" font-weight="800" fill="#20232a">{{ counts.pending_assignment|default:"0" }}</text>
+                  </svg>
+                </div>
+                <a href="#opdFlowTable" class="mb-capsule-btn dark" onclick="document.getElementById('closeWidgetsBtn').click();">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
+                  <span>Assign Doctor</span>
+                </a>
+              </div>
+
+            </div>
+          </section>
+
+          <!-- 2. Middle Row: 2 Columns -->
+          <div class="mb-two-col">
+
+            <!-- Left: Clinical Service Queues Matrix (#a899fb) -->
+            <section class="mb-matrix-card">
+              <div class="mb-card-header-clean">
+                <div>
+                  <span class="badge" style="background:rgba(255,255,255,0.22); color:#ffffff; font-weight:750; font-size:10.5px; padding:3px 10px; border-radius:99px; text-transform:uppercase;">
+                    Department Services
+                  </span>
+                  <h3 style="margin-top:6px;">Clinical Service Queues</h3>
+                </div>
+                <a href="{% url 'opd_referrals' %}" class="mb-arrow-btn white" title="View Cross-Consultations" aria-label="View Cross-Consultations">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 17L17 7M7 7h10v10"/></svg>
+                </a>
+              </div>
+
+              <div class="mb-service-grid">
+                <a href="{% url 'opd_service_queue' 'radiology' %}" class="mb-service-tile">
+                  <span class="mb-service-name">Radiology &amp; USG</span>
+                  <span class="mb-service-count">{{ counts.investigations|default:"0" }}</span>
+                </a>
+                <a href="{% url 'opd_service_queue' 'laboratory' %}" class="mb-service-tile">
+                  <span class="mb-service-name">Laboratory</span>
+                  <span class="mb-service-count">{{ counts.investigations|default:"0" }}</span>
+                </a>
+                <a href="{% url 'opd_service_queue' 'procedure-room' %}" class="mb-service-tile">
+                  <span class="mb-service-name">Procedure Room</span>
+                  <span class="mb-service-count">{{ counts.procedures|default:"0" }}</span>
+                </a>
+                <a href="{% url 'opd_service_queue' 'pharmacy' %}" class="mb-service-tile">
+                  <span class="mb-service-name">Pharmacy Dispense</span>
+                  <span class="mb-service-count">{{ counts.pharmacy|default:"0" }}</span>
+                </a>
+              </div>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; pt:8px;">
+                <span style="font-size:12px; color:rgba(255,255,255,0.85); font-weight:500;">
+                  Total OPD Visits Today: <strong>{{ counts.total }}</strong>
+                </span>
+                <a href="{% url 'opd_referrals' %}" style="color:#ffffff; font-size:12.5px; font-weight:750; text-decoration:none;">
+                  Cross-Consultations →
+                </a>
+              </div>
+            </section>
+
+            <!-- Right: OPD Patient Flow Activity (White card with Lime peak) -->
+            <section class="mb-activity-card">
+              <div class="mb-activity-head">
+                <div>
+                  <h3 class="mb-activity-title">OPD Patient Flow Activity</h3>
+                  <span style="font-size:12px; color:var(--mb-text-muted);">Hourly clinic arrival &amp; consultation throughput</span>
+                </div>
+                <span class="mb-badge-soft">Peak: 11:00 AM</span>
+              </div>
+
+              <!-- Hourly Activity Columns with Lime Peak Bar -->
+              <div class="mb-bars">
+                <div class="mb-bar-col">
+                  <div class="mb-bar muted" style="height:32%;"></div>
+                  <span class="mb-bar-label">08:00</span>
+                </div>
+                <div class="mb-bar-col">
+                  <div class="mb-bar muted" style="height:58%;"></div>
+                  <span class="mb-bar-label">09:00</span>
+                </div>
+                <div class="mb-bar-col">
+                  <div class="mb-bar muted" style="height:76%;"></div>
+                  <span class="mb-bar-label">10:00</span>
+                </div>
+                <div class="mb-bar-col">
+                  <div class="mb-bar-badge">{{ counts.total|default:"24" }} Visits</div>
+                  <div class="mb-bar accent" style="height:92%;"></div>
+                  <span class="mb-bar-label" style="font-weight:750; color:#1b1c26;">11:00</span>
+                </div>
+                <div class="mb-bar-col">
+                  <div class="mb-bar muted" style="height:68%;"></div>
+                  <span class="mb-bar-label">12:00</span>
+                </div>
+                <div class="mb-bar-col">
+                  <div class="mb-bar muted" style="height:48%;"></div>
+                  <span class="mb-bar-label">13:00</span>
+                </div>
+                <div class="mb-bar-col">
+                  <div class="mb-bar muted" style="height:55%;"></div>
+                  <span class="mb-bar-label">14:00</span>
+                </div>
+              </div>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f0eff6; padding-top:14px; font-size:12.5px;">
+                <span style="color:var(--mb-text-muted);">Average Triage Speed: <strong style="color:var(--mb-text-dark);">3.8 mins / pt</strong></span>
+                <span style="color:#16a34a; font-weight:700;">● Active Workflow</span>
+              </div>
+            </section>
+
+          </div>
+
+          <!-- 3. Lower Row: 2 Columns -->
+          <div class="mb-two-col">
+
+            <!-- Left: Queue & Triage Roster (Dark Obsidian #20232a) -->
+            <section class="mb-dark-box">
+              <div class="mb-card-header-clean">
+                <div>
+                  <span class="badge" style="background:rgba(212,241,80,0.18); color:var(--mb-lime); font-weight:800; font-size:11px; padding:3px 10px; border-radius:99px;">
+                    ● TRIAGE ACTIVE
+                  </span>
+                  <h3 style="margin-top:6px;">Priority Patient Roster</h3>
+                </div>
+                <a href="{% url 'initial_assessment' %}" class="btn" style="background:var(--mb-lime); color:#1b1c26; font-weight:800; font-size:11.5px; padding:6px 12px; border-radius:99px; text-decoration:none;">
+                  + Triage Vitals
+                </a>
+              </div>
+
+              <div>
+                {% for row in page_obj|slice:":3" %}
+                  <div class="mb-queue-row {% if forloop.first %}active{% endif %}">
+                    <div class="mb-q-left">
+                      <span class="mb-q-idx">0{{ forloop.counter }}</span>
+                      <div class="mb-q-info">
+                        <div class="mb-q-patient">
+                          {{ row.patient.full_name }}
+                          <span style="font-weight:500; font-size:11px; opacity:0.85;">({{ row.patient.uhid|default:row.visit_number }})</span>
+                        </div>
+                        <div class="mb-q-doc">
+                          {% if row.doctor %}Dr. {{ row.doctor.get_full_name|default:row.doctor.username }}{% else %}Needs Doctor Allocation{% endif %} · {{ row.status }}
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      {% if row.status == "Waiting" %}
+                        <a href="{% url 'initial_assessment' %}?patient={{ row.patient.pk }}" class="btn" style="padding:4px 9px; font-size:11px; font-weight:750; border-radius:8px; background:rgba(0,0,0,0.1); color:inherit; text-decoration:none;">
+                          Assess
+                        </a>
+                      {% else %}
+                        <a href="{% url 'opd_patient_queue' %}?patient={{ row.patient.pk }}" class="btn" style="padding:4px 9px; font-size:11px; font-weight:750; border-radius:8px; background:rgba(0,0,0,0.1); color:inherit; text-decoration:none;">
+                          Track
+                        </a>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% empty %}
+                  <div style="padding:20px; text-align:center; color:#9d9da8; font-size:13px;">
+                    No queue visits active at this moment.
+                  </div>
+                {% endfor %}
+              </div>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#9d9da8;">
+                <span>Waiting in queue: <strong style="color:#ffffff;">{{ counts.waiting|default:"0" }}</strong></span>
+                <a href="{% url 'opd_patient_queue' %}" style="color:var(--mb-lime); font-weight:700; text-decoration:none;">
+                  View Central Queue →
+                </a>
+              </div>
+            </section>
+
+            <!-- Right: Active Consulting Physicians (White card) -->
+            <section class="mb-clinical-card">
+              <div class="mb-card-header-clean">
+                <div>
+                  <span class="mb-badge-soft">Physician Allocation</span>
+                  <h3 style="margin-top:6px; font-size:18px; font-weight:800; color:var(--mb-text-dark); margin-bottom:0;">On-Duty Doctors</h3>
+                </div>
+                <span style="font-size:12px; color:var(--mb-text-muted); font-weight:600;">{{ doctors|length }} Active</span>
+              </div>
+
+              <div>
+                {% for doc in doctors|slice:":3" %}
+                  <div class="mb-doc-item">
+                    <div class="mb-doc-profile">
+                      <div class="mb-doc-avatar">
+                        {{ doc.first_name|slice:":1" }}{{ doc.last_name|slice:":1" }}
+                        <span class="mb-online-dot"></span>
+                      </div>
+                      <div>
+                        <div class="mb-doc-name">Dr. {{ doc.get_full_name|default:doc.username }}</div>
+                        <div class="mb-doc-spec">{{ doc.profile.department|default:"OPD Clinic" }}</div>
+                      </div>
+                    </div>
+                    <div>
+                      <span class="badge" style="background:#eef8f2; color:#1e7048; font-weight:700; font-size:11px; padding:4px 9px; border-radius:99px;">
+                        Chamber Ready
+                      </span>
+                    </div>
+                  </div>
+                {% empty %}
+                  <div style="padding:16px 0; text-align:center; color:var(--mb-text-muted); font-size:13px;">
+                    No doctors listed on duty.
+                  </div>
+                {% endfor %}
+              </div>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f0eff6; padding-top:12px; font-size:12px;">
+                <span style="color:var(--mb-text-muted);">Assign doctor from patient flow table</span>
+                <a href="#opdFlowTable" onclick="document.getElementById('closeWidgetsBtn').click();" style="color:#6352b5; font-weight:700; text-decoration:none;">Doctor Allocation →</a>
+              </div>
+            </section>
+
+          </div>
+
+        </div>
+
+        <!-- ============ RIGHT RAIL (Side Column) ============ -->
+        <aside class="mb-side-col">
+
+          <!-- OPD Desk Quick Actions Card (White) -->
+          <div class="mb-side-card-white">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h3 style="margin:0; font-size:17px; font-weight:800; color:var(--mb-text-dark);">OPD Shortcuts</h3>
+              <span class="badge" style="background:#f1effc; color:#6352b5; font-size:10.5px; font-weight:700; border-radius:99px;">Desk Central</span>
+            </div>
+
+            <div class="mb-action-grid">
+              <a href="{% url 'initial_assessment' %}" class="mb-action-tile">
+                <div class="mb-action-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+                </div>
+                <span class="mb-action-label">Assessment</span>
+              </a>
+
+              <a href="{% url 'opd_patient_queue' %}" class="mb-action-tile">
+                <div class="mb-action-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M18 8h5M20.5 5.5v5"/></svg>
+                </div>
+                <span class="mb-action-label">Patient Queue</span>
+              </a>
+
+              <a href="{% url 'opd_referrals' %}" class="mb-action-tile">
+                <div class="mb-action-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="m9 11 6-4M9 13l6 4"/></svg>
+                </div>
+                <span class="mb-action-label">Referrals</span>
+              </a>
+
+              <a href="{% url 'opd_module' 'reports' %}" class="mb-action-tile">
+                <div class="mb-action-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg>
+                </div>
+                <span class="mb-action-label">Reports</span>
+              </a>
+            </div>
+
+            <!-- Flow Snapshot -->
+            <div class="mb-snapshot-box">
+              <div>
+                <div class="mb-snap-label">Completed Visits</div>
+                <div class="mb-snap-val" style="color:#16a34a;">{{ counts.completed|default:"0" }}</div>
+                <div style="font-size:11px; color:var(--mb-text-muted);">Discharged Today</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="mb-snap-label">Review Required</div>
+                <div class="mb-snap-val" style="color:#ea580c;">{{ counts.review_required|default:"0" }}</div>
+                <div style="font-size:11px; color:var(--mb-text-muted);">Attention Flagged</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Daily Schedule & Appointments (Dark Obsidian #20232a) -->
+          <div class="mb-schedule-card">
+            <div class="mb-schedule-head">
+              <div>
+                <span class="badge" style="background:rgba(212,241,80,0.18); color:var(--mb-lime); font-size:10.5px; font-weight:800; border-radius:99px; text-transform:uppercase;">
+                  Schedule Strip
+                </span>
+                <h3 style="margin:4px 0 0; font-size:17px; font-weight:800; color:#ffffff;">{{ today|date:"F Y" }}</h3>
+              </div>
+              <div class="mb-cal-nav">
+                <button class="mb-cal-arrow" aria-label="Previous week">‹</button>
+                <button class="mb-cal-arrow" aria-label="Next week">›</button>
+              </div>
+            </div>
+
+            <!-- Weekday Selector with Today circled in Lime -->
+            <div class="mb-cal-week">
+              <div class="mb-cal-day">
+                <span>M</span>
+                <div class="mb-cal-num">19</div>
+              </div>
+              <div class="mb-cal-day">
+                <span>T</span>
+                <div class="mb-cal-num today">{{ today|date:"j" }}</div>
+              </div>
+              <div class="mb-cal-day">
+                <span>W</span>
+                <div class="mb-cal-num">21</div>
+              </div>
+              <div class="mb-cal-day">
+                <span>T</span>
+                <div class="mb-cal-num">22</div>
+              </div>
+              <div class="mb-cal-day">
+                <span>F</span>
+                <div class="mb-cal-num">23</div>
+              </div>
+              <div class="mb-cal-day">
+                <span>S</span>
+                <div class="mb-cal-num">24</div>
+              </div>
+            </div>
+
+            <!-- Upcoming Appointment Slots -->
+            <div style="margin-top:14px;">
+              <div style="font-size:12px; font-weight:700; color:#9d9da8; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.5px;">
+                Today's Scheduled Consultations
+              </div>
+              {% for appt in upcoming_appointments %}
+                <div class="mb-slot-item">
+                  <div>
+                    <div class="mb-slot-time">{{ appt.start_time|time:"H:i"|default:"Today" }}</div>
+                    <div class="mb-slot-name">{{ appt.patient.full_name }}</div>
+                    <div class="mb-slot-doc">Dr. {{ appt.doctor.first_name }} {{ appt.doctor.last_name }}</div>
+                  </div>
+                  <div>
+                    <span class="badge" style="background:rgba(212,241,80,0.2); color:var(--mb-lime); font-weight:750; font-size:10px; padding:3px 8px; border-radius:99px;">
+                      {{ appt.get_status_display }}
+                    </span>
+                  </div>
+                </div>
+              {% empty %}
+                <div style="padding:16px; text-align:center; color:#9d9da8; font-size:12.5px;">
+                  No remaining appointment slots today.
+                </div>
+              {% endfor %}
+            </div>
+
+            <div style="margin-top:16px; text-align:center;">
+              <a href="{% url 'appointment_list' %}" style="color:var(--mb-lime); font-size:12.5px; font-weight:750; text-decoration:none;">
+                View Full Appointment Calendar →
+              </a>
+            </div>
+          </div>
+
+        </aside>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MAIN SCREEN: PATIENT FLOW REGISTER & INTEGRATED FILTERS ============ -->
+<section class="mb-table-section" id="opdFlowTable">
+  <div class="mb-table-head">
+    <div>
+      <h2>OPD Patient Flow Register</h2>
+      <p>{{ page_obj.paginator.count }} outpatient visits matching your active filters</p>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <a href="?" class="mb-btn-action ghost" style="padding:7px 14px; font-size:12px;">Clear Filters</a>
+      <a href="{% url 'opd_assistant_dashboard' %}" class="mb-btn-action ghost" style="padding:7px 14px; font-size:12px;">↻ Refresh</a>
+    </div>
+  </div>
+
+  <!-- Integrated Filter Form (Horizontal Space-Saving Toolbar) -->
+  <form class="mb-filter-bar" method="get" action="{% url 'opd_assistant_dashboard' %}">
+    <div class="mb-filter-search-wrap">
+      <span class="mb-filter-search-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      </span>
+      <input type="search" name="q" value="{{ query }}" placeholder="Search UHID, name, visit #..." aria-label="Search patient register">
+    </div>
+    
+    <select name="status" aria-label="Filter by status">
+      <option value="">All Statuses</option>
+      <option value="Pending Assignment" {% if status_filter == "Pending Assignment" %}selected{% endif %}>Pending assignment</option>
+      <option value="Waiting" {% if status_filter == "Waiting" %}selected{% endif %}>Waiting</option>
+      <option value="In Central Pool" {% if status_filter == "In Central Pool" %}selected{% endif %}>In central pool</option>
+      <option value="With Doctor" {% if status_filter == "With Doctor" %}selected{% endif %}>With doctor</option>
+      <option value="Investigations" {% if status_filter == "Investigations" %}selected{% endif %}>Investigations</option>
+      <option value="Procedures" {% if status_filter == "Procedures" %}selected{% endif %}>Procedures</option>
+      <option value="Pharmacy" {% if status_filter == "Pharmacy" %}selected{% endif %}>Pharmacy</option>
+      <option value="Awaiting Payment" {% if status_filter == "Awaiting Payment" %}selected{% endif %}>Awaiting payment</option>
+      <option value="Review Required" {% if status_filter == "Review Required" %}selected{% endif %}>Review required</option>
+      <option value="Completed" {% if status_filter == "Completed" %}selected{% endif %}>Completed</option>
+    </select>
+
+    <select name="priority" aria-label="Filter by priority">
+      <option value="">All Priorities</option>
+      <option value="Urgent" {% if priority_filter == "Urgent" %}selected{% endif %}>Urgent</option>
+      <option value="Routine" {% if priority_filter == "Routine" %}selected{% endif %}>Routine</option>
+    </select>
+
+    <select name="doctor" aria-label="Filter by doctor">
+      <option value="">All Doctors</option>
+      {% for doctor in doctors %}
+        <option value="{{ doctor.pk }}" {% if doctor_filter == doctor.pk|stringformat:"s" %}selected{% endif %}>{{ doctor.get_full_name|default:doctor.username }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="department" aria-label="Filter by department">
+      <option value="">All Departments</option>
+      {% for department in departments %}
+        <option value="{{ department }}" {% if department_filter == department %}selected{% endif %}>{{ department }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="queue" aria-label="Filter by location">
+      <option value="">All Locations</option>
+      <option value="Assessment" {% if queue_filter == "Assessment" %}selected{% endif %}>Assessment</option>
+      <option value="Doctor" {% if queue_filter == "Doctor" %}selected{% endif %}>Doctor</option>
+      <option value="Laboratory" {% if queue_filter == "Laboratory" %}selected{% endif %}>Laboratory</option>
+      <option value="Radiology" {% if queue_filter == "Radiology" %}selected{% endif %}>Radiology</option>
+      <option value="Service" {% if queue_filter == "Service" %}selected{% endif %}>Other services</option>
+    </select>
+
+    <div class="mb-filter-actions">
+      <button class="mb-btn-action lime" type="submit">Filter</button>
+      <button class="mb-btn-action ghost" type="submit" name="export" value="csv">Export CSV</button>
+    </div>
+  </form>
+
+  {% if page_obj.object_list %}
+    <div style="overflow-x:auto;">
+      <table class="mb-styled-table">
+        <thead>
+          <tr>
+            <th>Patient / UHID</th>
+            <th>Age / Sex</th>
+            <th>Arrival</th>
+            <th>Location &amp; Status</th>
+            <th>Consulting Doctor</th>
+            <th>Pending Orders</th>
+            <th>Alerts</th>
+            <th>Billing</th>
+            <th>Updated</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in page_obj %}
+          <tr>
+            <td>
+              <div style="font-weight:750; color:var(--mb-text-dark);">
+                {{ row.patient.full_name }}
+                {% if row.patient.is_demo %}
+                  <span class="badge" style="background:#fed7d7; color:#c53030; font-size:10px; font-weight:800; border-radius:99px;">DEMO</span>
+                {% endif %}
+              </div>
+              <div style="margin-top:2px;">
+                <span class="mb-uhid-badge">{{ row.patient.uhid|default:row.visit_number }}</span>
+              </div>
+            </td>
+            <td>{{ row.patient.age|default:"—" }} / {{ row.patient.get_gender_display|default:"—" }}</td>
+            <td style="font-size:12px; color:var(--mb-text-muted);">
+              {{ row.patient.created_at|date:"H:i" }}
+              {% if row.appointment %}
+                <div style="font-size:11px; color:#6352b5;">Slot {{ row.appointment.start_time|date:"H:i" }}</div>
+              {% endif %}
+            </td>
+            <td>
+              <span class="mb-status-tag {{ row.status|slugify }}">{{ row.status }}</span>
+              <div style="font-size:11px; color:var(--mb-text-muted); margin-top:3px;">{{ row.location }}</div>
+            </td>
+            <td>
+              {% if row.doctor %}
+                <span style="font-weight:650; color:var(--mb-text-dark);">Dr. {{ row.doctor.get_full_name|default:row.doctor.username }}</span>
+              {% else %}
+                <span style="color:#dc2626; font-weight:700; font-size:12px;">Unassigned</span>
+              {% endif %}
+            </td>
+            <td style="font-size:12px; color:var(--mb-text-muted);">
+              {% if row.pending_services %}
+                {{ row.pending_services|join:", " }}
+              {% else %}
+                <span style="color:#a1a1aa;">None</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.alert %}
+                <span class="badge" style="background:#fee2e2; color:#b91c1c; font-weight:750; font-size:11px; border-radius:99px;">{{ row.alert }}</span>
+              {% else %}
+                <span style="color:#a1a1aa; font-size:12px;">—</span>
+              {% endif %}
+            </td>
+            <td style="font-weight:600; font-size:12.5px;">{{ row.billing }}</td>
+            <td style="font-size:12px; color:var(--mb-text-muted);">{{ row.updated_at|date:"H:i" }}</td>
+            <td style="text-align:right; white-space:nowrap;">
+              {% if row.status == "Pending Assignment" %}
+                <form method="post" action="{% url 'assign_doctor' row.patient.pk %}" style="display:inline-flex; align-items:center; gap:6px;">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  <select name="doctor_id" required style="padding:4px 8px; font-size:12px; border-radius:8px; border:1px solid #dcdce2;">
+                    <option value="">Doctor…</option>
+                    {% for doctor in doctors %}
+                      <option value="{{ doctor.pk }}">{{ doctor.get_full_name|default:doctor.username }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="mb-btn-action lime" style="padding:5px 10px; font-size:11.5px;">Assign</button>
+                </form>
+              {% elif row.status == "Waiting" %}
+                <a href="{% url 'initial_assessment' %}?patient={{ row.patient.pk }}" class="mb-btn-action lime" style="padding:5px 12px; font-size:12px;">Assess →</a>
+              {% else %}
+                <a href="{% url 'opd_patient_queue' %}?patient={{ row.patient.pk }}" class="mb-btn-action ghost" style="padding:5px 12px; font-size:12px;">Track →</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; font-size:13px; color:var(--mb-text-muted);">
+      <div>
+        {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}&q={{ query|urlencode }}&status={{ status_filter|urlencode }}" class="mb-btn-action ghost" style="padding:5px 12px; font-size:12px;">← Previous</a>
+        {% endif %}
+      </div>
+      <div>Page <strong>{{ page_obj.number }}</strong> of {{ page_obj.paginator.num_pages }}</div>
+      <div>
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}&q={{ query|urlencode }}&status={{ status_filter|urlencode }}" class="mb-btn-action ghost" style="padding:5px 12px; font-size:12px;">Next →</a>
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div style="text-align:center; padding:48px 20px;">
+      <div style="width:64px; height:64px; border-radius:50%; background:#f4f3fb; display:grid; place-items:center; margin:0 auto 16px; color:#9b87f8;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      </div>
+      <h3 style="margin:0 0 6px 0; font-size:17px; font-weight:750; color:var(--mb-text-dark);">No matching outpatient visits</h3>
+      <p style="color:var(--mb-text-muted); font-size:13.5px; margin-bottom:18px;">Try clearing filters or search by a different patient name or UHID.</p>
+      <a href="?" class="mb-btn-action lime">Clear Active Filters</a>
+    </div>
+  {% endif %}
 </section>
 
+<!-- ── Cute Modal Open/Close Logic ── -->
+<script>
+  (function () {
+    const modal = document.getElementById("widgetsModal");
+    const openBtn = document.getElementById("openWidgetsBtn");
+    const openRibbonBtn = document.getElementById("openWidgetsRibbonBtn");
+    const closeBtn = document.getElementById("closeWidgetsBtn");
+    const backdrop = document.getElementById("widgetsBackdrop");
+
+    if (!modal) return;
+
+    function openModal() {
+      modal.removeAttribute("hidden");
+      // Force reflow for smooth scale & opacity transition
+      modal.offsetHeight;
+      modal.classList.add("is-open");
+      document.body.style.overflow = "hidden";
+      if (openBtn) openBtn.setAttribute("aria-expanded", "true");
+      if (closeBtn) closeBtn.focus();
+    }
+
+    function closeModal() {
+      modal.classList.remove("is-open");
+      document.body.style.overflow = "";
+      if (openBtn) openBtn.setAttribute("aria-expanded", "false");
+      setTimeout(() => {
+        if (!modal.classList.contains("is-open")) {
+          modal.setAttribute("hidden", "");
+        }
+      }, 250);
+      if (openBtn) openBtn.focus();
+    }
+
+    if (openBtn) openBtn.addEventListener("click", openModal);
+    if (openRibbonBtn) openRibbonBtn.addEventListener("click", openModal);
+    if (closeBtn) closeBtn.addEventListener("click", closeModal);
+    if (backdrop) backdrop.addEventListener("click", closeModal);
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && modal.classList.contains("is-open")) {
+        closeModal();
+      }
+    });
+  })();
+</script>
 {% endblock %}

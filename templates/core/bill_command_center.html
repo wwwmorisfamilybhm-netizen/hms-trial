@@ -94,7 +94,7 @@
               <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-top:8px;">
                 <small style="color:var(--muted); line-height:1.65; display:grid;">
                   <span><strong style="color:var(--ink);">{{ bill.description }}</strong></span>
-                  <span>Created {{ bill.created_at|date:"d M Y, h:i A" }} · by {{ bill.created_by.get_full_name|default:bill.created_by.username|default:"Registration Desk" }}</span>
+                  <span>Created {{ bill.created_at|date:"d M Y, h:i A" }} · by {% if bill.created_by %}{{ bill.created_by.get_full_name|default:bill.created_by.username }}{% else %}Registration Desk{% endif %}</span>
                   {% if bill.paid_at %}<span>Paid on {{ bill.paid_at|date:"d M Y, h:i A" }}</span>{% endif %}
                 </small>
                 <span style="text-align:right; white-space:nowrap;">

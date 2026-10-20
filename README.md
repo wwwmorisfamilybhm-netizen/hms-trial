@@ -15,6 +15,7 @@ A hospital management system built from scratch with **Django** and **SQLite** (
 cd hms
 python3.14 -m venv .venv          # only needed once
 .venv/bin/pip install -r requirements.txt
+.venv/bin/python manage.py migrate
 .venv/bin/python manage.py runserver
 ```
 
@@ -31,6 +32,7 @@ Open:
 | Make migrations after editing models | `.venv/bin/python manage.py makemigrations` |
 | Apply migrations | `.venv/bin/python manage.py migrate` |
 | Create admin user | `.venv/bin/python manage.py createsuperuser` |
+| Seed synthetic OPD demo visits | `.venv/bin/python manage.py seed_opd_demo` |
 | Django shell (query data) | `.venv/bin/python manage.py shell` |
 | **Refresh CSS/JS after editing assets** | `.venv/bin/python manage.py collectstatic --noinput` |
 
@@ -73,6 +75,14 @@ python3 -c 'from django.core.management.utils import get_random_secret_key; prin
 
 Never commit the generated secret or database credentials. The app's initial admin account can be created with
 `python manage.py createsuperuser` using the platform's Django command console, if available.
+
+### OPD Assistant access and demo records
+
+OPD access uses the existing Django authentication backend and each user's assigned designation. Create or
+select a staff account in Django Admin, then set its profile designation to **OPD Assistant**. There is no
+hard-coded demo password. The seed command creates synthetic patients and workflow records marked `DEMO`, plus
+doctor directory entries with unusable passwords; it does not create sign-in credentials. Run it repeatedly
+without creating duplicate demo encounters. Never enter real patient information into a demo environment.
 
 ## Project structure
 

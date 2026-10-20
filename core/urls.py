@@ -27,6 +27,12 @@ urlpatterns = [
     path("admin-settings/export/", views.admin_backup_export, name="admin_backup_export"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("opd-assistant/", views.opd_assistant_dashboard, name="opd_assistant_dashboard"),
+    path("opd-assistant/patient-queue/", views.opd_patient_queue, name="opd_patient_queue"),
+    path("opd-assistant/services/<str:service>/", views.opd_service_queue, name="opd_service_queue"),
+    path("opd-assistant/orders/<int:order_id>/update/", views.opd_order_update, name="opd_order_update"),
+    path("opd-assistant/prescriptions/<int:item_id>/dispense/", views.opd_prescription_update, name="opd_prescription_update"),
+    path("opd-assistant/modules/<slug:module>/", views.opd_module_page, name="opd_module"),
+    path("opd-assistant/referrals/", views.opd_referrals, name="opd_referrals"),
     path("dashboard/patient/<int:patient_id>/assign-doctor/", views.assign_doctor, name="assign_doctor"),
     path("history/", views.history, name="history"),
     # ── Doctor portal (placeholder pages — content to be filled later) ──

@@ -1,46 +1,280 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Appointments — Cams HMS{% endblock %}
 
 {% block heading %}
-  <div class="page-header">
-    <h1>Appointments</h1>
-    {% if can_manage_appointments %}<a href="{% url 'appointment_create' %}" class="btn">+ Book appointment</a>{% endif %}
+<div class="rd-page-head">
+  <div class="rd-head-left">
+    <div class="rd-title-row">
+      <h1>Appointments</h1>
+      <span class="rd-counter-badge"><span class="rd-pulse-dot"></span>APPOINTMENT DESK</span>
+    </div>
+    <p class="page-sub">Search, book, and track outpatient appointments from the counter.</p>
   </div>
+  <div class="rd-head-actions">
+    <a href="{% url 'appointment_create' %}" class="rd-btn-primary">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      New appointment
+    </a>
+  </div>
+</div>
 {% endblock %}
 
 {% block content %}
-<div class="date-nav card">
-  <a class="btn btn-outline" href="?date={{ prev_date|date:'Y-m-d' }}">← Previous</a>
-  <form method="get" action="{% url 'appointment_list' %}">
-    <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}">
-    <button type="submit" class="btn btn-plain">Go</button>
-  </form>
-  <a class="btn btn-outline" href="?date={{ next_date|date:'Y-m-d' }}">Next →</a>
-  {% if not is_today %}<a class="btn btn-plain" href="{% url 'appointment_list' %}">Today</a>{% endif %}
-  <strong class="date-label">{{ selected_date|date:"l, F j, Y" }}</strong>
-</div>
 
-<section class="card">
+<!-- ── Day snapshot ── -->
+<section class="stats">
+  <div class="stat-card">
+    <span class="stat-icon lime">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#27272b" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    </span>
+    <div>
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-label">{% if search_mode %}Matching appointments{% else %}Appointments{% endif %}</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-icon lav">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#29272f" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="7"/><path d="M9 4.5V9l4 2.5"/></svg>
+    </span>
+    <div>
+      <div class="stat-value">{{ stats.scheduled }}</div>
+      <div class="stat-label">Scheduled</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-icon lav-soft">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#70659e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+    </span>
+    <div>
+      <div class="stat-value">{{ stats.completed }}</div>
+      <div class="stat-label">Completed</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-icon dark">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e9e9ec" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+    </span>
+    <div>
+      <div class="stat-value">{{ stats.cancelled }}</div>
+      <div class="stat-label">Cancelled / No-show</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Book by searching ── -->
+<section class="rd-main-card">
+  <div class="rd-card-topbar">
+    <div class="rd-card-titles">
+      <div class="rd-card-title-row"><h2>Book for an existing patient</h2></div>
+      <p class="rd-card-sub">Search by name, UHID, or phone — then book in one click.</p>
+    </div>
+    <a class="rd-btn-outline" href="{% url 'appointment_create' %}">Open full booking form</a>
+  </div>
+  <div class="rd-filter-bar">
+    <div class="rd-filter-search">
+      <svg class="rd-search-icon" width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="m17 17-3.2-3.2"/></svg>
+      <input type="search" id="rdPatientQuery" placeholder="Search patient — name, UHID, or phone" autocomplete="off" aria-label="Search patient to book appointment">
+    </div>
+    <span class="rd-filter-label">or</span>
+    <a class="rd-btn-ghost" href="{% url 'appointment_create' %}">Book manually →</a>
+  </div>
+  <div id="rdPatientResults" class="rd-search-results" aria-live="polite"></div>
+</section>
+
+<!-- ── Appointment history ── -->
+<section class="rd-main-card">
+  <div class="rd-card-topbar">
+    <div class="rd-card-titles">
+      <div class="rd-card-title-row">
+        <h2>Appointment history</h2>
+        <span class="rd-badge-count">{{ stats.total }} {% if search_mode %}matches{% else %}on {{ selected_date|date:"D, j M Y" }}{% endif %}</span>
+      </div>
+      <p class="rd-card-sub">{% if search_mode %}Showing results across all dates for “{{ query }}”.{% else %}Showing the day schedule for {{ selected_date|date:"l, F j, Y" }}.{% endif %}</p>
+    </div>
+    {% if not search_mode %}
+    <div class="rd-head-actions">
+      <a class="rd-btn-outline" href="?{{ nav|urlencode }}&date={{ prev_date|date:'Y-m-d' }}" aria-label="Previous day">← Prev</a>
+      {% if not is_today %}<a class="rd-btn-outline" href="?{{ nav|urlencode }}">Today</a>{% endif %}
+      <a class="rd-btn-outline" href="?{{ nav|urlencode }}&date={{ next_date|date:'Y-m-d' }}" aria-label="Next day">Next →</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <form class="rd-filter-bar" method="get" action="{% url 'appointment_list' %}">
+    <div class="rd-filter-search">
+      <svg class="rd-search-icon" width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="m17 17-3.2-3.2"/></svg>
+      <input type="search" name="q" value="{{ query }}" placeholder="Search history — patient, UHID, phone, or doctor">
+      {% if query %}<a class="rd-clear-search" href="{% url 'appointment_list' %}" aria-label="Clear search">✕</a>{% endif %}
+    </div>
+    {% if not search_mode %}
+    <div class="rd-filter-item"><span class="rd-filter-label">Date</span><input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}"></div>
+    {% endif %}
+    <div class="rd-filter-item"><span class="rd-filter-label">Status</span>
+      <select name="status">
+        <option value="">All</option>
+        {% for value, label in status_choices %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="rd-filter-item"><span class="rd-filter-label">Doctor</span>
+      <select name="doctor">
+        <option value="">All</option>
+        {% for doctor in doctors %}<option value="{{ doctor.pk }}" {% if doctor_filter == doctor.pk|stringformat:"s" %}selected{% endif %}>Dr. {{ doctor.full_name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="rd-filter-actions">
+      <button class="rd-btn-filter" type="submit">Apply</button>
+      <a class="rd-btn-reset" href="{% url 'appointment_list' %}">Reset</a>
+    </div>
+  </form>
+
   {% if appointments %}
-    <table>
-      <thead>
-        <tr><th>Time</th><th>Patient</th><th>Doctor</th><th>Reason</th><th>Status</th></tr>
-      </thead>
+  <div class="rd-table-wrap">
+    <table class="rd-table">
+      <thead><tr><th>Date &amp; time</th><th>Patient</th><th>Doctor</th><th>Reason</th><th>Status</th><th class="rd-actions-cell">Actions</th></tr></thead>
       <tbody>
         {% for appointment in appointments %}
         <tr>
-          <td>{{ appointment.start_time|time:"H:i" }}–{{ appointment.end_time|time:"H:i" }}</td>
-          <td><a href="{% url 'patient_detail' appointment.patient.pk %}">{{ appointment.patient }}</a></td>
-          <td>{{ appointment.doctor }}<br><small>{{ appointment.doctor.specialty_display }}</small></td>
+          <td class="rd-cell-date">
+            <div class="rd-date-main">{{ appointment.start_time|date:"H:i" }}–{{ appointment.end_time|date:"H:i" }}</div>
+            <div class="rd-date-time">{{ appointment.date|date:"D, j M Y" }}{% if search_mode %} · {{ appointment.get_status_display }}{% endif %}</div>
+          </td>
+          <td>
+            <div class="rd-cell-record">
+              <span class="rd-patient-avatar">{{ appointment.patient.first_name|slice:":1"|upper }}{{ appointment.patient.last_name|slice:":1"|upper }}</span>
+              <div class="rd-patient-info">
+                <a class="rd-patient-name" href="{% url 'patient_detail' appointment.patient.pk %}">{{ appointment.patient.full_name }}</a>
+                <small class="rd-patient-sub"><span class="rd-mr-chip">{{ appointment.patient.uhid }}</span>{% if appointment.patient.phone %} · {{ appointment.patient.phone }}{% endif %}</small>
+              </div>
+            </div>
+          </td>
+          <td>Dr. {{ appointment.doctor.full_name }}</td>
           <td>{{ appointment.reason }}</td>
           <td><span class="badge badge-{{ appointment.status|lower }}">{{ appointment.get_status_display }}</span></td>
+          <td class="rd-actions-cell">
+            <div class="rd-actions-cluster">
+              {% if can_manage_appointments %}<a class="rd-action-btn view" href="{% url 'appointment_edit' appointment.pk %}">Edit</a>{% endif %}
+              <a class="rd-action-btn" href="{% url 'patient_detail' appointment.patient.pk %}">View</a>
+            </div>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+  </div>
   {% else %}
-    <p class="empty">No appointments on this date.{% if can_manage_appointments %} <a href="{% url 'appointment_create' %}">Book one →</a>{% endif %}</p>
+  <div class="rd-empty-container">
+    <div class="rd-empty-bubble">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    </div>
+    <h3>No appointments found</h3>
+    <p>{% if search_mode %}Nothing in the history matches “{{ query }}”.{% else %}Nothing is booked on this date yet — search a patient above and book one in seconds.{% endif %}</p>
+    <a href="{% url 'appointment_create' %}" class="rd-btn-primary">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      Book appointment
+    </a>
+  </div>
   {% endif %}
+
+  <div class="rd-card-footer">
+    <span>{% if search_mode %}Search results across all dates{% else %}Schedule for {{ selected_date|date:"l, F j, Y" }}{% endif %} · {{ appointments|length }} shown</span>
+    {% if search_mode or not is_today %}<a class="rd-btn-reset" href="{% url 'appointment_list' %}">Back to today</a>{% endif %}
+  </div>
 </section>
+
+<script>
+  (function () {
+    var input = document.getElementById("rdPatientQuery");
+    var results = document.getElementById("rdPatientResults");
+    if (!input || !results) return;
+
+    var timer = null;
+    var lastQuery = "";
+
+    function initials(name) {
+      return String(name || "?")
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(function (part) { return part.charAt(0); })
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+    }
+
+    function buildRow(patient) {
+      var row = document.createElement("div");
+      row.className = "rd-search-row";
+
+      var avatar = document.createElement("span");
+      avatar.className = "rd-patient-avatar";
+      avatar.textContent = initials(patient.name);
+
+      var info = document.createElement("div");
+      info.className = "rd-patient-info";
+      var name = document.createElement("a");
+      name.className = "rd-patient-name";
+      name.href = patient.booking_url;
+      name.textContent = patient.name;
+      var sub = document.createElement("small");
+      sub.className = "rd-patient-sub";
+      sub.textContent = [
+        patient.uhid,
+        patient.age ? patient.age + " · " + patient.gender : patient.gender,
+        patient.phone,
+      ].filter(Boolean).join(" · ");
+      info.appendChild(name);
+      info.appendChild(sub);
+
+      var spacer = document.createElement("span");
+      spacer.className = "rd-search-spacer";
+
+      var book = document.createElement("a");
+      book.className = "rd-action-btn view";
+      book.href = patient.booking_url;
+      book.textContent = "Book appointment →";
+
+      row.appendChild(avatar);
+      row.appendChild(info);
+      row.appendChild(spacer);
+      row.appendChild(book);
+      return row;
+    }
+
+    function emptyRow() {
+      var empty = document.createElement("div");
+      empty.className = "rd-search-empty";
+      empty.textContent = "No registered patient matches this search — use the patient registration tab for a new record.";
+      return empty;
+    }
+
+    function fetchResults() {
+      var query = input.value.trim();
+      if (query.length < 2) { results.innerHTML = ""; lastQuery = query; return; }
+      fetch("{% url 'appointment_patient_search' %}?q=" + encodeURIComponent(query), {
+        headers: { "Accept": "application/json" },
+      })
+        .then(function (response) { return response.ok ? response.json() : { results: [] }; })
+        .then(function (payload) {
+          if (input.value.trim() !== query) return;
+          results.innerHTML = "";
+          (payload.results || []).forEach(function (patient) { results.appendChild(buildRow(patient)); });
+          if (results.childElementCount === 0) results.appendChild(emptyRow());
+          lastQuery = query;
+        })
+        .catch(function () { /* stay quiet on transient network errors */ });
+    }
+
+    input.addEventListener("input", function () {
+      clearTimeout(timer);
+      timer = setTimeout(fetchResults, 250);
+    });
+    input.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") { input.value = ""; results.innerHTML = ""; }
+    });
+    input.addEventListener("focus", function () {
+      if (input.value.trim().length >= 2 && input.value.trim() !== lastQuery) fetchResults();
+    });
+  })();
+</script>
 {% endblock %}
