@@ -1,6 +1,7 @@
 {% extends "core/pharmacy_base.html" %}
 {% block operations_content %}
 <div class="ops-grid">
+<div class="ops-actions ph-back"><a href="{% url 'medicine_catalogue' %}">← Medicine catalogue</a></div>
 <section class="ph-panel"><h2>Upload a medicine list or invoice</h2>
 <p>CSV, Excel (.xlsx), PDF, JPG or PNG · Up to 10 MB, 10 PDF pages and 500 rows. Review extracted values before receiving stock.</p>
 <p>Download a <a href="{% url 'pharmacy_import_template' %}">CSV template</a> or <a href="{% url 'pharmacy_import_template' %}?format=xlsx">Excel template</a>.</p>
