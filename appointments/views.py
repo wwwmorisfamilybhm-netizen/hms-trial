@@ -29,7 +29,7 @@ def appointment_list(request):
             Appointment.objects.filter(
                 Q(patient__first_name__icontains=query)
                 | Q(patient__last_name__icontains=query)
-                | Q(patient__mr_number__icontains=query)
+                | Q(patient__uhid__icontains=query)
                 | Q(patient__phone__icontains=query)
                 | Q(doctor__first_name__icontains=query)
                 | Q(doctor__last_name__icontains=query)
@@ -93,7 +93,7 @@ def appointment_patient_search(request):
             Q(first_name__icontains=query)
             | Q(last_name__icontains=query)
             | Q(second_name__icontains=query)
-            | Q(mr_number__icontains=query)
+            | Q(uhid__icontains=query)
             | Q(phone__icontains=query)
         )
         .order_by("last_name", "first_name")[:8]
@@ -124,11 +124,24 @@ def appointment_create(request):
         form = AppointmentForm(request.POST)
         if form.is_valid():
             appointment = form.save()
+            from patients.models import PatientBill
+            fee = form.cleaned_data.get("appointment_fee")
+            if fee is None:
+                from patients.models import AppointmentFeeSettings
+                fee = AppointmentFeeSettings.current().net_due
+            PatientBill.objects.create(
+                patient=appointment.patient,
+                source=PatientBill.Source.APPOINTMENT,
+                appointment=appointment,
+                description=f"Appointment fee — {appointment.doctor} on {appointment.date}",
+                amount=fee,
+                created_by=request.user,
+            )
             messages.success(
                 request,
                 f"Appointment booked: {appointment.patient} with "
                 f"{appointment.doctor} on {appointment.date} at "
-                f"{appointment.start_time:%H:%M}.",
+                f"{appointment.start_time:%H:%M}. Bill created for ₹{fee}.",
             )
             return redirect("appointment_list")
     else:

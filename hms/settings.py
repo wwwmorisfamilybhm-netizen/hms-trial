@@ -186,3 +186,7 @@ MAILERS = {
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
+
+
+# Pharmacy product photo suggestions. Manual upload is always available.
+BRAVE_SEARCH_API_KEY = os.environ.get("BRAVE_SEARCH_API_KEY", "")

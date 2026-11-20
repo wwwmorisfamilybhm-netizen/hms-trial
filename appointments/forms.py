@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from django import forms
 
-from patients.models import Patient
+from patients.models import AppointmentFeeSettings, Patient
 
 from .models import Appointment, Doctor
 
@@ -23,6 +24,13 @@ class AppointmentForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Show patient names nicely in the dropdown, newest first
         self.fields["patient"].queryset = Patient.objects.order_by("last_name")
+        from patients.models import AppointmentFeeSettings
+        fee_default = AppointmentFeeSettings.current().net_due
+        self.fields["appointment_fee"] = forms.DecimalField(
+            max_digits=8, decimal_places=2, min_value=Decimal("0"),
+            initial=fee_default, label="Appointment Fee (₹)",
+            help_text="Default ₹20. Change if needed.",
+        )
         self.fields["patient"].label_from_instance = (
             lambda obj: f"{obj.full_name} ({obj.phone or 'no phone'})"
         )

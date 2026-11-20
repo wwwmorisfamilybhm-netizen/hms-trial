@@ -2,6 +2,21 @@
 
 {% block title %}Doctor's Desk — CAMS HMS{% endblock %}
 
+{% block topbar_tools %}
+<div class="opd-topbar-tools">
+  <form action="{% url 'dashboard' %}" method="get" class="mb-search-box">
+    <input type="search" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Search patient, UHID or token..." aria-label="Search patient register">
+    <button type="submit" aria-label="Search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
+  </form>
+  <div class="mb-date-pill">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <span>{% if today %}{{ today|date:"D, j M Y" }}{% else %}{% now "D, j M Y" %}{% endif %}</span>
+  </div>
+</div>
+{% endblock %}
+
 {% block heading %}
 <style>
   /* ── MindBloom Doctor's Desk Theme ── */
@@ -21,7 +36,7 @@
 
   /* Canvas styling */
   .container {
-    max-width: 1520px;
+    max-width: 100%;
     padding: 20px 24px 60px;
     background: var(--mb-bg);
     min-height: 100vh;
@@ -50,11 +65,6 @@
     letter-spacing: -0.8px;
     margin: 0;
     line-height: 1.15;
-  }
-  .mb-header-tools {
-    display: flex;
-    align-items: center;
-    gap: 12px;
   }
   .mb-search-box {
     display: flex;
@@ -705,333 +715,425 @@
 
 {% block content %}
 
+<style>
+  /* ── Doctor Dashboard Department Board (Full-Page Layout) ── */
+  .container {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 20px 28px 60px !important;
+    box-sizing: border-box !important;
+  }
+  .db-board {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    grid-template-rows: auto auto !important;
+    gap: 18px !important;
+    width: 100% !important;
+    margin-bottom: 24px !important;
+    box-sizing: border-box !important;
+  }
+  .db-card {
+    background: linear-gradient(180deg, #ffffff 0%, #f7f5fd 100%) !important;
+    border: 1px solid rgba(155, 135, 248, 0.22) !important;
+    border-radius: 22px !important;
+    padding: 18px 20px !important;
+    box-shadow: 0 8px 24px rgba(155, 135, 248, 0.08) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 240px !important;
+    box-sizing: border-box !important;
+    transition: transform .15s ease, box-shadow .15s ease !important;
+    text-decoration: none !important;
+    color: inherit !important;
+    cursor: pointer !important;
+  }
+  .db-card-link {
+    margin-top: auto !important;
+    padding-top: 10px !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    color: #634be2 !important;
+    text-decoration: none !important;
+  }
+  .db-card:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 12px 30px rgba(155, 135, 248, 0.14) !important;
+  }
+  .db-card.queue {
+    background: linear-gradient(180deg, #f0eefb 0%, #e6e2f8 100%) !important;
+    grid-column: 4 !important;
+    grid-row: 1 / 3 !important;
+    min-height: 500px !important;
+  }
+  .db-card-head {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-bottom: 12px !important;
+  }
+  .db-card-title {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    color: #1b1c26 !important;
+    margin: 0 !important;
+    letter-spacing: -0.2px !important;
+  }
+  .db-card-count {
+    background: #634be2 !important;
+    color: #ffffff !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    padding: 2px 11px !important;
+    border-radius: 999px !important;
+    min-width: 22px !important;
+    text-align: center !important;
+    box-shadow: 0 2px 8px rgba(99, 75, 226, 0.25) !important;
+  }
+  /* Compact, elegant hero KPI card */
+  .db-hero-compact { padding: 14px 18px !important; }
+  .db-hero-compact .mb-card-header { margin-bottom: 8px !important; }
+  .db-hero-compact .mb-header-title span { font-size: 15px !important; font-weight: 750 !important; }
+  .db-hero-compact .mb-sub-cards { gap: 10px !important; }
+  .db-hero-compact .mb-sub-card { padding: 10px 12px !important; }
+  .db-hero-compact .mb-sub-title { font-size: 12.5px !important; margin-bottom: 2px !important; }
+  .db-hero-compact .mb-sub-desc { font-size: 11.5px !important; line-height: 1.3 !important; }
+  .db-hero-compact .mb-sub-gauge svg { width: 34px !important; height: 34px !important; }
+  .db-hero-compact .mb-sub-btn { padding: 5px 12px !important; font-size: 11.5px !important; }
+  .db-card-list {
+    list-style: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    flex: 1 !important;
+  }
+  .db-card-list li {
+    background: #f4f3fb !important;
+    color: #634be2 !important;
+    font-weight: 700 !important;
+    font-size: 13.5px !important;
+    border-radius: 12px !important;
+    padding: 10px 16px !important;
+    min-height: 40px !important;
+    display: flex !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+    transition: background 0.12s ease !important;
+  }
+  .db-card-list li:hover {
+    background: #ece8fa !important;
+  }
+  .db-card-list li.db-empty {
+    background: transparent !important;
+    color: #a1a1aa !important;
+    font-style: italic !important;
+    font-weight: 500 !important;
+    text-align: center !important;
+  }
+  @media (max-width: 1080px) {
+    .db-board { grid-template-columns: repeat(2, 1fr) !important; }
+    .db-card.queue { grid-column: auto !important; grid-row: auto !important; min-height: 240px !important; }
+  }
+  @media (max-width: 640px) {
+    .db-board { grid-template-columns: 1fr !important; }
+  }
+
+  /* ── Compact & Elegant Clinical Consultations Overview ── */
+  .db-overview-strip {
+    background: #ffffff !important;
+    border: 1px solid rgba(155, 135, 248, 0.2) !important;
+    border-radius: 18px !important;
+    padding: 12px 20px !important;
+    box-shadow: 0 4px 18px rgba(155, 135, 248, 0.05) !important;
+    margin-bottom: 22px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: wrap !important;
+    gap: 14px !important;
+  }
+  .db-overview-head {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+  .db-overview-title {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    font-size: 13.5px !important;
+    font-weight: 750 !important;
+    color: #1b1c26 !important;
+    letter-spacing: -0.2px !important;
+  }
+  .db-overview-title svg {
+    color: #634be2 !important;
+    flex-shrink: 0 !important;
+  }
+  .db-overview-tag {
+    background: #f4f3fb !important;
+    color: #634be2 !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    padding: 3px 9px !important;
+    border-radius: 999px !important;
+  }
+  .db-overview-grid {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    flex-wrap: wrap !important;
+  }
+  .db-metric-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    background: #faf9fd !important;
+    border: 1px solid rgba(155, 135, 248, 0.14) !important;
+    border-radius: 14px !important;
+    padding: 6px 14px 6px 10px !important;
+    text-decoration: none !important;
+    color: inherit !important;
+    transition: all 0.15s ease !important;
+  }
+  .db-metric-item:hover {
+    background: #ffffff !important;
+    border-color: #9b87f8 !important;
+    box-shadow: 0 4px 14px rgba(155, 135, 248, 0.12) !important;
+    transform: translateY(-1px) !important;
+    text-decoration: none !important;
+  }
+  .db-metric-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 10px !important;
+    display: grid !important;
+    place-items: center !important;
+    flex-shrink: 0 !important;
+  }
+  .db-metric-icon.lav {
+    background: #ece8fa !important;
+    color: #634be2 !important;
+  }
+  .db-metric-icon.lime {
+    background: #eef8c3 !important;
+    color: #556c07 !important;
+  }
+  .db-metric-icon.green {
+    background: #dcfce7 !important;
+    color: #166534 !important;
+  }
+  .db-metric-body {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .db-metric-val {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    color: #1b1c26 !important;
+    line-height: 1.1 !important;
+  }
+  .db-metric-lbl {
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #787886 !important;
+  }
+  .db-metric-arrow {
+    color: #a4a4b0 !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    margin-left: 2px !important;
+    transition: transform 0.15s ease !important;
+  }
+  .db-metric-item:hover .db-metric-arrow {
+    color: #634be2 !important;
+    transform: translateX(2px) !important;
+  }
+  @media (max-width: 900px) {
+    .db-overview-strip {
+      flex-direction: column !important;
+      align-items: stretch !important;
+    }
+    .db-overview-grid {
+      width: 100% !important;
+    }
+    .db-metric-item {
+      flex: 1 1 calc(33.333% - 8px) !important;
+    }
+  }
+  @media (max-width: 600px) {
+    .db-metric-item {
+      flex: 1 1 100% !important;
+    }
+  }
+</style>
+
 <!-- ── Greeting Header ── -->
 <div class="mb-header">
   <div>
     <div class="mb-welcome">Welcome back,</div>
     <h1 class="mb-doctor-name">Dr. {{ user.get_full_name|default:user.username }}</h1>
   </div>
-  <div class="mb-header-tools">
-    <form class="mb-search-box" method="get" action="{% url 'dashboard' %}">
-      <input type="search" name="q" placeholder="Search patient, UHID or token..." value="{{ request.GET.q|default:'' }}">
-      <button type="submit" aria-label="Search">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      </button>
-    </form>
-    <div class="mb-date-pill">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      <span>{{ today|date:"D, j M Y" }}</span>
-    </div>
-  </div>
 </div>
 
-<!-- ── Bento Grid ── -->
-<div class="mb-bento">
+<!-- ── Full-Page Department Board ── -->
+<div class="db-board">
 
-  <!-- LEFT MAIN COLUMN -->
-  <div class="mb-main-col">
-
-    <!-- Card 1: Hero Banner (Purple) -->
-    <div class="mb-hero-card">
-      <div class="mb-card-header">
-        <div class="mb-header-title">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>
-          <span>Clinical Consultations Overview</span>
-        </div>
-        <a href="#full-queue-roster" class="mb-arrow-btn white" title="Jump to full roster">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
-        </a>
-      </div>
-
-      <div class="mb-sub-cards">
-        <!-- Capsule 1: Central Pool -->
-        <div class="mb-sub-card">
-          <div class="mb-sub-card-top">
-            <div>
-              <h3 class="mb-sub-title">Waiting Pool</h3>
-              <p class="mb-sub-desc"><strong>{{ kpi_in_pool }} Patients</strong><br>Avg wait: 14 mins</p>
-            </div>
-            <div class="mb-sub-gauge">
-              <svg width="44" height="44" viewBox="0 0 36 36">
-                <circle class="bg" cx="18" cy="18" r="14" fill="none" stroke-width="4"/>
-                <circle class="fg" cx="18" cy="18" r="14" fill="none" stroke-width="4" stroke-dasharray="88" stroke-dashoffset="24"/>
-              </svg>
-            </div>
-          </div>
-          <a href="{% url 'patient_queue' %}" class="mb-sub-btn lime">Attend Next Patient</a>
-        </div>
-
-        <!-- Capsule 2: Appointments -->
-        <div class="mb-sub-card">
-          <div class="mb-sub-card-top">
-            <div>
-              <h3 class="mb-sub-title">Appointments</h3>
-              <p class="mb-sub-desc"><strong>{{ todays_appointments.count }} Scheduled</strong><br>{{ upcoming_count }} Upcoming</p>
-            </div>
-            <div class="mb-sub-gauge">
-              <svg width="44" height="44" viewBox="0 0 36 36">
-                <circle class="bg" cx="18" cy="18" r="14" fill="none" stroke-width="4"/>
-                <circle class="fg" cx="18" cy="18" r="14" fill="none" stroke-width="4" stroke-dasharray="88" stroke-dashoffset="18"/>
-              </svg>
-            </div>
-          </div>
-          <a href="{% url 'appointment_list' %}" class="mb-sub-btn lime">View Schedule</a>
-        </div>
-
-        <!-- Capsule 3: Urgent & Triage -->
-        <div class="mb-sub-card">
-          <div class="mb-sub-card-top">
-            <div>
-              <h3 class="mb-sub-title">Urgent / Triage</h3>
-              <p class="mb-sub-desc"><strong>{{ kpi_review_required }} Cases</strong><br>Immediate attention</p>
-            </div>
-            <div class="mb-sub-gauge">
-              <svg width="44" height="44" viewBox="0 0 36 36">
-                <circle class="bg" cx="18" cy="18" r="14" fill="none" stroke-width="4"/>
-                <circle class="fg alert" cx="18" cy="18" r="14" fill="none" stroke-width="4" stroke-dasharray="88" stroke-dashoffset="12"/>
-              </svg>
-            </div>
-          </div>
-          <a href="#full-queue-roster" class="mb-sub-btn dark">Review Alerts</a>
-        </div>
-      </div>
+  <a class="db-card" href="{% url 'opd_service_queue' 'laboratory' %}">
+    <div class="db-card-head">
+      <h3 class="db-card-title">Lab</h3>
+      <span class="db-card-count">{{ lab_patients|length }}</span>
     </div>
-
-    <!-- Row 2: Priority Queue + Hours Activity -->
-    <div class="mb-two-col">
-
-      <!-- Priority Queue (Lavender Middle) -->
-      <div class="mb-assignments-card">
-        <div class="mb-card-header" style="margin-bottom:12px;">
-          <div class="mb-header-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
-            <span>Priority Queue</span>
-          </div>
-          <a href="{% url 'patient_queue' %}" class="mb-arrow-btn white" title="Open patient queue">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
-          </a>
-        </div>
-        <div class="mb-pill-stack">
-          {% for p in queue_patients|slice:":3" %}
-            <a href="{% url 'patient_detail' p.pk %}" class="mb-queue-pill">
-              <div class="mb-qp-info">
-                <strong>{{ p.full_name }}</strong>
-                <small>{{ p.uhid|default:p.mr_number }} · {{ p.created_at|time:"h:i A" }}</small>
-              </div>
-              <span class="mb-badge-pill {% if p.is_emergency %}urgent{% elif forloop.first %}in-progress{% else %}upcoming{% endif %}">
-                {% if p.is_emergency %}Urgent{% elif forloop.first %}In Consultation{% else %}Waiting{% endif %}
-              </span>
-            </a>
-          {% empty %}
-            <div style="background:#ffffff; border-radius:18px; padding:20px; text-align:center; color:#71717a;">No waiting patients right now.</div>
-          {% endfor %}
-        </div>
-      </div>
-
-      <!-- Activity Card (White with chart) -->
-      <div class="mb-activity-card">
-        <div class="mb-card-header" style="margin-bottom:6px;">
-          <div class="mb-header-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-            <span>Patient Flow Activity</span>
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:12px; font-weight:700; background:#f4f3fb; color:#634be2; padding:4px 12px; border-radius:99px;">Today ▾</span>
-            <a href="{% url 'reports' %}" class="mb-arrow-btn soft-gray" title="Open Reports">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
-            </a>
-          </div>
-        </div>
-        <div class="mb-act-meta">
-          <span class="mb-act-badge">↗ +14%</span> vs yesterday · Peak hour: 11 AM
-        </div>
-        <div class="mb-chart-wrap">
-          <div class="mb-bar-col">
-            <div class="mb-bar-pillar" style="height: 48px;"></div>
-            <span class="mb-bar-label">9 AM</span>
-          </div>
-          <div class="mb-bar-col">
-            <div class="mb-bar-pillar" style="height: 72px;"></div>
-            <span class="mb-bar-label">10 AM</span>
-          </div>
-          <div class="mb-bar-col">
-            <span class="mb-bar-tag">14 Pts</span>
-            <div class="mb-bar-pillar active-peak" style="height: 105px;"></div>
-            <span class="mb-bar-label" style="font-weight:750; color:#1b1c26;">11 AM</span>
-          </div>
-          <div class="mb-bar-col">
-            <div class="mb-bar-pillar" style="height: 80px;"></div>
-            <span class="mb-bar-label">12 PM</span>
-          </div>
-          <div class="mb-bar-col">
-            <div class="mb-bar-pillar" style="height: 38px;"></div>
-            <span class="mb-bar-label">1 PM</span>
-          </div>
-          <div class="mb-bar-col">
-            <div class="mb-bar-pillar" style="height: 64px;"></div>
-            <span class="mb-bar-label">2 PM</span>
-          </div>
-          <div class="mb-bar-col">
-            <div class="mb-bar-pillar" style="height: 52px;"></div>
-            <span class="mb-bar-label">3 PM</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Row 3: Leaderboard (Dark Obsidian) + On-Duty Clinical Team -->
-    <div class="mb-two-col">
-
-      <!-- Leaderboard / Queue Triage (Dark Obsidian Card) -->
-      <div class="mb-leaderboard-card">
-        <div class="mb-card-header">
-          <div class="mb-header-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
-            <span>Queue Triage Roster</span>
-          </div>
-          <a href="#full-queue-roster" class="mb-arrow-btn dark" title="View all patients">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
-          </a>
-        </div>
-        <table class="mb-lb-table">
-          {% for p in queue_patients|slice:":5" %}
-            <tr class="mb-lb-row {% if forloop.counter == 3 %}highlight{% endif %}">
-              <td>0{{ forloop.counter }}</td>
-              <td class="mb-lb-name">{{ p.full_name }}</td>
-              <td style="font-size:12px; opacity:0.85;">
-                {% if forloop.counter == 3 %}Attending Now{% elif p.is_emergency %}Emergency{% else %}Wait: {{ forloop.counter|add:"6" }}m{% endif %}
-              </td>
-            </tr>
-          {% empty %}
-            <tr><td colspan="3" style="text-align:center; padding:16px; opacity:0.6;">No queue data available.</td></tr>
-          {% endfor %}
-        </table>
-      </div>
-
-      <!-- On-Duty Medical Team (White Card) -->
-      <div class="mb-team-card">
-        <div class="mb-card-header">
-          <div class="mb-header-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <span>On-Duty Clinical Team</span>
-          </div>
-          <a href="{% url 'admin_doctors' %}" class="mb-arrow-btn soft-gray" title="Manage Clinical Team">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
-          </a>
-        </div>
-        <div class="mb-team-row">
-          {% for doc in doctor_accounts|slice:":6" %}
-            <div class="mb-team-member">
-              <div class="mb-tm-avatar">
-                {% if doc.profile.photo %}
-                  <img src="{{ doc.profile.photo.url }}" alt="{{ doc.first_name }}">
-                {% else %}
-                  {{ doc.first_name|default:doc.username|slice:":1"|upper }}
-                {% endif %}
-                <span class="mb-tm-status"></span>
-              </div>
-              <span class="mb-tm-name">{{ doc.first_name|default:doc.username }}</span>
-            </div>
-          {% empty %}
-            <div style="font-size:12.5px; color:#71717a; padding:10px 0;">Doctors will appear here as they sign in.</div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- RIGHT SIDE COLUMN -->
-  <div class="mb-side-col">
-
-    <!-- Notifications Card -->
-    <div class="mb-notifications-card">
-      <div class="mb-card-header" style="margin-bottom:10px;">
-        <div class="mb-header-title">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span>Notifications</span>
-        </div>
-      </div>
-      <div class="mb-notif-stack">
-        <div class="mb-notif-item">
-          Your lab orders for Ramesh Kumar have been verified.
-        </div>
-        <div class="mb-notif-item">
-          New priority patient assigned from Central Registration Desk.
-        </div>
-        <div class="mb-notif-item">
-          Daily OPD consultation log auto-synchronized.
-        </div>
-      </div>
-    </div>
-
-    <!-- Daily Schedule Card (Dark Slate) -->
-    <div class="mb-schedule-card">
-      <div class="mb-card-header" style="margin-bottom:12px;">
-        <div class="mb-header-title">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <span>Daily Schedule</span>
-        </div>
-      </div>
-
-      <div class="mb-cal-nav">
-        <span>‹</span>
-        <span>{{ today|date:"F Y" }}</span>
-        <span>›</span>
-      </div>
-
-      <div class="mb-days-strip">
-        <div><div class="mb-day-header">M</div><div class="mb-day-num">19</div></div>
-        <div><div class="mb-day-header">T</div><div class="mb-day-num active">20</div></div>
-        <div><div class="mb-day-header">W</div><div class="mb-day-num">21</div></div>
-        <div><div class="mb-day-header">T</div><div class="mb-day-num">22</div></div>
-        <div><div class="mb-day-header">F</div><div class="mb-day-num">23</div></div>
-        <div><div class="mb-day-header">S</div><div class="mb-day-num">24</div></div>
-        <div><div class="mb-day-header">S</div><div class="mb-day-num">25</div></div>
-      </div>
-
-      {% for appt in todays_appointments|slice:":2" %}
-        <div class="mb-sched-slot">
-          <strong>{{ appt.patient.full_name }} · {{ appt.reason|default:"Consultation" }}</strong>
-          <small>{{ appt.start_time|time:"H:i" }} – {{ appt.end_time|time:"H:i" }}</small>
-        </div>
+    <ul class="db-card-list">
+      {% for p in lab_patients %}
+        <li>{{ p.full_name|truncatechars:22 }}{% if p.uhid %} · {{ p.uhid }}{% endif %}</li>
       {% empty %}
-        <div class="mb-sched-slot">
-          <strong>General Consultation (OPD)</strong>
-          <small>11:00 – 11:45 AM · Room 102</small>
-        </div>
-        <div class="mb-sched-slot">
-          <strong>Follow-up &amp; Case Review</strong>
-          <small>13:00 – 14:00 PM · Consultation Desk</small>
-        </div>
+        <li class="db-empty">No pending lab orders</li>
       {% endfor %}
-    </div>
+    </ul>
+    <span class="db-card-link">Open lab queue →</span>
+  </a>
 
+  <a class="db-card" href="{% url 'opd_service_queue' 'radiology' %}">
+    <div class="db-card-head">
+      <h3 class="db-card-title">Xray or ECG</h3>
+      <span class="db-card-count">{{ imaging_patients|length }}</span>
+    </div>
+    <ul class="db-card-list">
+      {% for p in imaging_patients %}
+        <li>{{ p.full_name|truncatechars:22 }}{% if p.uhid %} · {{ p.uhid }}{% endif %}</li>
+      {% empty %}
+        <li class="db-empty">No pending imaging orders</li>
+      {% endfor %}
+    </ul>
+    <span class="db-card-link">Open imaging queue →</span>
+  </a>
+
+  <a class="db-card queue" href="#full-queue-roster">
+    <div class="db-card-head">
+      <h3 class="db-card-title">Queue</h3>
+      <span class="db-card-count">{{ queue_patients|length }}</span>
+    </div>
+    <ul class="db-card-list">
+      {% for p in queue_patients|slice:":6" %}
+        <li>{{ p.full_name|truncatechars:22 }}{% if p.uhid %} · {{ p.uhid }}{% endif %}</li>
+      {% empty %}
+        <li class="db-empty">No patients in queue</li>
+      {% endfor %}
+    </ul>
+    <span class="db-card-link">View patient queue →</span>
+  </a>
+
+  <a class="db-card" href="{% url 'opd_service_queue' 'radiology' %}">
+    <div class="db-card-head">
+      <h3 class="db-card-title">USG</h3>
+      <span class="db-card-count">{{ usg_patients|length }}</span>
+    </div>
+    <ul class="db-card-list">
+      {% for p in usg_patients %}
+        <li>{{ p.full_name|truncatechars:22 }}{% if p.uhid %} · {{ p.uhid }}{% endif %}</li>
+      {% empty %}
+        <li class="db-empty">No pending USG orders</li>
+      {% endfor %}
+    </ul>
+    <span class="db-card-link">Open USG queue →</span>
+  </a>
+
+  <a class="db-card" href="{% url 'opd_service_queue' 'physiotherapy' %}">
+    <div class="db-card-head">
+      <h3 class="db-card-title">Physio Counselling</h3>
+      <span class="db-card-count">{{ physio_patients|length }}</span>
+    </div>
+    <ul class="db-card-list">
+      {% for p in physio_patients %}
+        <li>{{ p.full_name|truncatechars:22 }}{% if p.uhid %} · {{ p.uhid }}{% endif %}</li>
+      {% empty %}
+        <li class="db-empty">No pending physio/counselling</li>
+      {% endfor %}
+    </ul>
+    <span class="db-card-link">Open physio queue →</span>
+  </a>
+
+  <a class="db-card" href="{% url 'opd_referrals' %}">
+    <div class="db-card-head">
+      <h3 class="db-card-title">Cross Consult</h3>
+      <span class="db-card-count">{{ cross_patients|length }}</span>
+    </div>
+    <ul class="db-card-list">
+      {% for p in cross_patients %}
+        <li>{{ p.full_name|truncatechars:22 }}{% if p.uhid %} · {{ p.uhid }}{% endif %}</li>
+      {% empty %}
+        <li class="db-empty">No pending referrals</li>
+      {% endfor %}
+    </ul>
+    <span class="db-card-link">Open referrals →</span>
+  </a>
+
+</div>
+
+<!-- ── Compact & Elegant Clinical Consultations Overview ── -->
+<div class="db-overview-strip">
+  <div class="db-overview-head">
+    <div class="db-overview-title">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
+        <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/>
+        <circle cx="20" cy="10" r="2"/>
+      </svg>
+      <span>Clinical Consultations Overview</span>
+    </div>
+    <span class="db-overview-tag">Today's Summary</span>
+  </div>
+
+  <div class="db-overview-grid">
+    <a href="#full-queue-roster" class="db-metric-item" title="Jump to full registered patient roster">
+      <div class="db-metric-icon lav">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="db-metric-body">
+        <span class="db-metric-val">{{ kpi_total_today|default:total_patients|default:0 }}</span>
+        <span class="db-metric-lbl">Total Regd</span>
+      </div>
+      <span class="db-metric-arrow">→</span>
+    </a>
+
+    <a href="#full-queue-roster" class="db-metric-item" title="Patients awaiting consultation">
+      <div class="db-metric-icon lime">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div class="db-metric-body">
+        <span class="db-metric-val">{{ kpi_in_pool|default:0 }}</span>
+        <span class="db-metric-lbl">Waiting Pool</span>
+      </div>
+      <span class="db-metric-arrow">→</span>
+    </a>
+
+    <a href="#full-queue-roster" class="db-metric-item" title="Consultations completed today">
+      <div class="db-metric-icon green">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </div>
+      <div class="db-metric-body">
+        <span class="db-metric-val">{{ kpi_completed|default:0 }}</span>
+        <span class="db-metric-lbl">Completed</span>
+      </div>
+      <span class="db-metric-arrow">→</span>
+    </a>
   </div>
 </div>
 
-<!-- ── Full Interactive Patient Register & Queue Table ── -->
-<div class="mb-table-card" id="full-queue-roster">
+<!-- ── Full Patient Queue Table ── -->
+<div class="mb-table-card" id="full-queue-roster" style="margin-top:18px;">
   <div class="mb-table-header">
     <div class="mb-table-title">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
       <span>Live Patient Queue Register ({{ queue_patients|length }})</span>
     </div>
     <div style="display:flex; gap:10px;">
       <a class="mb-sub-btn" style="background:#f4f3fb; color:#634be2; font-size:12.5px; padding:7px 16px; margin:0; width:auto; border-radius:99px;" href="{% url 'dashboard' %}">↻ Refresh Queue</a>
     </div>
   </div>
-
-  <div class="mb-filters-row">
-    <select class="mb-select" aria-label="Location"><option>Queue / Location: Central Pool</option><option>OPD Central Pool</option><option>Procedure Room</option></select>
-    <select class="mb-select" aria-label="Doctor Filter">
-      <option value="">All Doctors</option>
-      {% for doc in doctor_accounts %}
-        <option>{{ doc.get_full_name|default:doc.username }}{% if doc.profile.specialty %} ({{ doc.profile.get_specialty_display }}){% endif %}</option>
-      {% endfor %}
-    </select>
-    <select class="mb-select" aria-label="Priority Filter"><option>Priority: All</option><option>Normal</option><option>Urgent</option><option>Emergency</option></select>
-  </div>
-
   <div class="mb-table-scroll">
     <table class="mb-queue-table">
       <thead>
@@ -1051,7 +1153,7 @@
         {% for patient in queue_patients %}
         <tr>
           <td style="color:#71717a; font-weight:600;">{{ forloop.counter }}</td>
-          <td style="font-family:monospace; font-weight:700; color:#634be2;">{{ patient.uhid|default:patient.mr_number }}</td>
+          <td style="font-family:monospace; font-weight:700; color:#634be2;">{{ patient.uhid|default:patient.uhid }}</td>
           <td>
             <a href="{% url 'patient_detail' patient.pk %}" style="color:#1b1c26; font-weight:750; text-decoration:none;">
               {{ patient.full_name }}
@@ -1072,22 +1174,9 @@
             {% if patient.assigned_doctor %}
               <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-weight:650; color:#1b1c26; font-size:13px;">{{ patient.assigned_doctor.get_full_name|default:patient.assigned_doctor.username }}</span>
-                <form method="post" action="{% url 'assign_doctor' patient.pk %}" style="display:inline;">
-                  {% csrf_token %}
-                  <input type="hidden" name="doctor_id" value="">
-                  <button type="submit" style="background:#fee2e2; border:none; color:#dc2626; border-radius:6px; cursor:pointer; width:20px; height:20px; display:grid; place-items:center; font-size:12px;" title="Unassign">×</button>
-                </form>
               </div>
             {% else %}
-              <form method="post" action="{% url 'assign_doctor' patient.pk %}">
-                {% csrf_token %}
-                <select name="doctor_id" onchange="this.form.submit()" class="mb-select" style="padding:4px 22px 4px 8px; font-size:11.5px; border-style:dashed;">
-                  <option value="">Assign Doctor…</option>
-                  {% for doc in doctor_accounts %}
-                    <option value="{{ doc.pk }}">{{ doc.get_full_name|default:doc.username }}</option>
-                  {% endfor %}
-                </select>
-              </form>
+              <span style="color:#a1a1aa;">Unassigned</span>
             {% endif %}
           </td>
           <td>
@@ -1101,7 +1190,7 @@
             {% endwith %}
           </td>
           <td>
-            <a href="{% url 'patient_detail' patient.pk %}" class="mb-sub-btn lime" style="margin:0; width:auto; padding:5px 14px; font-size:12px; display:inline-block;">
+            <a href="{% url 'doctor_consultation' %}?patient={{ patient.pk }}" class="mb-sub-btn lime" style="margin:0; width:auto; padding:5px 14px; font-size:12px; display:inline-block;">
               Consult →
             </a>
           </td>
@@ -1109,7 +1198,7 @@
         {% empty %}
         <tr>
           <td colspan="9" style="text-align:center; padding:36px; color:#71717a;">
-            No patients registered in the queue yet. Patients registered at the Registration Desk appear here automatically.
+            No patients registered in the queue yet.
           </td>
         </tr>
         {% endfor %}

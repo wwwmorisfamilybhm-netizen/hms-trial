@@ -1,6 +1,14 @@
 from datetime import date
+from io import BytesIO
+from tempfile import TemporaryDirectory
 
-from django.test import TestCase
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
+from django.urls import reverse
+from django.utils import timezone
+from PIL import Image
 
 from .forms import (
     COMMON_RELIGIONS,
@@ -78,3 +86,150 @@ class PatientRegistrationFormTests(TestCase):
         self.assertEqual(form.fields["state"].initial, "Bihar")
         self.assertEqual(state_choices[1:], INDIAN_STATES_AND_UNION_TERRITORIES)
         self.assertEqual(religion_choices[1:5], COMMON_RELIGIONS)
+
+
+@override_settings(STORAGES={
+    **settings.STORAGES,
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+})
+class PatientEditViewTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = get_user_model().objects.create_user(username="patient-editor")
+        cls.user.profile.designation = "admin"
+        cls.user.profile.save()
+        cls.patient = Patient.objects.create(
+            first_name="Sam",
+            second_name="Lee",
+            last_name="Rao",
+            uhid="100002",
+            phone="+919876543210",
+            date_of_birth=date(2000, 8, 23),
+            patient_category="LEGACY",
+            reg_fee=23,
+        )
+
+    def setUp(self):
+        self.client.force_login(self.user)
+        self.edit_url = reverse("patient_edit", args=[self.patient.pk])
+        self.detail_url = reverse("patient_detail", args=[self.patient.pk])
+
+    def edit_data(self, **overrides):
+        return {
+            "first_name": "Sam",
+            "second_name": "Lee",
+            "last_name": "Rao",
+            "phone": "9876543210",
+            "date_of_birth": "2000-08-23",
+            "patient_category": "LEGACY",
+            "payment_type": "cash",
+            "billing_type": "Individual",
+            **overrides,
+        }
+
+    def test_editor_renders_each_field_and_the_saved_identity(self):
+        response = self.client.get(self.edit_url)
+
+        self.assertTemplateUsed(response, "patients/patient_edit.html")
+        self.assertContains(response, "Sam Lee Rao")
+        self.assertContains(response, "UHID #100002")
+        self.assertContains(response, 'enctype="multipart/form-data"')
+        self.assertContains(response, 'value="2000-08-23"')
+        self.assertContains(response, self.detail_url)
+        self.assertContains(response, reverse("patient_delete", args=[self.patient.pk]))
+        form = response.context["form"]
+        for field in form.visible_fields():
+            self.assertContains(response, f'id="{field.id_for_label}"', count=1)
+        for name in ("age_years", "age_months", "age_days"):
+            self.assertIsNone(form[name].value())
+        self.assertIn(("LEGACY", "LEGACY"), form.fields["patient_category"].choices)
+
+    def test_updates_date_and_category_without_recalculating_the_fee(self):
+        response = self.client.post(
+            self.edit_url,
+            self.edit_data(
+                date_of_birth="2001-05-15",
+                patient_category="BPL",
+                email="patient@example.com",
+                reg_fee="99999",
+            ),
+            follow=True,
+        )
+
+        self.assertRedirects(response, self.detail_url)
+        self.assertContains(response, "Patient Sam Rao updated.")
+        self.patient.refresh_from_db()
+        self.assertEqual(self.patient.date_of_birth, date(2001, 5, 15))
+        self.assertEqual(self.patient.patient_category, "BPL")
+        self.assertEqual(self.patient.email, "patient@example.com")
+        self.assertEqual(self.patient.reg_fee, 23)
+
+    def test_partial_emergency_record_accepts_age_without_date_of_birth(self):
+        patient = Patient.objects.create(first_name="Emergency", is_emergency=True)
+        url = reverse("patient_edit", args=[patient.pk])
+        self.assertContains(self.client.get(url), f"Patient #{patient.pk}")
+        response = self.client.post(url, self.edit_data(
+            first_name=patient.first_name,
+            second_name="",
+            last_name="",
+            date_of_birth="",
+            age_years="20",
+            patient_category="GENERAL",
+        ))
+
+        self.assertRedirects(response, reverse("patient_detail", args=[patient.pk]))
+        patient.refresh_from_db()
+        self.assertEqual(patient.date_of_birth.year, timezone.localdate().year - 20)
+        self.assertEqual(patient.phone, "+919876543210")
+
+    def test_invalid_submission_shows_linked_errors_and_retains_values(self):
+        response = self.client.post(
+            self.edit_url, self.edit_data(first_name="Draft", phone="123", age_years="2")
+        )
+
+        self.assertContains(response, 'href="#id_phone"')
+        self.assertContains(response, 'aria-describedby="id_phone_error"')
+        self.assertContains(response, 'id="id_phone_error"')
+        self.assertContains(response, "Date of birth and age do not match")
+        self.assertContains(response, 'value="Draft"')
+        self.assertContains(response, "Sam Lee Rao")
+        self.patient.refresh_from_db()
+        self.assertEqual(self.patient.first_name, "Sam")
+
+    def test_photo_can_be_replaced_and_cleared(self):
+        with TemporaryDirectory() as media_root, self.settings(MEDIA_ROOT=media_root):
+            for name in ("original.png", "replacement.png"):
+                image = BytesIO()
+                Image.new("RGB", (2, 2)).save(image, format="PNG")
+                upload = SimpleUploadedFile(name, image.getvalue(), content_type="image/png")
+                response = self.client.post(self.edit_url, self.edit_data(photo=upload))
+                self.assertRedirects(response, self.detail_url)
+                self.patient.refresh_from_db()
+                self.assertEqual(self.patient.photo.name, f"patient_photos/{name}")
+
+            response = self.client.get(self.edit_url)
+            self.assertContains(response, self.patient.photo.url)
+            self.assertContains(response, 'name="photo-clear"')
+            response = self.client.post(self.edit_url, self.edit_data(**{"photo-clear": "on"}))
+            self.assertRedirects(response, self.detail_url)
+            self.patient.refresh_from_db()
+            self.assertFalse(self.patient.photo)
+
+    def test_invalid_photo_shows_error_without_saving(self):
+        upload = SimpleUploadedFile("invalid.png", b"invalid image", content_type="image/png")
+        response = self.client.post(self.edit_url, self.edit_data(photo=upload))
+
+        self.assertContains(response, 'href="#id_photo"')
+        self.assertContains(response, "Choose the photo again before saving.")
+        self.patient.refresh_from_db()
+        self.assertFalse(self.patient.photo)
+
+    def test_new_registration_routes_use_their_original_templates(self):
+        for route, template in (
+            ("patient_create", "patients/patient_form.html"),
+            ("registration_desk_new", "core/registration_desk_form.html"),
+        ):
+            with self.subTest(route=route):
+                response = self.client.get(reverse(route))
+                self.assertTemplateUsed(response, template)
+                self.assertNotContains(response, "patient_edit.css")

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Post-consultation billing — Cams HMS{% endblock %}
+
+{% block heading %}
+<div class="page-head" style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+  <div>
+    <h1>Post-consultation billing</h1>
+    <p class="page-sub">Collect payment for services and pharmacy after the doctor completes the visit. Paid work is released to the respective desks.</p>
+  </div>
+  <div style="display:flex; gap:9px; flex-wrap:wrap;">
+    <a href="{% url 'bill_command_center' %}" class="btn btn-outline">← Bill Command Center</a>
+    <a href="{% url 'pharmacy_billing' %}" class="btn btn-outline">Pharmacy billing</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="card" style="border-radius:22px; padding:22px; margin-bottom:18px;">
+  <form method="get" action="{% url 'post_consultation_billing' %}" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+    <input type="search" name="q" value="{{ query }}" placeholder="Search patient, UHID, phone or visit token…" style="flex:1; min-width:240px; padding:11px 14px; border:1px solid var(--line); border-radius:12px; font:inherit;">
+    <button type="submit" class="btn">Search</button>
+    {% if query %}<a href="{% url 'post_consultation_billing' %}" class="btn btn-outline">Clear</a>{% endif %}
+  </form>
+</section>
+
+<section class="card" style="border-radius:22px; padding:22px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
+    <div>
+      <h2 style="margin:0; font-size:18px;">Visits needing billing attention</h2>
+      <p style="margin:5px 0 0; color:var(--muted); font-size:13px;">Completed consultations with pending bills, or prescriptions still being priced by pharmacy.</p>
+    </div>
+    <span class="badge" style="background:#fff0cf; color:#805400; font-weight:800; padding:7px 12px;">{{ pending_count }} VISIT{{ pending_count|pluralize }}</span>
+  </div>
+
+  {% if rows %}
+  <div style="display:grid; gap:10px;">
+    {% for row in rows %}
+    <a href="{% url 'visit_billing' row.consultation.pk %}" style="display:grid; grid-template-columns:minmax(190px,1.3fr) minmax(160px,1fr) auto auto; align-items:center; gap:14px; padding:14px 16px; border:1px solid var(--line); border-radius:16px; color:var(--ink); text-decoration:none; background:#fffdf5;">
+      <span>
+        <strong>{{ row.patient.full_name }}</strong>
+        <small style="display:block; color:var(--muted); margin-top:4px;">UHID #{{ row.patient.uhid|default:row.patient.pk }} · {{ row.consultation.visit_token }}</small>
+      </span>
+      <span>
+        <small style="display:block; color:var(--muted);">Consultant</small>
+        <strong>{% if row.doctor %}{{ row.doctor.get_full_name|default:row.doctor.username }}{% else %}—{% endif %}</strong>
+        <small style="display:block; color:var(--muted); margin-top:3px;">Completed {{ row.consultation.updated_at|date:"d M Y, h:i A" }}</small>
+      </span>
+      <span style="text-align:right; white-space:nowrap;">
+        {% if row.pending_preparation %}
+          <small style="display:block; color:#9a3412; font-weight:700;">Pharmacy bill pending preparation</small>
+          <strong style="font-size:16px; color:#9a3412;">Awaiting price</strong>
+        {% else %}
+          <small style="display:block; color:var(--muted);">{{ row.service_count }} service{{ row.service_count|pluralize }} · {{ row.pharmacy_count }} pharmacy bill{{ row.pharmacy_count|pluralize }}</small>
+          <strong style="font-size:16px;">₹{{ row.total|floatformat:2 }}</strong>
+          {% if not row.pharmacy_prepared %}<small style="display:block; color:#9a3412;">Pharmacy bill not prepared yet</small>{% endif %}
+        {% endif %}
+      </span>
+      <span class="btn btn-outline" style="font-size:12px; padding:8px 12px; white-space:nowrap;">Open bill →</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p style="color:var(--muted); margin:0;">No completed visits are awaiting payment{% if query %} for “{{ query }}”{% endif %}.</p>
+  {% endif %}
+</section>
+{% endblock %}

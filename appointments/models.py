@@ -55,7 +55,8 @@ class Appointment(models.Model):
         Patient, on_delete=models.CASCADE, related_name="appointments"
     )
     doctor = models.ForeignKey(
-        Doctor, on_delete=models.PROTECT, related_name="appointments"
+        Doctor, on_delete=models.PROTECT, related_name="appointments",
+        null=True, blank=True,
     )
     date = models.DateField()
     start_time = models.TimeField()

@@ -763,8 +763,8 @@
     }).then(function (data) {
       if (!data || !data.ok) { throw new Error((data && data.error) || "Save failed"); }
       showToast(options.complete ? "Assessment completed and routed to the doctor queue." : (options.urgent ? "Assessment draft saved and marked urgent." : "Assessment draft saved."));
-      if (options.redirect && BASE_URL) {
-        window.setTimeout(function () { window.location.href = BASE_URL; }, 700);
+      if (options.redirect) {
+        window.setTimeout(function () { window.location.href = "/opd-assistant/"; }, 700);
       }
     }).catch(function (err) {
       showToast("Could not save the assessment (" + err.message + ")", "error");
@@ -775,7 +775,7 @@
 
   function initSaveActions() {
     var saveBtn = document.getElementById("btnSaveAssessment");
-    if (saveBtn) { saveBtn.addEventListener("click", function () { saveAssessment({}); }); }
+    if (saveBtn) { saveBtn.addEventListener("click", function () { saveAssessment({ redirect: true }); }); }
 
     var saveAndQueue = document.getElementById("saveAssessmentBtn");
     if (saveAndQueue) { saveAndQueue.addEventListener("click", function () {
@@ -785,10 +785,10 @@
     }); }
 
     var draftBtn = document.getElementById("saveDraftBtn");
-    if (draftBtn) { draftBtn.addEventListener("click", function () { saveAssessment({}); }); }
+    if (draftBtn) { draftBtn.addEventListener("click", function () { saveAssessment({ redirect: true }); }); }
 
     var urgentBtn = document.getElementById("markUrgentBtn");
-    if (urgentBtn) { urgentBtn.addEventListener("click", function () { saveAssessment({ urgent: true }); }); }
+    if (urgentBtn) { urgentBtn.addEventListener("click", function () { saveAssessment({ urgent: true, redirect: true }); }); }
 
     var editBtn = document.getElementById("btnEditAssessment");
     if (editBtn) {

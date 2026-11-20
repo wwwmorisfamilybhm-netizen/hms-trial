@@ -6,6 +6,7 @@ __pycache__/
 # Django
 db.sqlite3
 staticfiles/
+private_reports/
 
 # macOS
 .DS_Store
@@ -13,3 +14,6 @@ staticfiles/
 # Editors
 .vscode/
 .idea/
+
+# Uploaded medicine product photos
+media/medicine_photos/

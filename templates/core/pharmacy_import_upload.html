@@ -1,0 +1,12 @@
+{% extends "core/pharmacy_base.html" %}
+{% block operations_content %}
+<div class="ops-grid">
+<section class="ph-panel"><h2>Upload a medicine list or invoice</h2>
+<p>CSV, Excel (.xlsx), PDF, JPG or PNG · Up to 10 MB, 10 PDF pages and 500 rows. Review extracted values before receiving stock.</p>
+<p>Download a <a href="{% url 'pharmacy_import_template' %}">CSV template</a> or <a href="{% url 'pharmacy_import_template' %}?format=xlsx">Excel template</a>.</p>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.non_field_errors }}
+{% for field in form %}{% include "core/pharmacy_field.html" %}{% endfor %}
+<p class="ph-note">For a scan or a PDF without a heading row, clear “First extracted row contains column headings”.</p>
+<button class="np-btn teal">Extract &amp; review</button></form></section>
+<section class="ph-panel"><h2>Recent imports</h2><ul class="ops-list">{% for draft in drafts %}<li><a href="{% url 'pharmacy_import_review' draft.pk %}">{{ draft.filename }}</a><small class="ph-note"> · {{ draft.created_at|date:"d M Y H:i" }} · {% if draft.committed_at %}Saved{% else %}Draft{% endif %}</small></li>{% empty %}<li>No files imported yet.</li>{% endfor %}</ul></section></div>
+{% endblock %}

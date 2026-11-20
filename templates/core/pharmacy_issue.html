@@ -1,0 +1,38 @@
+{% extends "core/pharmacy_base.html" %}
+{% block operations_content %}
+{% if can_dispense %}
+  {% if request.GET.source == 'history' %}<a class="ph-back ops-no-print" href="{% url 'pharmacy_dispense_history' %}{% querystring source=None %}">← Dispensing history</a>
+  {% else %}<a class="ph-back ops-no-print" href="{% url 'pharmacy_dashboard' %}{% querystring %}">← Back to work queue</a>{% endif %}
+{% endif %}
+<article class="ops-card">
+  <header class="ops-header">
+    <div><h2 class="ops-patient">{{ issue.consultation.patient.full_name }}</h2>
+      <p class="ops-muted">{{ issue.consultation.patient.uhid }} · {{ issue.consultation.visit_token }}<br>
+        Issue #{{ issue.pk }} · {{ issue.created_at|date:'d M Y H:i' }} · {{ issue.bill.bill_number }}</p></div>
+    <div class="ops-actions"><span class="ph-status {% if issue.ready %}ready{% elif issue.status == 'awaiting_payment' %}pending{% endif %}">
+      {% if issue.ready %}Ready for handover{% else %}{{ issue.get_status_display }}{% endif %}</span>
+      <button type="button" class="np-btn ops-no-print" onclick="window.print()">Print issue slip</button></div>
+  </header>
+  {% if issue.stale %}<p class="ops-warning">Unpaid for over 24 hours. Review this reservation.</p>{% endif %}
+  <div class="ops-scroll"><table class="ops-table"><thead><tr>
+    <th>Medicine</th><th>Instructions</th><th>Batch / expiry</th><th>Quantity</th><th>Unit price</th><th>Total</th>
+  </tr></thead><tbody>{% for line in lines %}
+    <tr><td>{% include "core/pharmacy_thumbnail.html" with medicine=line.medicine %}<strong>{{ line.medicine_name }}</strong></td>
+      <td>{{ line.prescription.dose }} · {{ line.prescription.route }} · {{ line.prescription.frequency }} · {{ line.prescription.duration }}<br>{{ line.prescription.instructions }}</td>
+      <td>{% for allocation in line.allocations.all %}{{ allocation.batch.batch_number }} · {{ allocation.batch.expiry_date|date:'d M Y' }} · {{ allocation.quantity }} units<br>{% endfor %}</td>
+      <td>{{ line.quantity }} {{ line.medicine.unit }}</td><td>₹{{ line.unit_price }}</td><td>₹{{ line.total|floatformat:2 }}</td></tr>
+  {% endfor %}</tbody></table></div>
+  <div class="ops-total">Total ₹{{ issue.bill.amount_due|floatformat:2 }}</div>
+  {% if issue.dispensed_at %}<p>Handed over by {% firstof issue.dispensed_by.get_full_name issue.dispensed_by.username '—' %} · {{ issue.dispensed_at|date:'d M Y H:i' }}</p>{% endif %}
+  {% if other_dues %}<p class="ops-warning">Other patient dues are outstanding. Handover depends on payment of this issue’s bill.</p>{% endif %}
+  <div class="ops-actions ops-no-print">
+    {% if not can_dispense %}<a class="np-btn teal" href="{% url 'patient_bill_slip' issue.bill_id %}">Open cashier payment slip</a>{% endif %}
+    {% if can_dispense and issue.status == 'awaiting_payment' %}
+      {% if issue.ready %}<form method="post">{% csrf_token %}<button class="np-btn teal" name="action" value="handover">Confirm medicine handover</button></form>
+      {% else %}<span class="ops-muted">Awaiting cashier payment for {{ issue.bill.bill_number }}.</span>{% endif %}
+      <form method="post">{% csrf_token %}<button class="np-btn" name="action" value="reallocate">Refresh batch allocation</button></form>
+      {% if issue.bill.status == 'pending' %}<form method="post">{% csrf_token %}<button class="np-btn" name="action" value="cancel">Cancel unpaid issue</button></form>{% endif %}
+    {% endif %}
+  </div>
+</article>
+{% endblock %}

@@ -1,0 +1,892 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Triage Workstation — OPD Desk{% endblock %}
+
+{% block heading %}
+<div class="np-head">
+  <div>
+    <div class="np-kicker">OPD Desk · Initial Assessment</div>
+    <h1 class="np-title">Triage Workstation</h1>
+    <p class="np-sub">Record vitals, complaints and red flags. Saving returns the visit to the OPD Desk for doctor allocation.</p>
+  </div>
+  <div class="np-head-actions">
+    <a href="{% url 'opd_assistant_dashboard' %}" class="np-btn">← OPD Desk</a>
+    <a href="{% url 'nurse_queue' %}" class="np-btn">Queue</a>
+    {% if ticket %}
+      <span class="np-badge {% if ticket.priority == 'emergency' %}emergency{% elif ticket.priority == 'urgent' %}urgent{% else %}teal{% endif %}" style="align-self:center;">
+        {{ ticket.ticket_number }} · {{ ticket.get_status_display }}
+      </span>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  /* Page-local tweaks for the workstation */
+  .np-complaint-row select, .np-complaint-row input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1.5px solid #e6e2f7; background: #fbfbfd; font: inherit; font-size: 13.5px; }
+  .np-complaint-row select:focus, .np-complaint-row input:focus { outline: none; border-color: #9b87f8; box-shadow: 0 0 0 3px rgba(155,135,248,.16); background: #fff; }
+  .np-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; border-bottom: 1px solid #ece9fb; padding-bottom: 10px; }
+  .np-tab { border: 1px solid #e6e2f7; background: #fff; border-radius: 999px; padding: 7px 14px; font-size: 12.5px; font-weight: 700; color: #4b4b58; cursor: pointer; font-family: inherit; }
+  .np-tab.is-on { background: linear-gradient(135deg, #9b87f8, #7660ea); border-color: transparent; color: #fff; }
+  .np-tab-panel[hidden] { display: none; }
+  .np-orders { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .np-order-bank { border: 1px solid #ece9fb; border-radius: 16px; padding: 12px; background: #faf9ff; }
+  .np-order-bank h4 { margin: 0 0 8px; font-size: 12px; letter-spacing: .5px; text-transform: uppercase; color: #787886; }
+  .np-order-list { display: flex; flex-direction: column; gap: 6px; }
+  .np-order-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #43434f; }
+  .np-order-item input { accent-color: #9b87f8; }
+  .np-save-state { font-size: 12px; color: var(--muted); }
+  .np-save-state.is-dirty { color: #b45309; font-weight: 700; }
+  .np-save-state.is-saved { color: var(--np-routine); font-weight: 700; }
+  .np-vitals-summary { font-size: 12px; color: #3f3f4a; }
+</style>
+
+{% if not has_patient %}
+  <!-- ══════════════ No patient selected: picker ══════════════ -->
+  <div class="np-bento">
+    <div class="np-col">
+      <section class="np-card">
+        <div class="np-card-head">
+          <h2 class="np-card-title"><span class="np-dot"></span>Waiting for triage</h2>
+          <span class="np-card-sub">{{ queue_patients|length }} patient{{ queue_patients|length|pluralize }}</span>
+        </div>
+        {% if queue_patients %}
+          <div class="np-queue">
+            {% for item in queue_patients %}
+              <div class="np-qcard {% if item.priority == 'emergency' %}is-emergency{% elif item.priority == 'urgent' %}is-urgent{% endif %}">
+                <div class="np-qtoken">{{ item.ticket_number }}<small>{{ item.wait_minutes }} min</small></div>
+                <div class="np-qmain">
+                  <div class="np-qname">{{ item.patient.full_name }} <span class="np-badge {{ item.priority }}">{{ item.get_priority_display }}</span></div>
+                  <div class="np-qmeta"><span>{{ item.patient.uhid|default:"No UHID" }}</span><span>{{ item.patient.age|default:"—" }} yrs · {{ item.patient.get_gender_display|default:"—" }}</span></div>
+                  {% if item.visit_note %}<div class="np-qnote">“{{ item.visit_note }}”</div>{% endif %}
+                </div>
+                <div class="np-qactions">
+                  <a class="np-btn sm lime" href="{% url 'nurse_triage' %}?ticket={{ item.pk }}">Start →</a>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="np-empty">Nothing in the queue. Use the search on the right to start a walk-in triage.</div>
+        {% endif %}
+      </section>
+    </div>
+    <div class="np-col">
+      <section class="np-card">
+        <div class="np-card-head"><h2 class="np-card-title">Select or find patient</h2></div>
+        <div class="np-picker" data-nurse-picker>
+          <input type="search" placeholder="Search name, UHID or phone…" aria-label="Search patients" autocomplete="off">
+          <div class="np-picker-results" hidden></div>
+        </div>
+        <p class="np-card-sub" style="margin-top:12px;">A ticket is opened automatically for walk-ins so the OPD Desk can track the visit.</p>
+      </section>
+      <section class="np-card dark">
+        <div class="np-card-head"><h2 class="np-card-title"><span class="np-dot" style="background:var(--lime)"></span>How the flow works</h2></div>
+        <ol style="margin:0; padding-left:18px; font-size:12.5px; line-height:1.75; color:#c7e3de;">
+          <li>OPD Desk sends a visit to the nurse queue.</li>
+          <li>You claim it and record vitals, complaints &amp; red flags.</li>
+          <li>Save → the visit returns to the OPD Desk for doctor allocation.</li>
+          <li>Urgent cases are flagged automatically and escalated to the duty doctor.</li>
+        </ol>
+      </section>
+    </div>
+  </div>
+
+{% else %}
+  <!-- ══════════════ Workstation ══════════════ -->
+  <form id="nurseTriageForm" novalidate>
+    {% csrf_token %}
+    {% csrf_token %}
+    <input type="hidden" name="ticket_id" value="{{ ticket.pk }}">
+    <input type="hidden" name="patient_id" value="{{ selected_patient.pk }}">
+
+    <div class="np-work">
+      <div class="np-col">
+
+        <!-- Patient hero -->
+        <div class="np-patient-hero">
+          <div class="np-hero-top">
+            <div class="np-hero-avatar">{{ patient_ctx.initials }}</div>
+            <div style="min-width:0;">
+              <h2 class="np-hero-name">{{ patient_ctx.name }}</h2>
+              <div class="np-hero-meta">
+                {{ patient_ctx.uhid|default:"No UHID" }} · {{ patient_ctx.age }} yrs · {{ patient_ctx.gender }} · {{ patient_ctx.phone }}
+              </div>
+              <div class="np-hero-tags">
+                <span class="np-badge {% if ticket.priority == 'emergency' %}emergency{% elif ticket.priority == 'urgent' %}urgent{% else %}teal{% endif %}">{{ ticket.ticket_number }} · {{ ticket.get_priority_display }}</span>
+                {% if patient_ctx.is_emergency %}<span class="np-badge emergency">Emergency registration</span>{% endif %}
+                {% if vitals_status == "completed" %}<span class="np-badge routine">Vitals recorded</span>{% elif vitals_status == "draft" %}<span class="np-badge urgent">Draft vitals</span>{% else %}<span class="np-badge muted">First assessment</span>{% endif %}
+                {% if claimed_now %}<span class="np-badge lime">Claimed by you</span>{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="np-hero-facts">
+            <div class="np-hero-fact"><span>Registered</span><strong>{{ patient_ctx.visit_timestamp }}</strong></div>
+            <div class="np-hero-fact"><span>Blood group</span><strong>{{ patient_ctx.blood_group }}</strong></div>
+            <div class="np-hero-fact"><span>Waiting since</span><strong>{{ ticket.wait_minutes }} min</strong></div>
+            <div class="np-hero-fact"><span>Sent by</span><strong>{% if ticket.sent_by %}{{ ticket.sent_by.get_full_name|default:ticket.sent_by.username }}{% else %}—{% endif %}</strong></div>
+          </div>
+          {% if patient_ctx.allergies_text %}
+            <div class="np-allergy">⚠ Known allergies: {{ patient_ctx.allergies_text }}</div>
+          {% endif %}
+          {% if ticket.visit_note %}
+            <div class="np-hero-meta" style="margin-top:10px; position:relative;">OPD Desk note: “{{ ticket.visit_note }}”</div>
+          {% endif %}
+        </div>
+
+        <!-- 1. Vitals -->
+        <section class="np-section">
+          <div class="np-section-head">
+            <h3 class="np-section-title"><span class="np-step">1</span>Vital signs</h3>
+            <span class="np-section-hint">Fields turn red when out of range — the same ranges drive the priority score.</span>
+          </div>
+          <div class="np-vitals">
+            <div class="np-vital" data-vital="temperature">
+              <label for="v-temperature">Temperature (°C)</label>
+              <input id="v-temperature" name="temperature" type="number" step="0.1" min="25" max="45" inputmode="decimal" value="{{ assessment.temperature }}">
+              <div class="np-vital-hint"></div>
+            </div>
+            <div class="np-vital" data-vital="pulse">
+              <label for="v-pulse">Pulse (bpm)</label>
+              <input id="v-pulse" name="pulse" type="number" min="1" max="300" inputmode="numeric" value="{{ assessment.pulse }}">
+              <div class="np-vital-hint"></div>
+            </div>
+            <div class="np-vital" data-vital="bp_systolic">
+              <label for="v-bp-sys">BP systolic</label>
+              <input id="v-bp-sys" name="bp_systolic" type="number" min="1" max="350" inputmode="numeric" value="{{ assessment.bp_systolic }}">
+              <div class="np-vital-hint"></div>
+            </div>
+            <div class="np-vital" data-vital="bp_diastolic">
+              <label for="v-bp-dia">BP diastolic</label>
+              <input id="v-bp-dia" name="bp_diastolic" type="number" min="1" max="250" inputmode="numeric" value="{{ assessment.bp_diastolic }}">
+              <div class="np-vital-hint"></div>
+            </div>
+            <div class="np-vital" data-vital="spo2">
+              <label for="v-spo2">SpO₂ (%)</label>
+              <input id="v-spo2" name="spo2" type="number" min="1" max="100" inputmode="numeric" value="{{ assessment.spo2 }}">
+              <div class="np-vital-hint"></div>
+            </div>
+            <div class="np-vital" data-vital="respiratory_rate">
+              <label for="v-rr">Resp. rate /min</label>
+              <input id="v-rr" name="respiratory_rate" type="number" min="1" max="100" inputmode="numeric" value="{{ assessment.respiratory_rate }}">
+              <div class="np-vital-hint"></div>
+            </div>
+            <div class="np-vital" data-vital="weight">
+              <label for="v-weight">Weight (kg)</label>
+              <input id="v-weight" name="weight" type="number" step="0.1" min="0.2" max="500" inputmode="decimal" value="{{ assessment.weight }}">
+              <div class="np-vital-hint"></div>
+            </div>
+            <div class="np-vital" data-vital="height">
+              <label for="v-height">Height (cm)</label>
+              <input id="v-height" name="height" type="number" step="0.1" min="20" max="250" inputmode="decimal" value="{{ assessment.height }}">
+              <div class="np-vital-hint"></div>
+            </div>
+            <div class="np-vital" data-vital="bmi">
+              <label for="v-bmi">BMI</label>
+              <input id="v-bmi" name="bmi" type="number" step="0.1" min="1" max="150" value="{{ assessment.bmi }}" readonly>
+              <div class="np-vital-hint">Auto from height &amp; weight</div>
+            </div>
+            <div class="np-vital" data-vital="rbs">
+              <label for="v-rbs">RBS (mg/dL)</label>
+              <input id="v-rbs" name="rbs" type="number" min="1" max="2000" inputmode="numeric" value="{{ assessment.rbs }}">
+              <div class="np-vital-hint"></div>
+            </div>
+            <div class="np-vital" data-vital="pain_score">
+              <label for="v-pain">Pain score (0–10)</label>
+              <input id="v-pain" name="pain_score" type="number" min="0" max="10" inputmode="numeric" value="{{ assessment.pain_score }}">
+              <div class="np-vital-hint"></div>
+            </div>
+            <div class="np-vital">
+              <label for="v-oxygen">Oxygen support</label>
+              <select id="v-oxygen" name="oxygen_support">
+                <option value="">Room air</option>
+                {% with ox=assessment.examination.nurse_observations.oxygen %}
+                  <option value="Nasal prongs" {% if ox == "Nasal prongs" %}selected{% endif %}>Nasal prongs</option>
+                  <option value="Mask" {% if ox == "Mask" %}selected{% endif %}>O₂ mask</option>
+                  <option value="NRB mask" {% if ox == "NRB mask" %}selected{% endif %}>NRB mask</option>
+                  <option value="Nebulisation" {% if ox == "Nebulisation" %}selected{% endif %}>Nebulisation</option>
+                {% endwith %}
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. Complaints -->
+        <section class="np-section">
+          <div class="np-section-head">
+            <h3 class="np-section-title"><span class="np-step">2</span>Chief complaints</h3>
+            <span class="np-section-hint">Tap a chip to add · record duration</span>
+          </div>
+          <div class="np-complaint-rows" id="complaintRows">
+            {% for c in assessment.complaints %}
+              <div class="np-complaint-row">
+                <input type="text" class="complaint-text" placeholder="Complaint" value="{{ c.text }}">
+                <select class="complaint-duration">
+                  <option value="">Duration</option>
+                  {% for d in duration_options %}<option value="{{ d }}" {% if c.duration == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
+                </select>
+                <button type="button" class="np-icon-btn" data-remove-row aria-label="Remove complaint">×</button>
+              </div>
+            {% empty %}
+              <div class="np-complaint-row">
+                <input type="text" class="complaint-text" placeholder="e.g. Fever with chills">
+                <select class="complaint-duration">
+                  <option value="">Duration</option>
+                  {% for d in duration_options %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+                </select>
+                <button type="button" class="np-icon-btn" data-remove-row aria-label="Remove complaint">×</button>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="np-chips">
+            {% for chip in complaint_chips %}
+              <button type="button" class="np-chip" data-complaint-chip="{{ chip }}">+ {{ chip }}</button>
+            {% endfor %}
+          </div>
+          <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+            <button type="button" class="np-btn sm" id="addComplaintRow">+ Add row</button>
+            <span class="np-save-state" style="align-self:center;">Complaint is required before sending to OPD Desk.</span>
+          </div>
+        </section>
+
+        <!-- 3. Red flags -->
+        <section class="np-section">
+          <div class="np-section-head">
+            <h3 class="np-section-title"><span class="np-step">3</span>Red flags &amp; triage priority</h3>
+            <span class="np-section-hint">Toggling a flag updates the live priority score</span>
+          </div>
+          <div class="np-flag-grid">
+            {% for key, label, why in red_flags %}
+              <label class="np-flag" data-flag="{{ key }}" title="{{ why|capfirst }}">
+                <input type="checkbox" name="red_flag_{{ key }}">
+                <span>{{ label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </section>
+
+        <!-- 4. History & examination -->
+        <section class="np-section">
+          <div class="np-section-head">
+            <h3 class="np-section-title"><span class="np-step">4</span>History &amp; observations</h3>
+          </div>
+          <div class="np-tabs" role="tablist">
+            <button type="button" class="np-tab is-on" data-tab="history">History</button>
+            <button type="button" class="np-tab" data-tab="allergies">Allergies &amp; meds</button>
+            <button type="button" class="np-tab" data-tab="exam">Quick exam</button>
+            <button type="button" class="np-tab" data-tab="orders">Pre-visit orders</button>
+          </div>
+
+          <div class="np-tab-panel" data-panel="history">
+            <div class="np-field">
+              <label for="f-hpi">History of presenting illness</label>
+              <textarea id="f-hpi" name="hpi" placeholder="Onset, progression, associated symptoms, treatment taken…">{{ assessment.hpi }}</textarea>
+            </div>
+            <div class="np-grid-2">
+              <div class="np-field">
+                <label for="f-mobility">Mobility</label>
+                <select id="f-mobility" name="mobility">
+                  {% with m=assessment.examination.nurse_observations.mobility %}
+                    <option value="">—</option>
+                    <option value="Independent" {% if m == "Independent" %}selected{% endif %}>Independent</option>
+                    <option value="Uses stick / walker" {% if m == "Uses stick / walker" %}selected{% endif %}>Uses stick / walker</option>
+                    <option value="Wheelchair" {% if m == "Wheelchair" %}selected{% endif %}>Wheelchair</option>
+                    <option value="Stretcher / bed-bound" {% if m == "Stretcher / bed-bound" %}selected{% endif %}>Stretcher / bed-bound</option>
+                  {% endwith %}
+                </select>
+              </div>
+              <div class="np-field">
+                <label for="f-conscious">Consciousness</label>
+                <select id="f-conscious" name="consciousness">
+                  {% with c=assessment.examination.nurse_observations.consciousness %}
+                    <option value="">—</option>
+                    <option value="Alert &amp; oriented" {% if c == "Alert &amp; oriented" %}selected{% endif %}>Alert &amp; oriented</option>
+                    <option value="Drowsy" {% if c == "Drowsy" %}selected{% endif %}>Drowsy</option>
+                    <option value="Confused" {% if c == "Confused" %}selected{% endif %}>Confused</option>
+                    <option value="Unresponsive" {% if c == "Unresponsive" %}selected{% endif %}>Unresponsive</option>
+                  {% endwith %}
+                </select>
+              </div>
+            </div>
+            <div class="np-field">
+              <label>Chronic conditions</label>
+              <div class="np-check-list">
+                {% for cond in assessment.conditions %}
+                  <div class="np-check {% if cond.checked %}is-on{% endif %}" data-condition="{{ cond.key }}">
+                    <label class="np-condition-name">
+                      <input type="checkbox" class="cond-on" {% if cond.checked %}checked{% endif %}>
+                      <span>{{ cond.label }}</span>
+                    </label>
+                    <label class="np-condition-since">
+                      <span>Since</span>
+                      <input type="text" class="cond-since" aria-label="{{ cond.label }} — since" placeholder="e.g. 6 years or 2020" value="{{ cond.since }}">
+                    </label>
+                  </div>
+                {% endfor %}
+                {% for extra in assessment.custom_conditions %}
+                  <div class="np-check is-on">
+                    <label class="np-condition-name">
+                      <input type="checkbox" class="cond-on" checked>
+                      <span>{{ extra.name }}</span>
+                    </label>
+                    <label class="np-condition-since">
+                      <span>Since</span>
+                      <input type="text" class="cond-since" aria-label="{{ extra.name }} — since" placeholder="e.g. 6 years or 2020" value="{{ extra.since }}">
+                    </label>
+                  </div>
+                {% endfor %}
+              </div>
+              <template id="conditionTemplate">
+                <div class="np-check is-on">
+                  <label class="np-condition-name">
+                    <input type="checkbox" class="cond-on" checked>
+                    <span></span>
+                  </label>
+                  <label class="np-condition-since">
+                    <span>Since</span>
+                    <input type="text" class="cond-since" placeholder="e.g. 6 years or 2020">
+                  </label>
+                </div>
+              </template>
+              <input type="text" id="customCondition" placeholder="Add another condition and press Enter" style="margin-top:8px; padding:9px 12px; border-radius:12px; border:1.5px solid var(--line); font:inherit; font-size:13px; width:100%;">
+            </div>
+            <div class="np-field">
+              <label>Social history</label>
+              <div class="np-chips">
+                <button type="button" class="np-chip" data-social="Smoker">Smoker</button>
+                <button type="button" class="np-chip" data-social="Tobacco chewer">Tobacco</button>
+                <button type="button" class="np-chip" data-social="Alcohol">Alcohol</button>
+                <button type="button" class="np-chip" data-social="Sedentary">Sedentary</button>
+              </div>
+            </div>
+            <div class="np-field">
+              <label for="f-surgeries">Past surgeries / hospitalisations</label>
+              <textarea id="f-surgeries" name="surgeries" placeholder="Year, procedure…">{{ assessment.surgeries }}</textarea>
+            </div>
+          </div>
+
+          <div class="np-tab-panel" data-panel="allergies" hidden>
+            <div class="np-field">
+              <label for="f-allergies">Allergies (comma separated)</label>
+              <input id="f-allergies" name="allergies" type="text" value="{{ assessment.allergies|join:', ' }}" placeholder="Penicillin, Sulfa, Dust…">
+            </div>
+            <div class="np-field">
+              <label for="f-medications">Current medications</label>
+              <textarea id="f-medications" name="medications" placeholder="One per line — e.g. Amlodipine 5 mg OD">{{ assessment.medications_text }}</textarea>
+            </div>
+            <div class="np-field">
+              <label for="f-observations">Nursing observations</label>
+              <textarea id="f-observations" name="observations" placeholder="Pallor, icterus, hydration, wounds, IV status, behaviour…">{{ assessment.examination.nurse_observations.observations }}</textarea>
+            </div>
+          </div>
+
+          <div class="np-tab-panel" data-panel="exam" hidden>
+            {% with ex=assessment.examination %}
+              <div class="np-grid-2">
+                <div class="np-field"><label>General</label><input type="text" name="ex_general" value="{{ ex.general }}" placeholder="e.g. Pallor+, febrile"></div>
+                <div class="np-field"><label>CVS</label><input type="text" name="ex_cvs" value="{{ ex.cvs }}" placeholder="S1 S2 normal"></div>
+                <div class="np-field"><label>Respiratory</label><input type="text" name="ex_respiratory" value="{{ ex.respiratory }}" placeholder="Bilateral clear"></div>
+                <div class="np-field"><label>Abdomen</label><input type="text" name="ex_abdomen" value="{{ ex.abdomen }}" placeholder="Soft, non-tender"></div>
+                <div class="np-field"><label>CNS</label><input type="text" name="ex_cns" value="{{ ex.cns }}" placeholder="Conscious, oriented"></div>
+              </div>
+            {% endwith %}
+          </div>
+
+          <div class="np-tab-panel" data-panel="orders" hidden>
+            <p class="np-section-hint" style="margin:0 0 12px;">Tick tests that should be collected before the doctor sees the patient. The doctor can still add more.</p>
+            <div class="np-orders">
+              {% for bank_key, bank_title, items in order_banks %}
+                <div class="np-order-bank">
+                  <h4>{{ bank_title }}</h4>
+                  <div class="np-order-list">
+                    {% for item in items %}
+                      <label class="np-order-item">
+                        <input type="checkbox" data-order-bank="{{ bank_key }}" value="{{ item }}"{% if item in checked_orders %} checked{% endif %}>
+                        <span>{{ item }}</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ══════════ RIGHT RAIL ══════════ -->
+      <aside class="np-rail">
+        <div class="np-score-card band-{{ band.label|slugify }}" id="scoreCard">
+          <div class="np-score-label">Triage priority score</div>
+          <div class="np-score-value" id="scoreValue">{{ band.score }}</div>
+          <div class="np-score-band" id="scoreBand">{{ band.label }}</div>
+          <div class="np-score-guidance" id="scoreGuidance">{{ band.guidance }}</div>
+          <div class="np-score-bar"><span id="scoreBar" style="width: {{ band.score }}%"></span></div>
+        </div>
+
+        <div class="np-card">
+          <div class="np-card-head"><h2 class="np-card-title">Handover to OPD Desk</h2></div>
+          <div class="np-field">
+            <label>Priority override</label>
+            <select name="priority_override">
+              <option value="">Auto from score</option>
+              <option value="routine">Routine</option>
+              <option value="urgent">Urgent</option>
+              <option value="emergency">Emergency</option>
+            </select>
+          </div>
+          <div class="np-field">
+            <label for="f-eta">Estimated wait for doctor (min)</label>
+            <input id="f-eta" name="eta_minutes" type="number" min="0" max="600" placeholder="e.g. 15">
+          </div>
+          <label class="np-check" style="margin-bottom:10px;">
+            <input type="checkbox" name="escalate" id="escalateBox">
+            Escalate to duty doctor now
+          </label>
+          <div class="np-field" style="margin-bottom:0;">
+            <label for="f-summary">Nurse summary note</label>
+            <textarea id="f-summary" name="summary_note" placeholder="One line the OPD Desk &amp; doctor should read first…">{{ assessment.summary_note }}</textarea>
+          </div>
+        </div>
+
+        <div class="np-card">
+          <div class="np-card-head"><h2 class="np-card-title">Follow-up nursing task</h2></div>
+          <div class="np-field">
+            <label>Task</label>
+            <div class="np-chips" id="taskPresets">
+              {% for kind, title in task_presets %}
+                <button type="button" class="np-chip" data-task-title="{{ title }}" data-task-kind="{{ kind }}">{{ title }}</button>
+              {% endfor %}
+            </div>
+            <input type="text" name="follow_up_task" id="followUpTask" placeholder="Optional — add to nursing board" style="margin-top:8px;">
+            <input type="hidden" name="follow_up_kind" id="followUpKind" value="other">
+          </div>
+        </div>
+
+        <div class="np-sticky-actions">
+          <div class="np-save-state" id="saveState">Unsaved changes</div>
+          <button type="submit" class="np-btn teal" data-action="complete">Save &amp; send to OPD Desk →</button>
+          <button type="button" class="np-btn" data-action="draft">Save vitals draft</button>
+          <a href="{% if request.session.designation == 'doctor' %}{% url 'doctor_consultation' %}{% else %}{% url 'opd_assistant_dashboard' %}{% endif %}" class="np-btn" style="justify-content:center;">Cancel</a>
+          {% if ticket.status == 'completed' %}
+            <form method="post" action="{% url 'nurse_recall_ticket' ticket.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="np-btn sm" style="width:100%; justify-content:center;">Recall for re-assessment</button>
+            </form>
+          {% endif %}
+        </div>
+
+        {% if recent_tickets %}
+          <div class="np-card">
+            <div class="np-card-head"><h2 class="np-card-title">Visit history</h2></div>
+            <ul class="np-mini-list">
+              {% for t in recent_tickets %}
+                <li>
+                  <span><strong>{{ t.ticket_number }}</strong> · {{ t.get_status_display }}</span>
+                  <span style="color:var(--muted);">{{ t.sent_at|date:"j M, H:i" }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+      </aside>
+    </div>
+  </form>
+{% endif %}
+{% endblock %}
+
+{% block tail_scripts %}
+<script src="{% static 'js/nurse_portal.js' %}?v=1"></script>
+{% if has_patient %}
+<script>
+window.NURSE_TRIAGE = {
+  saveUrl: "{% url 'nurse_save_triage' %}",
+  portalUrl: "{% url 'opd_assistant_dashboard' %}",
+  queueUrl: "{% url 'nurse_queue' %}",
+  existingOrders: {{ assessment.orders_json|default_if_none:"{}"|safe }},
+  socialHistory: {{ assessment.social_history_json|default_if_none:"[]"|safe }},
+  redFlags: {{ assessment.red_flags_json|default_if_none:"{}"|safe }}
+};
+</script>
+<script>
+(function () {
+  "use strict";
+  var cfg = window.NURSE_TRIAGE;
+  var form = document.getElementById("nurseTriageForm");
+  if (!cfg || !form) return;
+  var toast = (window.NursePortal || {}).toast || function (m) { alert(m); };
+  var saveState = document.getElementById("saveState");
+  var dirty = false;
+
+  function markDirty() {
+    dirty = true;
+    saveState.textContent = "Unsaved changes";
+    saveState.className = "np-save-state is-dirty";
+  }
+  form.addEventListener("input", markDirty);
+  form.addEventListener("change", markDirty);
+
+  /* ── Vitals: BMI + range hints + live score ─────────────── */
+  var ranges = {
+    temperature: [36.1, 37.5, 0], pulse: [60, 100, 0], bp_systolic: [90, 140, 0],
+    bp_diastolic: [60, 90, 0], spo2: [95, 100, 0], respiratory_rate: [12, 20, 0],
+    rbs: [70, 180, 0], pain_score: [0, 3, 0], weight: [0, 500, 0], height: [0, 250, 0]
+  };
+  var labels = {
+    temperature: "Temp", pulse: "Pulse", bp_systolic: "Systolic", bp_diastolic: "Diastolic",
+    spo2: "SpO₂", respiratory_rate: "Resp. rate", rbs: "RBS", pain_score: "Pain", weight: "", height: ""
+  };
+
+  function num(name) {
+    var el = form.elements[name];
+    if (!el || el.value === "") return null;
+    var v = parseFloat(el.value);
+    return isNaN(v) ? null : v;
+  }
+
+  function recomputeBmi() {
+    var w = num("weight"), h = num("height");
+    var bmi = form.elements["bmi"];
+    if (w && h) {
+      bmi.value = (w / Math.pow(h / 100, 2)).toFixed(1);
+    } else {
+      bmi.value = "";
+    }
+  }
+
+  function checkRanges() {
+    Object.keys(ranges).forEach(function (key) {
+      var wrap = document.querySelector('[data-vital="' + key + '"]');
+      if (!wrap) return;
+      var v = num(key);
+      var hint = wrap.querySelector(".np-vital-hint");
+      var r = ranges[key];
+      var bad = v !== null && (v < r[0] || v > r[1]);
+      wrap.classList.toggle("is-abnormal", bad);
+      if (hint && labels[key]) {
+        hint.textContent = bad ? "Out of range" : "";
+      }
+    });
+  }
+
+  function computeScore() {
+    var s = 0;
+    document.querySelectorAll('[data-flag] input:checked').forEach(function () { s += 20; });
+    if (document.querySelector('[data-flag="chest_pain"] input:checked') ||
+        document.querySelector('[data-flag="breathlessness"] input:checked') ||
+        document.querySelector('[data-flag="neuro_deficit"] input:checked')) s += 25;
+    var spo2 = num("spo2");
+    if (spo2 !== null) s += spo2 <= 90 ? 40 : spo2 <= 94 ? 25 : spo2 <= 96 ? 10 : 0;
+    var sys = num("bp_systolic");
+    if (sys !== null) s += (sys < 90 || sys > 180) ? 25 : sys > 160 ? 10 : 0;
+    var dia = num("bp_diastolic");
+    if (dia !== null && dia > 110) s += 15;
+    var pulse = num("pulse");
+    if (pulse !== null) s += (pulse > 130 || pulse < 50) ? 25 : pulse > 110 ? 12 : 0;
+    var rr = num("respiratory_rate");
+    if (rr !== null) s += (rr > 30 || rr < 10) ? 25 : rr > 24 ? 12 : 0;
+    var temp = num("temperature");
+    if (temp !== null) s += temp >= 39.5 ? 20 : temp >= 38.5 ? 12 : temp < 35 ? 20 : 0;
+    var pain = num("pain_score");
+    if (pain !== null) s += pain >= 8 ? 20 : pain >= 5 ? 10 : 0;
+    var rbs = num("rbs");
+    if (rbs !== null) s += (rbs < 60 || rbs > 350) ? 20 : rbs > 250 ? 8 : 0;
+    s = Math.min(s, 100);
+
+    var band = s >= 70 ? { label: "Emergency", cls: "band-emergency", guidance: "Call the duty doctor immediately and keep the patient under observation." }
+      : s >= 40 ? { label: "Semi-urgent", cls: "band-semiurgent", guidance: "Fast-track ahead of routine visits." }
+      : { label: "Routine", cls: "band-routine", guidance: "Send back in the normal doctor queue." };
+    var card = document.getElementById("scoreCard");
+    card.className = "np-score-card " + band.cls;
+    document.getElementById("scoreValue").textContent = s;
+    document.getElementById("scoreBand").textContent = band.label;
+    document.getElementById("scoreGuidance").textContent = band.guidance;
+    document.getElementById("scoreBar").style.width = s + "%";
+    if (s >= 70 && !document.getElementById("escalateBox").checked) {
+      document.getElementById("escalateBox").checked = true;
+    }
+  }
+
+  function refreshVitals() {
+    recomputeBmi();
+    checkRanges();
+    computeScore();
+  }
+  ["temperature", "pulse", "bp_systolic", "bp_diastolic", "spo2", "respiratory_rate", "rbs", "pain_score", "weight", "height"]
+    .forEach(function (key) {
+      var el = form.elements[key];
+      if (el) el.addEventListener("input", refreshVitals);
+    });
+
+  /* ── Red flags ─────────────────────────────────────────── */
+  document.querySelectorAll("[data-flag]").forEach(function (label) {
+    var box = label.querySelector("input");
+    if (box.checked) label.classList.add("is-on");
+    box.addEventListener("change", function () {
+      label.classList.toggle("is-on", box.checked);
+      computeScore();
+    });
+  });
+
+  /* ── Complaint rows + chips ─────────────────────────────── */
+  var rows = document.getElementById("complaintRows");
+  function rowTemplate() {
+    var div = document.createElement("div");
+    div.className = "np-complaint-row";
+    div.innerHTML = '<input type="text" class="complaint-text" placeholder="Complaint">' +
+      '<select class="complaint-duration"><option value="">Duration</option>' +
+      Array.from(document.querySelector('.complaint-duration').options).slice(1)
+        .map(function (o) { return '<option value="' + o.value + '">' + o.textContent + '</option>'; }).join("") +
+      '</select><button type="button" class="np-icon-btn" data-remove-row aria-label="Remove">×</button>';
+    return div;
+  }
+  document.getElementById("addComplaintRow").addEventListener("click", function () {
+    rows.appendChild(rowTemplate());
+  });
+  rows.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-remove-row]");
+    if (!btn) return;
+    if (rows.children.length > 1) btn.closest(".np-complaint-row").remove();
+    else {
+      btn.closest(".np-complaint-row").querySelector(".complaint-text").value = "";
+      btn.closest(".np-complaint-row").querySelector(".complaint-duration").value = "";
+    }
+  });
+  document.querySelectorAll("[data-complaint-chip]").forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      var val = chip.getAttribute("data-complaint-chip");
+      var empty = Array.from(rows.querySelectorAll(".complaint-text")).find(function (i) { return !i.value.trim(); });
+      if (empty) empty.value = val;
+      else rows.appendChild(rowTemplate()).querySelector(".complaint-text").value = val;
+      markDirty();
+    });
+  });
+
+  /* ── Conditions ────────────────────────────────────────── */
+  document.querySelector(".np-check-list").addEventListener("change", function (e) {
+    if (!e.target.matches(".cond-on")) return;
+    e.target.closest(".np-check").classList.toggle("is-on", e.target.checked);
+  });
+  var custom = document.getElementById("customCondition");
+  custom.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" || !custom.value.trim()) return;
+    e.preventDefault();
+    var card = document.getElementById("conditionTemplate").content.firstElementChild.cloneNode(true);
+    card.querySelector(".np-condition-name span").textContent = custom.value.trim();
+    card.querySelector(".cond-since").setAttribute("aria-label", custom.value.trim() + " — since");
+    custom.closest(".np-field").querySelector(".np-check-list").appendChild(card);
+    custom.value = "";
+    markDirty();
+  });
+
+  /* ── Social history chips ──────────────────────────────── */
+  var social = cfg.socialHistory ? cfg.socialHistory.slice() : [];
+  document.querySelectorAll("[data-social]").forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      chip.classList.toggle("is-on");
+      var v = chip.getAttribute("data-social");
+      var i = social.indexOf(v);
+      if (chip.classList.contains("is-on") && i === -1) social.push(v);
+      if (!chip.classList.contains("is-on") && i > -1) social.splice(i, 1);
+    });
+  });
+
+  /* ── Tabs ──────────────────────────────────────────────── */
+  document.querySelectorAll(".np-tab").forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      document.querySelectorAll(".np-tab").forEach(function (t) { t.classList.toggle("is-on", t === tab); });
+      document.querySelectorAll(".np-tab-panel").forEach(function (p) {
+        p.hidden = p.getAttribute("data-panel") !== tab.getAttribute("data-tab");
+      });
+    });
+  });
+
+  /* ── Follow-up task presets ────────────────────────────── */
+  document.querySelectorAll("[data-task-title]").forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      document.querySelectorAll("[data-task-title]").forEach(function (c) { c.classList.remove("is-on"); });
+      chip.classList.add("is-on");
+      document.getElementById("followUpTask").value = chip.getAttribute("data-task-title");
+      document.getElementById("followUpKind").value = chip.getAttribute("data-task-kind");
+      markDirty();
+    });
+  });
+
+  /* ── Payload ───────────────────────────────────────────── */
+  function payload(action) {
+    var complaints = [];
+    rows.querySelectorAll(".np-complaint-row").forEach(function (row) {
+      var text = row.querySelector(".complaint-text").value.trim();
+      if (text) complaints.push({ text: text, duration: row.querySelector(".complaint-duration").value });
+    });
+
+    var conditions = [];
+    document.querySelectorAll("[data-condition]").forEach(function (label) {
+      if (!label.querySelector(".cond-on").checked) return;
+      conditions.push({
+        name: label.querySelector(".np-condition-name span").textContent.trim(),
+        since: label.querySelector(".cond-since").value.trim(),
+      });
+    });
+    document.querySelectorAll(".np-check-list .np-check:not([data-condition])").forEach(function (label) {
+      if (!label.querySelector(".cond-on").checked) return;
+      conditions.push({
+        name: label.querySelector(".np-condition-name span").textContent.trim(),
+        since: label.querySelector(".cond-since").value.trim(),
+      });
+    });
+
+    var redFlags = {};
+    document.querySelectorAll("[data-flag]").forEach(function (label) {
+      redFlags[label.getAttribute("data-flag")] = label.querySelector("input").checked;
+    });
+
+    var orders = { laboratory: [], radiology: [], other: [] };
+    document.querySelectorAll("[data-order-bank] input:checked").forEach(function (box) {
+      orders[box.getAttribute("data-order-bank")].push(box.value);
+    });
+
+    var override = form.elements["priority_override"].value;
+    if (override) {
+      // Surface the override as an escalation hint for the backend.
+      redFlags._override = override;
+    }
+
+    return {
+      ticket_id: form.elements["ticket_id"].value,
+      patient_id: form.elements["patient_id"].value,
+      action: action,
+      temperature: form.elements["temperature"].value,
+      pulse: form.elements["pulse"].value,
+      bp_systolic: form.elements["bp_systolic"].value,
+      bp_diastolic: form.elements["bp_diastolic"].value,
+      spo2: form.elements["spo2"].value,
+      respiratory_rate: form.elements["respiratory_rate"].value,
+      height: form.elements["height"].value,
+      weight: form.elements["weight"].value,
+      bmi: form.elements["bmi"].value,
+      rbs: form.elements["rbs"].value,
+      pain_score: form.elements["pain_score"].value,
+      complaints: complaints,
+      hpi: form.elements["hpi"].value,
+      surgeries: form.elements["surgeries"].value,
+      summary_note: form.elements["summary_note"].value,
+      allergies: form.elements["allergies"].value.split(",").map(function (s) { return s.trim(); }).filter(Boolean),
+      medications: form.elements["medications"].value.split("\n").map(function (s) { return { name: s.trim() }; }).filter(function (m) { return m.name; }),
+      chronic_conditions: conditions,
+      social_history: social,
+      examination: {
+        general: form.elements["ex_general"].value,
+        cvs: form.elements["ex_cvs"].value,
+        respiratory: form.elements["ex_respiratory"].value,
+        abdomen: form.elements["ex_abdomen"].value,
+        cns: form.elements["ex_cns"].value,
+      },
+      red_flags: redFlags,
+      mobility: form.elements["mobility"].value,
+      consciousness: form.elements["consciousness"].value,
+      oxygen_support: form.elements["oxygen_support"].value,
+      observations: form.elements["observations"].value,
+      orders: orders,
+      eta_minutes: form.elements["eta_minutes"].value,
+      escalate: form.elements["escalate"].checked,
+      priority_override: override,
+      follow_up_task: form.elements["follow_up_task"].value,
+      follow_up_kind: form.elements["follow_up_kind"].value,
+    };
+  }
+
+  function submit(action, button) {
+    var data = payload(action);
+    if (action === "complete") {
+      if (!data.complaints.length) {
+        toast("Record the chief complaint before sending to the OPD Desk.", true);
+        document.querySelector('.np-tab[data-tab="history"]');
+        return;
+      }
+      var hasCore = ["pulse", "bp_systolic", "spo2", "temperature"].some(function (k) { return String(data[k]).trim() !== ""; });
+      if (!hasCore) {
+        toast("Record at least one core vital (pulse, BP, SpO₂ or temperature).", true);
+        return;
+      }
+    }
+    button.disabled = true;
+    button.dataset.label = button.textContent;
+    button.textContent = "Saving…";
+    fetch(cfg.saveUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": (function () {
+          try { if (window.NursePortal && typeof window.NursePortal.csrfToken === "function") return window.NursePortal.csrfToken(); } catch (e) {}
+          var inp = document.querySelector("input[name=csrfmiddlewaretoken]");
+          if (inp) return inp.value;
+          var m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+          return m ? decodeURIComponent(m[1]) : "";
+        })(),
+      },
+      credentials: "same-origin",
+      body: JSON.stringify(data),
+    })
+      .then(function (r) {
+        return r.text().then(function (text) {
+          try { return JSON.parse(text); } catch (e) { throw new Error(text || ("HTTP " + r.status)); }
+        });
+      })
+      .then(function (res) {
+        if (!res.ok) {
+          toast(res.error || "Could not save the assessment.", true);
+          button.disabled = false;
+          button.textContent = button.dataset.label;
+          return;
+        }
+        dirty = false;
+        if (action === "complete") {
+          saveState.textContent = "Saved · routing to OPD Desk…";
+          saveState.className = "np-save-state is-saved";
+          toast("Assessment saved — " + res.band.label + " (score " + res.priority_score + "). Returned to the OPD Desk.");
+          // Follow the server's handoff (lands on the patient's pool entry so
+          // doctor allocation is one click away).
+          setTimeout(function () {
+            window.location.href = res.redirect || cfg.portalUrl;
+          }, 900);
+        } else {
+          saveState.textContent = "Draft saved — visit stays in the assessment queue";
+          saveState.className = "np-save-state is-saved";
+          toast("Vitals draft saved. You can continue later.");
+          button.disabled = false;
+          button.textContent = button.dataset.label;
+        }
+      })
+      .catch(function () {
+        toast("Network error — the assessment was not saved.", true);
+        button.disabled = false;
+        button.textContent = button.dataset.label;
+      });
+  }
+
+  form.addEventListener("submit", function (e) { e.preventDefault(); });
+  form.querySelectorAll("[data-action]").forEach(function (btn) {
+    btn.addEventListener("click", function () { submit(btn.getAttribute("data-action"), btn); });
+  });
+  window.addEventListener("beforeunload", function (e) {
+    if (dirty) { e.preventDefault(); e.returnValue = ""; }
+  });
+
+  /* Keyboard: Ctrl/⌘+S saves the draft. */
+  document.addEventListener("keydown", function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      var btn = form.querySelector('[data-action="draft"]');
+      if (btn) submit("draft", btn);
+    }
+  });
+
+  refreshVitals();
+  saveState.className = "np-save-state";
+  saveState.textContent = "No changes yet";
+})();
+</script>
+{% endif %}
+{% endblock %}

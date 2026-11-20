@@ -1015,6 +1015,15 @@
         </div>
 
       </div>
+
+      <div style="display:flex; gap:9px; flex-wrap:wrap; margin-top:14px;">
+        <a href="{% url 'opd_patient_queue' %}?allocation=nurse" class="mb-btn-action ghost" style="background:rgba(255,255,255,.9);">
+          Ready for OPD · {{ ready_for_opd_count|default:"0" }}
+        </a>
+        <a href="{% url 'post_consultation_billing' %}" class="mb-btn-action ghost" style="background:rgba(255,255,255,.9);">
+          Post-consultation billing · {{ post_consultation_count|default:"0" }}
+        </a>
+      </div>
     </section>
 
     <!-- 2. Middle Row: 2 Columns -->
@@ -1039,7 +1048,7 @@
             <div class="mb-token-item">
               <div style="min-width:0;">
                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                  <span class="mb-token-tag">#{{ p.mr_number|default:p.id }}</span>
+                  <span class="mb-token-tag">#{{ p.uhid|default:p.id }}</span>
                   {% if p.is_emergency %}
                     <span class="badge" style="background:#fed7d7; color:#9b2c2c; font-weight:800; font-size:10px; padding:2px 7px; border-radius:99px;">
                       EMERGENCY
@@ -1132,97 +1141,7 @@
     <!-- 3. Lower Row: 2 Columns -->
     <div class="mb-two-col">
 
-      <!-- Left: Queue & Triage Roster (Dark Obsidian #20232a) -->
-      <section class="mb-dark-box">
-        <div class="mb-card-header-clean">
-          <div>
-            <span class="badge" style="background:rgba(212,241,80,0.18); color:var(--mb-lime); font-weight:800; font-size:11px; padding:3px 10px; border-radius:99px;">
-              ● ACTIVE ROSTER
-            </span>
-            <h3 style="margin-top:6px;">Queue Triage Roster</h3>
-          </div>
-          <a href="{% url 'emergency_registration' %}" class="btn" style="background:#fed7d7; color:#9b2c2c; font-weight:800; font-size:11.5px; padding:6px 12px; border-radius:99px; text-decoration:none;" title="Direct Emergency Registration">
-            🚨 Emergency
-          </a>
-        </div>
 
-        <div>
-          {% for p in recent_patients|slice:":3" %}
-            <div class="mb-queue-row {% if forloop.first %}active{% endif %}">
-              <div class="mb-q-left">
-                <span class="mb-q-idx">0{{ forloop.counter }}</span>
-                <div class="mb-q-info">
-                  <div class="mb-q-patient">
-                    {{ p.full_name }}
-                    <span style="font-weight:500; font-size:11px; opacity:0.85;">(#{{ p.mr_number|default:p.id }})</span>
-                  </div>
-                  <div class="mb-q-doc">
-                    {% if p.assigned_doctor %}Allocated: Dr. {{ p.assigned_doctor.first_name }} {{ p.assigned_doctor.last_name }}{% else %}Ready for OPD Allocation{% endif %}
-                  </div>
-                </div>
-              </div>
-              <div>
-                <a href="{% url 'patient_print_card' p.pk %}" class="btn" style="padding:4px 9px; font-size:11px; font-weight:750; border-radius:8px; background:rgba(0,0,0,0.1); color:inherit; text-decoration:none;">
-                  Slip
-                </a>
-              </div>
-            </div>
-          {% empty %}
-            <div style="padding:20px; text-align:center; color:#9d9da8; font-size:13px;">
-              No queue tokens active at this moment.
-            </div>
-          {% endfor %}
-        </div>
-
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#9d9da8;">
-          <span>Emergency cases today: <strong style="color:#ffffff;">{{ emergency_today|default:"0" }}</strong></span>
-          <a href="{% url 'emergency_registration' %}" style="color:var(--mb-lime); font-weight:700; text-decoration:none;">
-            + Fast Emergency Entry →
-          </a>
-        </div>
-      </section>
-
-      <!-- Right: OPD Clinical Roster (Available Doctors) -->
-      <section class="mb-clinical-card">
-        <div class="mb-card-header-clean">
-          <div>
-            <span class="mb-badge-soft">Clinical Availability</span>
-            <h3 style="margin-top:6px; font-size:18px; font-weight:800; color:var(--mb-text-dark); margin-bottom:0;">On-Duty Doctors</h3>
-          </div>
-          <span style="font-size:12px; color:var(--mb-text-muted); font-weight:600;">{{ available_doctors|length }} On Duty</span>
-        </div>
-
-        <div>
-          {% for doc in available_doctors|slice:":3" %}
-            <div class="mb-doc-item">
-              <div class="mb-doc-profile">
-                <div class="mb-doc-avatar">
-                  {{ doc.first_name|slice:":1" }}{{ doc.last_name|slice:":1" }}
-                  <span class="mb-online-dot"></span>
-                </div>
-                <div>
-                  <div class="mb-doc-name">Dr. {{ doc.first_name }} {{ doc.last_name }}</div>
-                  <div class="mb-doc-spec">{{ doc.get_specialty_display|default:"General Medicine" }}</div>
-                </div>
-              </div>
-              <div>
-                <span class="badge" style="background:#eef8f2; color:#1e7048; font-weight:700; font-size:11px; padding:4px 9px; border-radius:99px;">
-                  Available
-                </span>
-              </div>
-            </div>
-          {% empty %}
-            <div style="padding:16px 0; text-align:center; color:var(--mb-text-muted); font-size:13px;">
-              No doctors currently listed.
-            </div>
-          {% endfor %}
-        </div>
-
-        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f0eff6; padding-top:12px; font-size:12px;">
-          <span style="color:var(--mb-text-muted);">Doctor allocation is active on new registrations</span>
-          <a href="{% url 'registration_desk_new' %}" style="color:#6352b5; font-weight:700; text-decoration:none;">Assign Doctor →</a>
-        </div>
-      </section>
 
     </div>
 
@@ -1283,80 +1202,48 @@
       </div>
     </div>
 
-    <!-- Daily Schedule & Appointments (Dark Obsidian #20232a) -->
-    <div class="mb-schedule-card">
-      <div class="mb-schedule-head">
+      <!-- Right: OPD Clinical Roster (Available Doctors) -->
+      <section class="mb-clinical-card">
+        <div class="mb-card-header-clean">
+          <div>
+            <span class="mb-badge-soft">Clinical Availability</span>
+            <h3 style="margin-top:6px; font-size:18px; font-weight:800; color:var(--mb-text-dark); margin-bottom:0;">On-Duty Doctors</h3>
+          </div>
+          <span style="font-size:12px; color:var(--mb-text-muted); font-weight:600;">{{ available_doctors|length }} On Duty</span>
+        </div>
+
         <div>
-          <span class="badge" style="background:rgba(212,241,80,0.18); color:var(--mb-lime); font-size:10.5px; font-weight:800; border-radius:99px; text-transform:uppercase;">
-            Schedule Strip
-          </span>
-          <h3 style="margin:4px 0 0; font-size:17px; font-weight:800; color:#ffffff;">{{ today|date:"F Y" }}</h3>
-        </div>
-        <div class="mb-cal-nav">
-          <button class="mb-cal-arrow" aria-label="Previous week">‹</button>
-          <button class="mb-cal-arrow" aria-label="Next week">›</button>
-        </div>
-      </div>
-
-      <!-- Weekday Selector with Today circled in Lime -->
-      <div class="mb-cal-week">
-        <div class="mb-cal-day">
-          <span>M</span>
-          <div class="mb-cal-num">19</div>
-        </div>
-        <div class="mb-cal-day">
-          <span>T</span>
-          <div class="mb-cal-num today">{{ today|date:"j" }}</div>
-        </div>
-        <div class="mb-cal-day">
-          <span>W</span>
-          <div class="mb-cal-num">21</div>
-        </div>
-        <div class="mb-cal-day">
-          <span>T</span>
-          <div class="mb-cal-num">22</div>
-        </div>
-        <div class="mb-cal-day">
-          <span>F</span>
-          <div class="mb-cal-num">23</div>
-        </div>
-        <div class="mb-cal-day">
-          <span>S</span>
-          <div class="mb-cal-num">24</div>
-        </div>
-      </div>
-
-      <!-- Upcoming Appointment Slots -->
-      <div style="margin-top:14px;">
-        <div style="font-size:12px; font-weight:700; color:#9d9da8; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.5px;">
-          Today's Scheduled Slots
-        </div>
-        {% for appt in upcoming_appointments %}
-          <div class="mb-slot-item">
-            <div>
-              <div class="mb-slot-time">{% if appt.start_time %}{{ appt.start_time|time:"H:i" }}{% else %}Today{% endif %}</div>
-              <div class="mb-slot-name">{{ appt.patient.full_name }}</div>
-              <div class="mb-slot-doc">Dr. {{ appt.doctor.first_name }} {{ appt.doctor.last_name }}</div>
+          {% for doc in available_doctors|slice:":3" %}
+            <div class="mb-doc-item">
+              <div class="mb-doc-profile">
+                <div class="mb-doc-avatar">
+                  {{ doc.first_name|slice:":1" }}{{ doc.last_name|slice:":1" }}
+                  <span class="mb-online-dot"></span>
+                </div>
+                <div>
+                  <div class="mb-doc-name">Dr. {{ doc.first_name }} {{ doc.last_name }}</div>
+                  <div class="mb-doc-spec">{{ doc.get_specialty_display|default:"General Medicine" }}</div>
+                </div>
+              </div>
+              <div>
+                <span class="badge" style="background:#eef8f2; color:#1e7048; font-weight:700; font-size:11px; padding:4px 9px; border-radius:99px;">
+                  Available
+                </span>
+              </div>
             </div>
-            <div>
-              <span class="badge" style="background:rgba(212,241,80,0.2); color:var(--mb-lime); font-weight:750; font-size:10px; padding:3px 8px; border-radius:99px;">
-                {{ appt.get_status_display }}
-              </span>
+          {% empty %}
+            <div style="padding:16px 0; text-align:center; color:var(--mb-text-muted); font-size:13px;">
+              No doctors currently listed.
             </div>
-          </div>
-        {% empty %}
-          <div style="padding:16px; text-align:center; color:#9d9da8; font-size:12.5px;">
-            No remaining appointment slots today.
-          </div>
-        {% endfor %}
-      </div>
+          {% endfor %}
+        </div>
 
-      <div style="margin-top:16px; text-align:center;">
-        <a href="{% url 'appointment_list' %}" style="color:var(--mb-lime); font-size:12.5px; font-weight:750; text-decoration:none;">
-          View Full Appointment Calendar →
-        </a>
-      </div>
-    </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f0eff6; padding-top:12px; font-size:12px;">
+          <span style="color:var(--mb-text-muted);">Doctor allocation is active on new registrations</span>
+          <a href="{% url 'registration_desk_new' %}" style="color:#6352b5; font-weight:700; text-decoration:none;">Assign Doctor →</a>
+        </div>
+      </section>
+
 
   </aside>
 
@@ -1386,7 +1273,7 @@
       <table class="mb-styled-table">
         <thead>
           <tr>
-            <th>MR Number</th>
+            <th>UHID</th>
             <th>Patient Name</th>
             <th>Gender / Age</th>
             <th>Contact Phone</th>
@@ -1400,7 +1287,7 @@
           <tr>
             <td>
               <span class="mb-mr-badge">
-                #{{ patient.mr_number|default:patient.id }}
+                #{{ patient.uhid|default:patient.id }}
               </span>
             </td>
             <td>

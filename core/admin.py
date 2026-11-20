@@ -10,7 +10,7 @@ class UserProfileInline(admin.StackedInline):
     can_delete = False
     verbose_name = "Designation Allocation"
     verbose_name_plural = "Designation Allocation"
-    fields = ("designation", "notes")
+    fields = ("designation", "notes", "service_departments")
     extra = 0
 
 

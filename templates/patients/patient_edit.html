@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Edit patient — {{ saved_name }} | Cams HMS{% endblock %}
+{% block body_class %}patient-edit-page{% endblock %}
+
+{% block page_styles %}
+  <link rel="stylesheet" href="{% static 'css/patient_edit.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="patient-edit">
+  <header class="patient-edit-header">
+    <div>
+      <h1>Edit Patient Information</h1>
+      <div class="patient-edit-identity">
+        <span>{{ saved_name }}</span>
+        {% if patient.uhid %}
+          <span class="badge">UHID #{{ patient.uhid }}</span>
+        {% else %}
+          <span class="badge">Patient #{{ patient.pk }}</span>
+        {% endif %}
+      </div>
+    </div>
+    <a href="{% url 'patient_detail' patient.pk %}" class="btn btn-outline"><span aria-hidden="true">←</span> Back to Patient Record</a>
+  </header>
+
+  {% if form.errors %}
+    <div class="alert alert-error patient-edit-summary" role="alert">
+      <h2>Review the following before saving</h2>
+      <ul>
+        {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+        {% for field in form %}
+          {% for error in field.errors %}
+            <li><a href="#{{ field.id_for_label }}">{{ field.label }}</a> · {{ error }}</li>
+          {% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <form class="card patient-edit-form" method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+
+    <section class="patient-edit-section" aria-labelledby="edit-personal-heading">
+      <h2 id="edit-personal-heading">Personal Details</h2>
+      <div class="patient-edit-photo">
+        <div class="patient-edit-portrait" aria-hidden="true">
+          {% if form.photo.initial %}
+            <img src="{{ form.photo.initial.url }}" alt="" width="84" height="84">
+          {% else %}
+            {{ saved_initials }}
+          {% endif %}
+        </div>
+        <div class="field{% if form.photo.errors %} field-error{% endif %}">
+          <label for="{{ form.photo.id_for_label }}">{% if form.photo.initial %}Replace patient photo{% else %}Add patient photo{% endif %}</label>
+          {{ form.photo }}
+          {{ form.photo.errors }}
+          {% if form.files.photo %}<small class="help">Choose the photo again before saving.</small>{% endif %}
+        </div>
+      </div>
+
+      <div class="patient-edit-grid">
+        {% include "patients/edit_field.html" with field=form.first_name only %}
+        {% include "patients/edit_field.html" with field=form.second_name only %}
+        {% include "patients/edit_field.html" with field=form.last_name only %}
+        {% include "patients/edit_field.html" with field=form.gender only %}
+        {% include "patients/edit_field.html" with field=form.marital_status only %}
+        {% include "patients/edit_field.html" with field=form.centre only %}
+      </div>
+
+      <div class="patient-edit-birth">
+        {% include "patients/edit_field.html" with field=form.date_of_birth only %}
+        <fieldset class="patient-edit-age" aria-describedby="edit-age-help">
+          <legend>Age</legend>
+          <div class="patient-edit-age-grid">
+            {% include "patients/edit_field.html" with field=form.age_years only %}
+            {% include "patients/edit_field.html" with field=form.age_months only %}
+            {% include "patients/edit_field.html" with field=form.age_days only %}
+          </div>
+          <small id="edit-age-help" class="help">Enter age if the date of birth is unknown. Leave the date field empty when using age.</small>
+        </fieldset>
+      </div>
+    </section>
+
+    <section class="patient-edit-section" aria-labelledby="edit-contact-heading">
+      <h2 id="edit-contact-heading">Contact &amp; Identification</h2>
+      <div class="patient-edit-grid">
+        {% include "patients/edit_field.html" with field=form.phone only %}
+        {% include "patients/edit_field.html" with field=form.email only %}
+        {% include "patients/edit_field.html" with field=form.care_of only %}
+        {% include "patients/edit_field.html" with field=form.aadhar_no only %}
+        {% include "patients/edit_field.html" with field=form.abha_no only %}
+      </div>
+    </section>
+
+    <section class="patient-edit-section" aria-labelledby="edit-address-heading">
+      <h2 id="edit-address-heading">Address &amp; Demographics</h2>
+      <div class="patient-edit-grid">
+        {% include "patients/edit_field.html" with field=form.address wide=True only %}
+        {% include "patients/edit_field.html" with field=form.state only %}
+        {% include "patients/edit_field.html" with field=form.district only %}
+        {% include "patients/edit_field.html" with field=form.pin_code only %}
+        {% include "patients/edit_field.html" with field=form.zone only %}
+        {% include "patients/edit_field.html" with field=form.block only %}
+        {% include "patients/edit_field.html" with field=form.village only %}
+        {% include "patients/edit_field.html" with field=form.nationality only %}
+        {% include "patients/edit_field.html" with field=form.religion only %}
+      </div>
+    </section>
+
+    <section class="patient-edit-section" aria-labelledby="edit-billing-heading">
+      <h2 id="edit-billing-heading">Fees, Billing &amp; Category</h2>
+      <div class="patient-edit-grid">
+        {% include "patients/edit_field.html" with field=form.patient_category only %}
+        {% include "patients/edit_field.html" with field=form.billing_type only %}
+        {% include "patients/edit_field.html" with field=form.payment_type only %}
+        {% include "patients/edit_field.html" with field=form.reg_fee only %}
+        {% include "patients/edit_field.html" with field=form.con_fee only %}
+        {% include "patients/edit_field.html" with field=form.discount only %}
+        {% include "patients/edit_field.html" with field=form.reference_no only %}
+      </div>
+      <div class="patient-edit-mlc">
+        <label class="patient-edit-checkbox" for="{{ form.mlc.id_for_label }}">
+          {{ form.mlc }} {{ form.mlc.label }}
+        </label>
+        {{ form.mlc.errors }}
+      </div>
+    </section>
+
+    <div class="patient-edit-actions">
+      <button type="submit" class="btn patient-edit-save">Save Changes</button>
+      <a href="{% url 'patient_detail' patient.pk %}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+
+  <footer class="patient-edit-delete">
+    <a href="{% url 'patient_delete' patient.pk %}">Delete Record</a>
+  </footer>
+</div>
+{% endblock %}

@@ -3,15 +3,14 @@
 {% block title %}Patients Directory — Cams HMS{% endblock %}
 
 {% block heading %}
-  <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:16px;">
+  <div class="mb-header">
     <div>
-      <h1>Patients Directory ({{ patients|length }})</h1>
-      <p class="page-sub">Master outpatient registration list · Complete records and history</p>
+      <div class="mb-welcome">Patient Directory</div>
+      <h1 class="mb-desk-name">Patients ({{ patients|length }})</h1>
+      <p class="page-sub" style="margin:6px 0 0; color:var(--mb-text-muted); font-size:13px;">Master outpatient registration list · Complete records and history</p>
     </div>
-    <div style="display:flex; gap:10px;">
-      <a href="{% url 'registration_desk_new' %}" class="btn" style="background:var(--lime); color:var(--ink); font-weight:750; border-radius:12px; padding:10px 20px;">
-        + Register New Patient
-      </a>
+    <div class="mb-header-tools">
+      <a href="{% url 'registration_desk_new' %}" class="mb-btn-action lime">+ Register New Patient</a>
     </div>
   </div>
 {% endblock %}
@@ -19,7 +18,7 @@
 {% block content %}
 <form class="search-bar" method="get" action="{% url 'patient_list' %}" style="display:flex; gap:12px; margin-bottom:24px;">
   <div style="flex:1; position:relative;">
-    <input type="search" name="q" value="{{ query }}" placeholder="Search by MR Number, Patient Name, Phone, Aadhar, or ABHA No…" style="width:100%; padding:12px 18px; border-radius:14px; border:1.5px solid var(--line); font-size:14px;">
+    <input type="search" name="q" value="{{ query }}" placeholder="Search by UHID, Patient Name, Phone, Aadhar, or ABHA No…" style="width:100%; padding:12px 18px; border-radius:14px; border:1.5px solid var(--line); font-size:14px;">
   </div>
   <button type="submit" class="btn btn-outline" style="padding:10px 22px; border-radius:14px; font-weight:700;">Search</button>
   {% if query %}
@@ -32,7 +31,7 @@
     <table>
       <thead>
         <tr>
-          <th>MR No.</th>
+          <th>UHID</th>
           <th>Patient</th>
           <th>Age / Gender</th>
           <th>Phone / Contact</th>
@@ -47,7 +46,7 @@
         <tr>
           <td>
             <span class="badge" style="background:var(--lav-soft); color:var(--ink); font-weight:800; font-size:12px; padding:5px 10px; border-radius:8px;">
-              #{{ patient.mr_number|default:patient.id }}
+              #{{ patient.uhid|default:patient.id }}
             </span>
           </td>
           <td>

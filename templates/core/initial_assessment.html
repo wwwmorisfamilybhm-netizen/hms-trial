@@ -441,7 +441,7 @@
       <div class="ia-picker-head">
         <div>
           <h3>Patient Search</h3>
-          <span class="ia-picker-sub">Search by name, MR number or phone{% if query %} · “{{ query }}”{% endif %}</span>
+          <span class="ia-picker-sub">Search by name, UHID or phone{% if query %} · “{{ query }}”{% endif %}</span>
         </div>
         <div class="ia-picker-head-actions">
           <span class="ia-count" id="patientCount" data-patient-count>{{ patients|length }}</span>
@@ -452,7 +452,7 @@
       </div>
 
       <form method="get" action="{% url 'initial_assessment' %}" class="ia-search" id="patientSearchForm" data-patient-search>
-        <input type="search" name="q" id="patientSearchInput" data-patient-search-input value="{{ query }}" placeholder="Search patient by name, MR number or phone…" autocomplete="off">
+        <input type="search" name="q" id="patientSearchInput" data-patient-search-input value="{{ query }}" placeholder="Search patient by name, UHID or phone…" autocomplete="off">
         {% if selected_patient %}<input type="hidden" name="patient" value="{{ selected_patient.pk }}">{% endif %}
         <button type="submit" class="ia-btn ia-btn-sm">Search</button>
       </form>
@@ -549,7 +549,7 @@
     <div class="ia-modal-head">
       <div>
         <h3 id="iaPatientModalTitle">Find a patient</h3>
-        <span class="ia-picker-sub">Search by name, MR number or phone — then pick the patient to assess.</span>
+        <span class="ia-picker-sub">Search by name, UHID or phone — then pick the patient to assess.</span>
       </div>
       <button type="button" class="ia-icon-btn" id="iaPatientModalClose" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -560,7 +560,7 @@
       <div class="ia-search" data-patient-search>
         <input type="search" id="iaModalSearchInput" data-patient-search-input data-live-search="1"
                data-patient-api="{% url 'initial_assessment_patients' %}"
-               placeholder="Search patient by name, MR number or phone…" autocomplete="off">
+               placeholder="Search patient by name, UHID or phone…" autocomplete="off">
         <button type="button" class="ia-btn ia-btn-sm" data-patient-search-btn>Search</button>
       </div>
 

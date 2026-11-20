@@ -1,646 +1,1476 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block body_class %}dc-page dc-immersive{% endblock %}
+
 {% block title %}Doctor Consultation (OPD) — Cams HMS{% endblock %}
 
+{% block sidebar_controls %}
+<button type="button" class="dc-sidebar-toggle" id="dcSidebarToggle"
+        aria-controls="appSidebar" aria-expanded="false" aria-label="Expand sidebar" title="Expand sidebar">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+</button>
+{% endblock %}
+
 {% block heading %}
-<div class="page-head" style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+<div class="np-head dc-head">
   <div>
-    <h1 style="font-size:22px; font-weight:800; color:var(--ink);">Doctor Consultation <span style="color:var(--muted); font-weight:600;">(OPD)</span></h1>
-    <p class="page-sub">Comprehensive clinical encounter workstation: assess, diagnose, prescribe, and review diagnostics.</p>
+    <div class="np-kicker">Doctor Desk · OPD Consultation</div>
+    <h1 class="np-title">Consultation Workstation</h1>
+    <p class="np-sub">Review the initial assessment, examine the patient, then diagnose, order and prescribe — one visit, one record.</p>
   </div>
-  {% if selected_patient %}
-  <div style="display:flex; gap:8px; flex-wrap:wrap;">
-    <a href="{% url 'doctor_consultation' %}" class="btn btn-outline" style="padding:7px 14px; font-size:12.5px;">Change Patient</a>
-    <button type="button" class="btn btn-outline" id="btnPrintTopSummary" style="padding:7px 14px; font-size:12.5px;" onclick="window.print();">🖨️ Print Summary</button>
-    <button type="button" class="btn" id="btnEndConsultation" style="background:#2563eb; color:#fff; font-weight:700; padding:7px 16px; font-size:12.5px; border-radius:8px;">End Consultation</button>
+  <div class="np-head-actions dc-head-actions">
+    <a href="{% url 'dashboard' %}" class="np-btn">← Desk</a>
+    <a href="{% url 'dashboard' %}" class="np-btn">Queue</a>
+    {% if selected_patient %}
+    <a href="{% url 'doctor_consultation' %}" class="np-btn">Change patient</a>
+    <button type="button" class="np-btn" data-print="summary">Print summary</button>
+    <button type="button" class="np-btn lime" data-action="complete" id="btnEndConsultationTop">End consultation</button>
+    {% endif %}
   </div>
-  {% endif %}
 </div>
 {% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/doctor_consultation.css' %}">
+<link rel="stylesheet" href="{% static 'css/doctor_consultation.css' %}?v=sidebar-toggle">
+
+<style>
+  /* ============================================================
+     Doctor Consultation — Immersive Workstation Mode
+     Guaranteed 0ms FOUC & zero caching issues
+     ============================================================ */
+  /* 1. Topbar Vanishing */
+  body.dc-immersive .topbar {
+    display: none !important;
+  }
+
+  /* 2. Optimal Immersive Container — uses freed sidebar space */
+  body.dc-immersive .container {
+    max-width: 1480px !important;
+    width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding: 16px 32px 60px !important;
+  }
+
+  /* 2b. Wider Rail — better proportion at 1480px container */
+  body.dc-immersive .dc-layout {
+    grid-template-columns: minmax(0, 1fr) 360px !important;
+  }
+
+  /* 3. Sticky Offsets Adapt to Missing Topbar */
+  body.dc-immersive .dc-page .dc-steps,
+  body.dc-immersive .dc-steps {
+    top: 14px !important;
+  }
+  body.dc-immersive .dc-page .dc-rail,
+  body.dc-immersive .dc-rail {
+    top: 16px !important;
+  }
+  body.dc-immersive .dc-page .dc-formulary,
+  body.dc-immersive .dc-formulary {
+    top: 16px !important;
+  }
+  body.dc-immersive .dc-page .dc-form-card {
+    scroll-margin-top: 16px !important;
+  }
+
+  /* 4. Left Sidebar Collapsed to 68px Icon Rail */
+  body.dc-immersive .sidebar {
+    width: 68px !important;
+    min-width: 68px !important;
+    padding: 16px 10px 14px !important;
+    box-sizing: border-box !important;
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                min-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.35s ease !important;
+    overflow-x: hidden !important;
+    position: sticky !important;
+    top: 0 !important;
+    height: 100vh !important;
+    z-index: 50 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* Brand Mark Centered */
+  body.dc-immersive .sidebar .brand {
+    justify-content: center !important;
+    padding: 2px 0 14px !important;
+    gap: 0 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    margin-bottom: 12px !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+  body.dc-immersive .sidebar .brand-mark {
+    margin: 0 auto !important;
+  }
+  body.dc-immersive .sidebar .brand-text {
+    opacity: 0 !important;
+    width: 0 !important;
+    max-width: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+    white-space: nowrap !important;
+    display: none !important;
+  }
+
+  /* Nav Items Centered as Icon Squircles */
+  body.dc-immersive .sidebar .nav-item {
+    width: 44px !important;
+    height: 44px !important;
+    padding: 0 !important;
+    margin: 0 auto 4px !important;
+    border-radius: 12px !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    position: relative !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transform: none !important;
+  }
+  body.dc-immersive .sidebar .nav-item:hover {
+    background: rgba(255, 255, 255, 0.12) !important;
+    transform: scale(1.06) !important;
+  }
+  body.dc-immersive .sidebar .nav-item.active {
+    background: #ffffff !important;
+    color: #1a1a1e !important;
+    border-color: #ffffff !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25), 0 0 16px rgba(255, 255, 255, 0.25) !important;
+    transform: scale(1.02) !important;
+  }
+  body.dc-immersive .sidebar .nav-item.active .nav-icon {
+    color: #1a1a1e !important;
+  }
+  body.dc-immersive .sidebar .nav-item .nav-icon {
+    margin: 0 !important;
+    display: grid !important;
+    place-items: center !important;
+    flex-shrink: 0 !important;
+    width: 20px !important;
+    height: 20px !important;
+  }
+  body.dc-immersive .sidebar .nav-item .nav-label,
+  body.dc-immersive .sidebar .nav-item .nav-subtag,
+  body.dc-immersive .sidebar .nav-section-label {
+    opacity: 0 !important;
+    width: 0 !important;
+    max-width: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+    display: none !important;
+  }
+
+  /* Micro Tooltip on Hover */
+  body.dc-immersive:not(.dc-sidebar-open) .sidebar .nav-item::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-6px);
+    background: #18181b;
+    color: #ffffff;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 100;
+  }
+  body.dc-immersive:not(.dc-sidebar-open) .sidebar .nav-item:hover::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+
+  /* Profile Dock when Collapsed */
+  body.dc-immersive .sidebar .side-status-dock {
+    padding-top: 8px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    margin-top: auto !important;
+    transition: all 0.3s ease !important;
+  }
+  body.dc-immersive .sidebar .side-profile-tile {
+    justify-content: center !important;
+    padding: 4px 0 !important;
+    background: transparent !important;
+    border: none !important;
+  }
+  body.dc-immersive .sidebar .profile-avatar {
+    margin: 0 auto !important;
+  }
+  body.dc-immersive .sidebar .profile-info,
+  body.dc-immersive .sidebar .side-logout-btn,
+  body.dc-immersive .sidebar .sidebar-footer {
+    display: none !important;
+  }
+
+  /* Expanded sidebar */
+  body.dc-immersive.dc-sidebar-open .sidebar {
+    width: 260px !important;
+    min-width: 260px !important;
+    padding: 16px 14px 16px !important;
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.35) !important;
+  }
+  body.dc-immersive.dc-sidebar-open .sidebar .brand {
+    justify-content: flex-start !important;
+    padding-inline: 6px !important;
+    gap: 12px !important;
+  }
+  body.dc-immersive.dc-sidebar-open .sidebar .brand-text {
+    opacity: 1 !important;
+    width: auto !important;
+    max-width: 200px !important;
+    pointer-events: auto !important;
+    display: flex !important;
+  }
+  body.dc-immersive.dc-sidebar-open .sidebar .nav-item {
+    width: auto !important;
+    height: auto !important;
+    padding: 11px 16px !important;
+    margin: 0 0 4px !important;
+    border-radius: 9999px !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
+  }
+  body.dc-immersive.dc-sidebar-open .sidebar .nav-item .nav-label {
+    opacity: 1 !important;
+    width: auto !important;
+    max-width: 200px !important;
+    pointer-events: auto !important;
+    display: inline !important;
+  }
+  body.dc-immersive.dc-sidebar-open .sidebar .nav-item .nav-subtag {
+    opacity: 1 !important;
+    width: auto !important;
+    max-width: 100px !important;
+    pointer-events: auto !important;
+    display: inline-block !important;
+  }
+  body.dc-immersive.dc-sidebar-open .sidebar .nav-section-label {
+    opacity: 1 !important;
+    width: auto !important;
+    max-width: 200px !important;
+    pointer-events: auto !important;
+    display: block !important;
+  }
+  body.dc-immersive.dc-sidebar-open .sidebar .side-profile-tile {
+    justify-content: flex-start !important;
+    padding: 8px 10px !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-radius: 12px !important;
+  }
+  body.dc-immersive.dc-sidebar-open .sidebar .profile-info,
+  body.dc-immersive.dc-sidebar-open .sidebar .side-logout-btn,
+  body.dc-immersive.dc-sidebar-open .sidebar .sidebar-footer {
+    display: flex !important;
+  }
+
+  /* ── Compact Patient Hero Strip ── */
+  .dc-compact-hero {
+    background: linear-gradient(135deg, #8f79f3 0%, #6f58e6 100%) !important;
+    color: #ffffff !important;
+    border-radius: 16px !important;
+    padding: 12px 18px !important;
+    box-shadow: 0 10px 30px -15px rgba(99, 82, 181, 0.45) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    margin-bottom: 4px !important;
+    transition: all 0.25s ease !important;
+  }
+  .dc-compact-hero::before {
+    content: "" !important;
+    position: absolute !important;
+    width: 200px !important;
+    height: 200px !important;
+    border-radius: 50% !important;
+    right: -60px !important;
+    top: -90px !important;
+    background: radial-gradient(circle, rgba(212, 241, 80, 0.25), transparent 70%) !important;
+    pointer-events: none !important;
+  }
+  .dc-hero-main-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 14px !important;
+    flex-wrap: wrap !important;
+    position: relative !important;
+    z-index: 2 !important;
+  }
+  .dc-hero-id-cluster {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    min-width: 0 !important;
+  }
+  .dc-hero-mini-avatar {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 11px !important;
+    background: #d4f150 !important;
+    color: #1b1c26 !important;
+    font-size: 15px !important;
+    font-weight: 850 !important;
+    display: grid !important;
+    place-items: center !important;
+    flex-shrink: 0 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  }
+  .dc-hero-title-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    min-width: 0 !important;
+  }
+  .dc-hero-name-line {
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+  }
+  .dc-hero-name {
+    margin: 0 !important;
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    color: #ffffff !important;
+    letter-spacing: -0.3px !important;
+    line-height: 1.2 !important;
+  }
+  .dc-hero-demog {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: rgba(255, 255, 255, 0.88) !important;
+  }
+  .dc-hero-blood {
+    display: inline-block !important;
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+    border-radius: 6px !important;
+    padding: 1px 6px !important;
+    color: #ffffff !important;
+    letter-spacing: 0.2px !important;
+    line-height: 1.3 !important;
+  }
+  .dc-hero-sub-meta {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    font-size: 12px !important;
+    color: rgba(255, 255, 255, 0.72) !important;
+  }
+  .dc-hero-sub-meta strong {
+    color: #ffffff !important;
+    font-weight: 650 !important;
+  }
+  .dc-meta-dot {
+    opacity: 0.5 !important;
+  }
+  .dc-hero-badges-cluster {
+    display: flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    flex-wrap: wrap !important;
+    position: relative !important;
+    z-index: 2 !important;
+  }
+  .dc-strip-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    padding: 4px 10px !important;
+    border-radius: 999px !important;
+    white-space: nowrap !important;
+    transition: all 0.15s ease !important;
+  }
+  .dc-strip-badge.is-emergency {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.35) !important;
+    font-weight: 800 !important;
+  }
+  .dc-strip-badge.is-urgent {
+    background: #f59e0b !important;
+    color: #1b1c26 !important;
+    font-weight: 800 !important;
+  }
+  .dc-strip-badge.is-routine {
+    background: rgba(255, 255, 255, 0.16) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  }
+  .dc-strip-badge.is-nurse-ready {
+    background: #d4f150 !important;
+    color: #1b1c26 !important;
+    font-weight: 800 !important;
+  }
+  .dc-strip-badge.is-nurse-pending {
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: rgba(255, 255, 255, 0.88) !important;
+    border: 1px dashed rgba(255, 255, 255, 0.3) !important;
+  }
+  .dc-strip-badge.is-allergy-alert {
+    background: #dc2626 !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.45) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  }
+  .dc-strip-badge.is-allergy-none {
+    background: rgba(255, 255, 255, 0.14) !important;
+    color: rgba(255, 255, 255, 0.92) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    font-size: 11px !important;
+  }
+  .dc-strip-badge.is-chronic {
+    background: rgba(255, 255, 255, 0.15) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.24) !important;
+  }
+  .dc-hero-expand-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    padding: 4px 10px !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff !important;
+    font: inherit !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+  }
+  .dc-hero-expand-btn:hover {
+    background: rgba(255, 255, 255, 0.22) !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
+  }
+  .dc-hero-expand-btn .dc-expand-icon {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+  .dc-hero-expand-btn.is-open .dc-expand-icon {
+    transform: rotate(180deg) !important;
+  }
+  .dc-hero-drawer {
+    margin-top: 12px !important;
+    padding-top: 12px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
+    animation: dcDrawerIn 0.2s ease !important;
+    position: relative !important;
+    z-index: 2 !important;
+  }
+  .dc-hero-drawer[hidden] {
+    display: none !important;
+  }
+  @keyframes dcDrawerIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .dc-drawer-facts {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
+    gap: 8px 14px !important;
+    font-size: 11.5px !important;
+  }
+  .dc-drawer-facts div {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+  }
+  .dc-drawer-facts span {
+    color: rgba(255, 255, 255, 0.65) !important;
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    font-weight: 700 !important;
+  }
+  .dc-drawer-facts strong {
+    color: #ffffff !important;
+    font-weight: 650 !important;
+    font-size: 12.5px !important;
+  }
+  .dc-drawer-span-full {
+    grid-column: 1 / -1 !important;
+  }
+</style>
 
 {% if not selected_patient %}
-<!-- ═══════════ Patient Selector / Queue Picker ═══════════ -->
-<section class="dc-card" style="margin-top:10px;">
-  <div class="dc-card-head">
-    <div>
-      <h3 class="dc-card-title">Select Patient for Consultation</h3>
-      <span style="font-size:12.5px; color:var(--dc-muted);">Search OPD queue by patient name, UHID, MR number, or phone number.</span>
-    </div>
-  </div>
+<!-- ══════════════════════════════════════════════════════════════
+     PATIENT PICKER
+     ══════════════════════════════════════════════════════════════ -->
+<div class="np-bento dc-picker-layout">
 
-  <form method="get" action="{% url 'doctor_consultation' %}" style="display:flex; gap:10px; margin-bottom:18px;">
-    <input type="text" name="q" value="{{ query }}" class="dc-input" placeholder="Search patient by name, UHID, MR number or phone…">
-    <button type="submit" class="dc-btn dc-btn-primary" style="white-space:nowrap;">Search</button>
-  </form>
+  <div class="np-col">
+    <section class="np-card dc-picker-ready">
+      <div class="np-card-head">
+        <h2 class="np-card-title"><span class="np-dot"></span>Ready for consultation</h2>
+        <span class="np-card-sub">{{ ready_patients|length }} patient{{ ready_patients|length|pluralize }}</span>
+      </div>
 
-  <div style="overflow-x:auto;">
-    {% if patients %}
-    <table class="dc-table">
-      <thead>
-        <tr>
-          <th>Patient Name</th>
-          <th>UHID</th>
-          <th>Demographics</th>
-          <th>Phone</th>
-          <th>Registration Date</th>
-          <th style="text-align:right;">Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in patients %}
-        <tr>
-          <td>
-            <strong>{{ p.full_name }}</strong>
-            {% if p.is_emergency %}<span class="dc-chip dc-chip-urgent" style="margin-left:6px;">Emergency</span>{% endif %}
-          </td>
-          <td style="font-family:monospace; font-weight:700; color:#0369a1;">{{ p.uhid }}</td>
-          <td>{{ p.age|default:"—" }} yrs · {{ p.get_gender_display|default:"—" }}</td>
-          <td>{{ p.phone|default:"—" }}</td>
-          <td>{{ p.created_at|date:"d M Y, h:i A" }}</td>
-          <td style="text-align:right;">
-            <a href="{% url 'doctor_consultation' %}?patient={{ p.pk }}" class="dc-btn dc-btn-primary dc-btn-sm">Start Consultation →</a>
-          </td>
-        </tr>
+      {% if ready_patients %}
+      <div class="dc-ready-list">
+        {% for p in ready_patients %}
+        <a class="dc-ready-item{% if p.is_emergency %} is-emergency{% endif %}"
+           href="{% url 'doctor_consultation' %}?patient={{ p.pk }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}">
+          <span class="dc-ready-avatar">{{ p.first_name|slice:":1"|upper }}{% if p.last_name %}{{ p.last_name|slice:":1"|upper }}{% endif %}</span>
+          <span class="dc-ready-main">
+            <span class="dc-ready-name">
+              {{ p.full_name }}
+              {% if p.is_emergency %}<span class="np-badge emergency">Emergency</span>{% endif %}
+              {% if p.triage_priority == "urgent" %}<span class="np-badge urgent">Urgent</span>{% endif %}
+            </span>
+            <span class="dc-ready-meta">{{ p.uhid|default:"No UHID" }} · {{ p.age|default:"—" }} yrs · {{ p.get_gender_display|default:"—" }}{% if p.phone %} · {{ p.phone }}{% endif %}</span>
+            <span class="dc-ready-sub">Assessment ready · waiting {{ p.wait_label }}{% if p.is_assigned %} · assigned to you{% endif %}</span>
+          </span>
+          <span class="np-btn sm lime">Start →</span>
+        </a>
         {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div class="dc-empty">
-      <p>No patients found in queue{% if query %} matching "{{ query }}"{% endif %}.</p>
-    </div>
+      </div>
+      {% else %}
+      <div class="np-empty">No patients are waiting for a consultation.{% if unassigned_ready_patients %} Pick one from the unassigned pool below.{% else %} Search the patient register on the right to start a visit.{% endif %}</div>
+      {% endif %}
+    </section>
+
+    {% if unassigned_ready_patients %}
+    <!-- Unassigned central pool: assessed visits with no doctor yet — the
+         doctor can pick these straight from here. -->
+    <section class="np-card dc-picker-ready">
+      <div class="np-card-head">
+        <h2 class="np-card-title"><span class="np-dot"></span>Unassigned — waiting for a doctor</h2>
+        <span class="np-card-sub">{{ unassigned_ready_patients|length }} assessed visit{{ unassigned_ready_patients|length|pluralize }}</span>
+      </div>
+      <div class="dc-ready-list">
+        {% for p in unassigned_ready_patients %}
+        <div class="dc-ready-item{% if p.is_emergency %} is-emergency{% endif %}">
+          <span class="dc-ready-avatar">{{ p.first_name|slice:":1"|upper }}{% if p.last_name %}{{ p.last_name|slice:":1"|upper }}{% endif %}</span>
+          <span class="dc-ready-main">
+            <span class="dc-ready-name">
+              {{ p.full_name }}
+              {% if p.is_emergency %}<span class="np-badge emergency">Emergency</span>{% endif %}
+              {% if p.triage_priority == "urgent" %}<span class="np-badge urgent">Urgent</span>{% endif %}
+            </span>
+            <span class="dc-ready-meta">{{ p.uhid|default:"No UHID" }} · {{ p.age|default:"—" }} yrs · {{ p.get_gender_display|default:"—" }}{% if p.phone %} · {{ p.phone }}{% endif %}</span>
+            <span class="dc-ready-sub">Assessment ready · waiting {{ p.wait_label }} · no doctor assigned yet</span>
+          </span>
+          <form method="post" action="{% url 'assign_doctor' p.pk %}" style="display:inline-flex; align-items:center; margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="doctor_id" value="{{ request.user.pk }}">
+            <input type="hidden" name="next" value="{% url 'doctor_consultation' %}?patient={{ p.pk }}">
+            <button type="submit" class="np-btn sm lime">Pick this patient</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
     {% endif %}
-  </div>
-</section>
 
-{% else %}
-
-<!-- ═══════════ Active Consultation Workspace ═══════════ -->
-<div class="dc-workspace">
-  <input type="hidden" id="dcPatientId" value="{{ patient_ctx.id }}">
-  <input type="hidden" id="dcConsultationId" value="{{ consultation.id }}">
-
-  <!-- 1. Patient Demographics Banner -->
-  <section class="dc-banner">
-    <div class="dc-banner-left">
-      <div class="dc-avatar">{{ patient_ctx.initials }}</div>
-      <div class="dc-banner-details">
-        <div class="dc-name-row">
-          <h2 class="dc-patient-name">{{ patient_ctx.name }}</h2>
-          <span class="dc-chip dc-chip-uhid">UHID: {{ patient_ctx.uhid }}</span>
-          <span class="dc-chip dc-chip-token">{{ patient_ctx.visit_token }}</span>
-          {% if patient_ctx.is_emergency %}
-          <span class="dc-chip dc-chip-urgent">Emergency</span>
-          {% endif %}
-        </div>
-        <div class="dc-meta-grid">
-          <span><strong>Age / Gender:</strong> {{ patient_ctx.age }} yrs / {{ patient_ctx.gender }}</span>
-          <span><strong>Phone:</strong> {{ patient_ctx.phone }}</span>
-          <span><strong>Address:</strong> {{ patient_ctx.address }}</span>
-          <span><strong>Visit Date:</strong> {{ patient_ctx.visit_timestamp }}</span>
-          <span><strong>Department:</strong> {{ patient_ctx.department }}</span>
-          <span><strong>Type:</strong> {{ patient_ctx.visit_type }}</span>
-        </div>
+    <section class="np-card dc-picker-empty">
+      <div class="dc-picker-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
       </div>
-    </div>
-
-    <!-- Alert Box -->
-    <div class="dc-banner-right">
-      <div class="dc-alert-box" id="bannerAlertBox">
-        <div class="dc-alert-title">
-          ⚠️ Allergy: 
-          {% if patient_ctx.allergies %}
-            {{ patient_ctx.allergies|join:", " }}
-          {% else %}
-            <span style="color:#059669; font-weight:600;">No Known Drug Allergies (NKDA)</span>
-          {% endif %}
-        </div>
-        <div class="dc-alert-item">
-          <strong>Known Illness:</strong> 
-          {% if patient_ctx.chronic_illnesses %}
-            {{ patient_ctx.chronic_illnesses|join:", " }}
-          {% else %}
-            None reported
-          {% endif %}
-        </div>
-        <div class="dc-alert-item">
-          <strong>Current Medicines:</strong> 
-          {% if patient_ctx.active_medications %}
-            {{ patient_ctx.active_medications|join:", " }}
-          {% else %}
-            None reported
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 2. Sequential 7-Tab Navigation -->
-  <nav class="dc-tab-nav">
-    <button type="button" class="dc-tab-btn active" data-tab="1">1. Assessment</button>
-    <button type="button" class="dc-tab-btn" data-tab="2">2. Examination</button>
-    <button type="button" class="dc-tab-btn" data-tab="3">3. Diagnosis & Plan</button>
-    <button type="button" class="dc-tab-btn" data-tab="4">4. Orders</button>
-    <button type="button" class="dc-tab-btn" data-tab="5">5. Reports & Results</button>
-    <button type="button" class="dc-tab-btn" data-tab="6">6. Prescription</button>
-    <button type="button" class="dc-tab-btn" data-tab="7">7. Advice & Follow-up</button>
-  </nav>
-
-  <!-- ═══════════ TAB 1: Assessment ═══════════ -->
-  <div class="dc-tab-content active" data-tab="1">
-    <div class="dc-grid-main-side">
-      <!-- Main Column -->
-      <div>
-        <!-- Vitals from OPD Assistant -->
-        <section class="dc-card">
-          <div class="dc-card-head">
-            <h3 class="dc-card-title">🩺 Initial Assessment (from OPD Assistant)</h3>
-            <span style="font-size:12px; color:var(--dc-muted);">Recorded prior to consultation</span>
-          </div>
-
-          <div class="dc-vitals-grid">
-            <div class="dc-vital-box {% if assessment.temperature and assessment.temperature|floatformat:0 > 99 %}alert-red{% endif %}">
-              <div class="dc-vital-k">Temp (°F)</div>
-              <div class="dc-vital-v">{{ assessment.temperature|default:"—" }}</div>
-            </div>
-            <div class="dc-vital-box {% if assessment.pulse and assessment.pulse > 100 %}alert-amber{% endif %}">
-              <div class="dc-vital-k">Pulse (/min)</div>
-              <div class="dc-vital-v">{{ assessment.pulse|default:"—" }}</div>
-            </div>
-            <div class="dc-vital-box">
-              <div class="dc-vital-k">RR (/min)</div>
-              <div class="dc-vital-v">{{ assessment.respiratory_rate|default:"—" }}</div>
-            </div>
-            <div class="dc-vital-box {% if assessment.bp_systolic and assessment.bp_systolic > 139 %}alert-red{% endif %}">
-              <div class="dc-vital-k">BP (mmHg)</div>
-              <div class="dc-vital-v">
-                {% if assessment.bp_systolic and assessment.bp_diastolic %}
-                  {{ assessment.bp_systolic }} / {{ assessment.bp_diastolic }}
-                {% else %}
-                  —
-                {% endif %}
-              </div>
-            </div>
-            <div class="dc-vital-box {% if assessment.spo2 and assessment.spo2 < 95 %}alert-red{% endif %}">
-              <div class="dc-vital-k">SpO₂ (%)</div>
-              <div class="dc-vital-v">{{ assessment.spo2|default:"—" }}</div>
-            </div>
-            <div class="dc-vital-box">
-              <div class="dc-vital-k">Weight (kg)</div>
-              <div class="dc-vital-v">{{ assessment.weight|default:"—" }}</div>
-            </div>
-            <div class="dc-vital-box">
-              <div class="dc-vital-k">Height (cm)</div>
-              <div class="dc-vital-v">{{ assessment.height|default:"—" }}</div>
-            </div>
-            <div class="dc-vital-box">
-              <div class="dc-vital-k">RBS (mg/dL)</div>
-              <div class="dc-vital-v">{{ assessment.rbs|default:"—" }}</div>
-            </div>
-            <div class="dc-vital-box">
-              <div class="dc-vital-k">Pain (0-10)</div>
-              <div class="dc-vital-v">{{ assessment.pain_score|default:"0" }}</div>
-            </div>
-          </div>
-
-          <div style="background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:12px; margin-bottom:12px;">
-            <div style="font-size:12px; font-weight:700; color:var(--dc-muted); margin-bottom:4px;">Chief Complaints:</div>
-            <div style="font-size:14px; font-weight:600; color:var(--dc-ink);">
-              {{ assessment.complaints|default:"No primary complaints logged." }}
-            </div>
-          </div>
-        </section>
-
-        <!-- History of Present Illness & Clinical Notes -->
-        <section class="dc-card">
-          <div class="dc-card-head">
-            <h3 class="dc-card-title">📝 History of Present Illness</h3>
-          </div>
-          <div style="font-size:13.5px; color:var(--dc-ink-soft); line-height:1.6; margin-bottom:16px;">
-            {{ assessment.hpi|default:"Patient reports onset of symptoms. Detailed timeline to be verified during clinical examination." }}
-          </div>
-
-          <div class="dc-card-head" style="margin-top:16px;">
-            <h3 class="dc-card-title">👨‍⚕️ Doctor's Clinical Note</h3>
-          </div>
-          <div class="dc-toolbar">
-            <button type="button" class="dc-tool-btn" onclick="document.execCommand('bold', false, null);">B</button>
-            <button type="button" class="dc-tool-btn" onclick="document.execCommand('italic', false, null);">I</button>
-            <button type="button" class="dc-tool-btn" onclick="document.execCommand('underline', false, null);">U</button>
-            <button type="button" class="dc-tool-btn" onclick="document.execCommand('insertUnorderedList', false, null);">• List</button>
-          </div>
-          <textarea id="clinicalNoteText" class="dc-textarea" rows="6" placeholder="Enter clinical impressions, objective observations, and bedside assessment notes...">{{ consultation.clinical_note }}</textarea>
-        </section>
-      </div>
-
-      <!-- Right Column: Quick Orders & Services -->
-      <div>
-        <section class="dc-card">
-          <div class="dc-card-head">
-            <h3 class="dc-card-title">⚡ Quick Orders</h3>
-          </div>
-
-          <div style="margin-bottom:14px;">
-            <div style="font-size:12px; font-weight:700; color:var(--dc-muted); margin-bottom:8px; text-transform:uppercase;">Laboratory Orders</div>
-            <div style="display:flex; flex-direction:column; gap:8px;">
-              <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
-                <input type="checkbox" class="order-checkbox" data-name="Complete Blood Count (CBC)" data-type="laboratory" checked>
-                <span>Complete Blood Count (CBC)</span>
-                <span class="dc-pill dc-pill-success" style="margin-left:auto;">Ordered</span>
-              </label>
-              <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
-                <input type="checkbox" class="order-checkbox" data-name="C-Reactive Protein (CRP)" data-type="laboratory">
-                <span>C-Reactive Protein (CRP)</span>
-                <span class="dc-pill dc-pill-neutral" style="margin-left:auto;">Not Ordered</span>
-              </label>
-              <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
-                <input type="checkbox" class="order-checkbox" data-name="Liver Function Test (LFT)" data-type="laboratory">
-                <span>Liver Function Test (LFT)</span>
-                <span class="dc-pill dc-pill-neutral" style="margin-left:auto;">Not Ordered</span>
-              </label>
-            </div>
-          </div>
-
-          <div style="margin-bottom:14px;">
-            <div style="font-size:12px; font-weight:700; color:var(--dc-muted); margin-bottom:8px; text-transform:uppercase;">Radiology / Imaging</div>
-            <div style="display:flex; flex-direction:column; gap:8px;">
-              <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
-                <input type="checkbox" class="order-checkbox" data-name="Chest X-Ray (PA View)" data-type="radiology">
-                <span>Chest X-Ray (PA View)</span>
-                <span class="dc-pill dc-pill-neutral" style="margin-left:auto;">Not Ordered</span>
-              </label>
-              <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
-                <input type="checkbox" class="order-checkbox" data-name="USG Whole Abdomen" data-type="radiology">
-                <span>USG Whole Abdomen</span>
-                <span class="dc-pill dc-pill-neutral" style="margin-left:auto;">Not Ordered</span>
-              </label>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════ TAB 2: Examination ═══════════ -->
-  <div class="dc-tab-content" data-tab="2">
-    <section class="dc-card">
-      <div class="dc-card-head">
-        <h3 class="dc-card-title">🔍 Physical & Systemic Examination</h3>
-        <button type="button" class="dc-btn dc-btn-outline dc-btn-sm" onclick="alert('Preset: Standard normal findings applied.');">Apply All Normal Findings</button>
-      </div>
-
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px; margin-bottom:16px;">
-        <div style="background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:14px;">
-          <h4 style="margin:0 0 10px; font-size:14px;">General Physical Exam (GPE)</h4>
-          <div style="display:flex; flex-wrap:wrap; gap:8px;">
-            <label><input type="checkbox"> Pallor</label>
-            <label><input type="checkbox"> Icterus</label>
-            <label><input type="checkbox"> Cyanosis</label>
-            <label><input type="checkbox"> Clubbing</label>
-            <label><input type="checkbox"> Lymphadenopathy</label>
-            <label><input type="checkbox"> Pedal Edema</label>
-          </div>
-        </div>
-
-        <div style="background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:14px;">
-          <h4 style="margin:0 0 10px; font-size:14px;">Respiratory System (RS)</h4>
-          <input type="text" class="dc-input" placeholder="Bilateral equal air entry, vesicular breath sounds, no added sounds" value="Bilateral vesicular breath sounds, no rhonchi">
-        </div>
-
-        <div style="background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:14px;">
-          <h4 style="margin:0 0 10px; font-size:14px;">Cardiovascular System (CVS)</h4>
-          <input type="text" class="dc-input" placeholder="S1 S2 heard, no murmurs" value="S1, S2 normal, no murmurs">
-        </div>
-
-        <div style="background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:14px;">
-          <h4 style="margin:0 0 10px; font-size:14px;">Per Abdomen (P/A)</h4>
-          <input type="text" class="dc-input" placeholder="Soft, non-tender, no organomegaly" value="Soft, non-tender, bowel sounds normal">
-        </div>
+      <h2>Select Patient for Consultation</h2>
+      <p>Find the patient in the search panel on the right. Their initial assessment, vitals and visit history open here with the full consultation workspace.</p>
+      {% if query %}
+      <p class="dc-picker-note">Showing results for “{{ query }}”.</p>
+      {% endif %}
+      <div class="dc-picker-hints">
+        <span class="dc-picker-hint"><strong>1</strong> Review the initial assessment</span>
+        <span class="dc-picker-hint"><strong>2</strong> Examine &amp; diagnose</span>
+        <span class="dc-picker-hint"><strong>3</strong> Prescribe &amp; complete</span>
       </div>
     </section>
   </div>
 
-  <!-- ═══════════ TAB 3: Diagnosis & Plan ═══════════ -->
-  <div class="dc-tab-content" data-tab="3">
-    <section class="dc-card">
-      <div class="dc-card-head">
-        <h3 class="dc-card-title">🎯 Diagnosis & Clinical Management Plan</h3>
-      </div>
-
-      <div style="display:grid; grid-template-columns:1fr 180px; gap:14px; margin-bottom:14px; position:relative;">
+  <div class="np-col">
+    <section class="np-card dc-picker-search">
+      <div class="np-card-head">
         <div>
-          <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:4px;">Primary Diagnosis *</label>
-          <input type="text" id="primaryDiagnosisInput" class="dc-input" placeholder="Type disease name or ICD-10 term (e.g., Acute Upper Respiratory Infection)…" value="{{ consultation.diagnosis_primary }}">
-          <div id="icdDropdownResults" style="display:none; position:absolute; left:0; right:194px; background:#fff; border:1px solid var(--dc-border-strong); border-radius:8px; box-shadow:var(--dc-shadow); z-index:20; max-height:200px; overflow-y:auto;"></div>
+          <h2 class="np-card-title">Patient Search</h2>
+          <span class="np-card-sub">Search by name, UHID or phone{% if query %} · “{{ query }}”{% endif %}</span>
         </div>
-        <div>
-          <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:4px;">ICD-10 Code</label>
-          <input type="text" id="primaryIcdInput" class="dc-input" placeholder="e.g. J06.9" value="{{ consultation.diagnosis_primary_icd }}" style="font-family:monospace; font-weight:700;">
-        </div>
+        <span class="dc-count-pill">{{ patients|length }}</span>
       </div>
 
-      <div style="margin-bottom:16px;">
-        <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:6px;">Visit Type</label>
-        <div style="display:flex; gap:16px; font-size:13px;">
-          <label><input type="radio" name="visit_type" value="new_problem" {% if consultation.visit_type == 'new_problem' or not consultation.visit_type %}checked{% endif %}> New Problem</label>
-          <label><input type="radio" name="visit_type" value="follow_up_same" {% if consultation.visit_type == 'follow_up_same' %}checked{% endif %}> Follow-up (Same Problem)</label>
-          <label><input type="radio" name="visit_type" value="follow_up_diff" {% if consultation.visit_type == 'follow_up_diff' %}checked{% endif %}> Follow-up (Different Problem)</label>
+      <form method="get" action="{% url 'doctor_consultation' %}" class="dc-search">
+        <input type="search" name="q" value="{{ query }}" placeholder="Search name, UHID or phone…" autocomplete="off">
+        <button type="submit" class="np-btn">Search</button>
+      </form>
+
+      <div class="dc-picker-list">
+        {% for p in patients %}
+        <a class="dc-picker-patient{% if p.is_emergency %} is-emergency{% endif %}"
+           href="{% url 'doctor_consultation' %}?patient={{ p.pk }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}">
+          <span class="dc-picker-avatar">{{ p.first_name|slice:":1"|upper }}{% if p.last_name %}{{ p.last_name|slice:":1"|upper }}{% endif %}</span>
+          <span class="dc-picker-info">
+            <span class="dc-picker-name">{{ p.full_name }}{% if p.is_emergency %}<span class="np-badge emergency">Emergency</span>{% endif %}</span>
+            <span class="dc-picker-meta">{{ p.uhid|default:"No UHID" }} · {{ p.age|default:"—" }} yrs · {{ p.get_gender_display|default:"—" }}{% if p.phone %} · {{ p.phone }}{% endif %}</span>
+          </span>
+          {% if p.has_active_consultation %}
+          <span class="np-badge teal">In consult</span>
+          {% elif p.has_assessment %}
+          <span class="np-badge routine">Ready</span>
+          {% else %}
+          <span class="np-badge muted">Triage</span>
+          {% endif %}
+        </a>
+        {% empty %}
+        <div class="np-empty">
+          {% if query %}No patients match “{{ query }}”.{% else %}No patients registered yet.{% endif %}
         </div>
+        {% endfor %}
       </div>
 
-      <div style="margin-bottom:16px;">
-        <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:4px;">Treatment & Investigation Plan</label>
-        <textarea id="treatmentPlanText" class="dc-textarea" rows="4" placeholder="Detail conservative management, planned investigations, hydration, and monitoring guidelines...">{{ consultation.treatment_plan }}</textarea>
-      </div>
-
-      <div style="display:flex; align-items:center; gap:14px; background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:12px;">
-        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600;">
-          <input type="checkbox" id="markFollowUpCheck" {% if consultation.mark_follow_up %}checked{% endif %}>
-          Mark for Follow-up
-        </label>
-        <select id="followUpDurationSelect" class="dc-input" style="width:160px;">
-          <option value="3 days" {% if consultation.follow_up_after == '3 days' %}selected{% endif %}>After 3 days</option>
-          <option value="5 days" {% if consultation.follow_up_after == '5 days' %}selected{% endif %}>After 5 days</option>
-          <option value="1 week" {% if consultation.follow_up_after == '1 week' %}selected{% endif %}>After 1 week</option>
-          <option value="2 weeks" {% if consultation.follow_up_after == '2 weeks' %}selected{% endif %}>After 2 weeks</option>
-          <option value="1 month" {% if consultation.follow_up_after == '1 month' %}selected{% endif %}>After 1 month</option>
-        </select>
-      </div>
+      {% if query %}
+      <a class="dc-clear-search" href="{% url 'doctor_consultation' %}">Clear search</a>
+      {% endif %}
     </section>
-  </div>
 
-  <!-- ═══════════ TAB 4: Orders ═══════════ -->
-  <div class="dc-tab-content" data-tab="4">
-    <div class="dc-grid-main-side">
-      <div>
-        <section class="dc-card">
-          <div class="dc-card-head">
-            <h3 class="dc-card-title">📋 Clinical Blueprint Summary</h3>
-          </div>
-          <div style="margin-bottom:14px;">
-            <div style="font-size:12px; font-weight:700; color:var(--dc-muted);">Special Advice</div>
-            <textarea id="specialAdviceText" class="dc-textarea" rows="3" placeholder="Rest, hydration, temperature charting...">{{ consultation.special_advice }}</textarea>
-          </div>
-        </section>
+    <section class="np-card dark dc-picker-guide">
+      <div class="np-card-head">
+        <h2 class="np-card-title"><span class="np-dot"></span>How the visit flows</h2>
       </div>
-
-      <div>
-        <section class="dc-card">
-          <div class="dc-card-head">
-            <h3 class="dc-card-title">Current Visit Orders</h3>
-          </div>
-          <table class="dc-table">
-            <thead>
-              <tr><th>#</th><th>Service / Test</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              {% for ord in current_orders %}
-              <tr>
-                <td>{{ forloop.counter }}</td>
-                <td><strong>{{ ord.name }}</strong></td>
-                <td><span class="dc-pill dc-pill-success">{{ ord.status }}</span></td>
-              </tr>
-              {% empty %}
-              <tr><td colspan="3" class="dc-empty">No orders submitted for this visit yet.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </section>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════ TAB 5: Reports & Results ═══════════ -->
-  <div class="dc-tab-content" data-tab="5">
-    <div class="dc-grid-main-side">
-      <!-- Reports List -->
-      <div>
-        <section class="dc-card">
-          <div class="dc-card-head">
-            <h3 class="dc-card-title">🧪 Diagnostic Reports & Results</h3>
-            <button type="button" class="dc-btn dc-btn-outline dc-btn-sm" onclick="alert('Upload report modal');">+ Upload Report</button>
-          </div>
-
-          <!-- Laboratory CBC Card -->
-          <div style="border:1px solid var(--dc-border); border-radius:8px; padding:14px; margin-bottom:16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <strong>Laboratory Report — Complete Blood Count (CBC)</strong>
-              <span class="dc-pill dc-pill-success">Verified</span>
-            </div>
-            <table class="dc-table">
-              <thead>
-                <tr><th>Test Parameter</th><th>Observed Value</th><th>Unit</th><th>Reference Range</th></tr>
-              </thead>
-              <tbody>
-                <tr><td>Haemoglobin</td><td style="font-weight:700;">12.8</td><td>g/dL</td><td>13.0 – 17.0</td></tr>
-                <tr><td>Total WBC Count</td><td style="font-weight:700;">8,600</td><td>/µL</td><td>4,000 – 11,000</td></tr>
-                <tr><td>Platelets</td><td style="font-weight:700;">2.4</td><td>lakhs/µL</td><td>1.5 – 4.5</td></tr>
-                <tr><td>Neutrophils</td><td style="font-weight:700;">62</td><td>%</td><td>40 – 75</td></tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- PACS / Radiology Viewer -->
-          <div style="border:1px solid var(--dc-border); border-radius:8px; padding:14px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <strong>Radiology — Chest X-Ray (PA View)</strong>
-              <span style="font-size:12px; color:var(--dc-muted);">Verified by Radiologist</span>
-            </div>
-            <div class="dc-viewer-container">
-              <svg width="220" height="220" viewBox="0 0 200 200" fill="none" id="radiologyMainImg" style="transition:transform 0.2s ease;">
-                <rect width="200" height="200" fill="#1e293b"/>
-                <path d="M60 40 Q100 60 140 40 Q160 120 130 170 Q100 180 70 170 Q40 120 60 40 Z" fill="#475569" opacity="0.6"/>
-                <path d="M100 30 L100 180" stroke="#94a3b8" stroke-width="4"/>
-                <path d="M70 70 Q100 85 130 70" stroke="#cbd5e1" stroke-width="2"/>
-                <path d="M65 95 Q100 110 135 95" stroke="#cbd5e1" stroke-width="2"/>
-                <path d="M68 120 Q100 135 132 120" stroke="#cbd5e1" stroke-width="2"/>
-              </svg>
-              <div class="dc-viewer-toolbar">
-                <button type="button" class="dc-viewer-btn" id="btnViewerZoomIn" title="Zoom In">🔍+</button>
-                <button type="button" class="dc-viewer-btn" id="btnViewerZoomOut" title="Zoom Out">🔍-</button>
-                <button type="button" class="dc-viewer-btn" id="btnViewerRotate" title="Rotate">↻</button>
-                <button type="button" class="dc-viewer-btn" id="btnViewerInvert" title="Invert Colors">◑</button>
-                <button type="button" class="dc-viewer-btn" id="btnViewerReset" title="Reset">↺</button>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <!-- Historical Reports -->
-      <div>
-        <section class="dc-card">
-          <div class="dc-card-head">
-            <h3 class="dc-card-title">Previous Records</h3>
-          </div>
-          <table class="dc-table">
-            <thead>
-              <tr><th>Date</th><th>Report Title</th><th>Type</th></tr>
-            </thead>
-            <tbody>
-              {% for rep in diagnostic_reports %}
-              <tr>
-                <td>{{ rep.report_date|date:"d M Y" }}</td>
-                <td><strong>{{ rep.title }}</strong></td>
-                <td>{{ rep.get_category_display }}</td>
-              </tr>
-              {% empty %}
-              <tr><td colspan="3" class="dc-empty">No prior reports on file.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </section>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════ TAB 6: Prescription ═══════════ -->
-  <div class="dc-tab-content" data-tab="6">
-    <div class="dc-grid-main-side">
-      <!-- Active Prescriptions -->
-      <div>
-        <section class="dc-card">
-          <div class="dc-card-head">
-            <h3 class="dc-card-title">💊 Current Prescription</h3>
-            <button type="button" class="dc-btn dc-btn-outline dc-btn-sm" id="btnCopyPreviousRx">📋 Copy from Previous Visit</button>
-          </div>
-
-          <table class="dc-table" id="currentPrescriptionTable">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Medicine Name</th>
-                <th>Dose</th>
-                <th>Route</th>
-                <th>Freq</th>
-                <th>Duration</th>
-                <th>Instructions</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- Rendered via JS -->
-            </tbody>
-          </table>
-        </section>
-
-        <!-- Live Printable Preview -->
-        <section class="dc-card">
-          <div class="dc-card-head">
-            <h3 class="dc-card-title">📄 Prescription Print Preview</h3>
-            <span style="font-size:12px; color:var(--dc-muted);">What the patient will receive</span>
-          </div>
-          <div id="prescriptionPreviewList" style="background:#f8fafc; border:1px solid var(--dc-border); border-radius:8px; padding:14px;">
-            <!-- Rendered via JS -->
-          </div>
-        </section>
-      </div>
-
-      <!-- Right Column: Drug Formulary Search & Safety -->
-      <div>
-        <!-- Clinical Safety Box -->
-        <div id="safetyAlertCard" style="display:none; margin-bottom:14px;"></div>
-
-        <!-- Formulary Search -->
-        <section class="dc-card">
-          <div class="dc-card-head">
-            <h3 class="dc-card-title">🔎 Hospital Formulary</h3>
-          </div>
-
-          <input type="text" id="drugSearchInput" class="dc-input" placeholder="Search medicine by brand or generic…" style="margin-bottom:10px;">
-
-          <div class="dc-cat-chips">
-            <button type="button" class="dc-cat-pill active" data-cat="Common">Common</button>
-            <button type="button" class="dc-cat-pill" data-cat="Antibiotics">Antibiotics</button>
-            <button type="button" class="dc-cat-pill" data-cat="Analgesics">Analgesics</button>
-            <button type="button" class="dc-cat-pill" data-cat="Antihypertensives">Antihypertensives</button>
-            <button type="button" class="dc-cat-pill" data-cat="Antidiabetics">Antidiabetics</button>
-            <button type="button" class="dc-cat-pill" data-cat="GI Drugs">GI Drugs</button>
-            <button type="button" class="dc-cat-pill" data-cat="Respiratory">Respiratory</button>
-          </div>
-
-          <div class="dc-drug-list" id="drugResultsList">
-            {% for d in formulary|slice:":10" %}
-            <div class="dc-drug-row">
-              <div>
-                <div style="font-weight:700; color:var(--dc-ink);">{{ d.name }}</div>
-                <div style="font-size:11.5px; color:var(--dc-muted);">{{ d.generic }} · {{ d.dose }}</div>
-              </div>
-              <button type="button" class="dc-btn dc-btn-outline dc-btn-sm btn-quick-add-drug" data-drug='{"name":"{{ d.name }}","generic":"{{ d.generic }}","dose":"{{ d.dose }}","route":"{{ d.route }}","default_freq":"{{ d.default_freq }}","default_dur":"{{ d.default_dur }}","instructions":"{{ d.instructions }}"}'>+ Add</button>
-            </div>
-            {% endfor %}
-          </div>
-        </section>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════ TAB 7: Advice & Follow-up ═══════════ -->
-  <div class="dc-tab-content" data-tab="7">
-    <section class="dc-card">
-      <div class="dc-card-head">
-        <h3 class="dc-card-title">🩺 Advice & Follow-up Directions</h3>
-      </div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-        <div>
-          <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:4px;">Dietary & Lifestyle Guidelines</label>
-          <textarea class="dc-textarea" rows="4" placeholder="e.g. Low salt diet, regular hydration, avoid strenuous physical activity..."></textarea>
-        </div>
-        <div>
-          <label style="display:block; font-size:12.5px; font-weight:700; margin-bottom:4px;">Emergency Red Flags / Warning Signs</label>
-          <textarea class="dc-textarea" rows="4" placeholder="e.g. Return to emergency immediately if breathing difficulty, chest pain, or persistent fever develops..."></textarea>
-        </div>
-      </div>
+      <ol>
+        <li>Review the nurse vitals, complaints and handover.</li>
+        <li>Record your examination and clinical impression.</li>
+        <li>Set the diagnosis, order investigations and prescribe.</li>
+        <li>Add advice, follow-up and close the consultation.</li>
+      </ol>
     </section>
   </div>
 </div>
 
-<!-- ═══════════ Fixed Bottom Action Bar ═══════════ -->
-<footer class="dc-action-bar">
-  <div class="dc-action-left">
-    <button type="button" class="dc-btn dc-btn-outline" onclick="alert('Marked encounter as urgent priority.');">🚩 Mark as Urgent</button>
-    <button type="button" class="dc-btn dc-btn-outline" onclick="alert('Refer to specialist modal');">👥 Refer to Another Doctor</button>
-    <button type="button" class="dc-btn dc-btn-outline" id="btnSaveDraft">💾 Save as Draft</button>
-  </div>
-  <div class="dc-action-right">
-    <button type="button" class="dc-btn dc-btn-outline" id="btnPrintPrescription">🖨️ Print Prescription</button>
-    <button type="button" class="dc-btn dc-btn-outline" onclick="alert('Digital prescription sent directly to the pharmacy dispensary.');">💊 Send to Pharmacy</button>
-    <button type="button" class="dc-btn dc-btn-primary" id="btnSaveContinue" data-action="continue">Save & Continue →</button>
-  </div>
-</footer>
+{% else %}
+<!-- ══════════════════════════════════════════════════════════════
+     ACTIVE CONSULTATION WORKSPACE
+     ══════════════════════════════════════════════════════════════ -->
+<div class="dc-workspace">
 
-<script>
-  window.INITIAL_PRESCRIPTIONS = [
-    {% for rx in prescriptions %}
-    {
-      "medicine_name": "{{ rx.medicine_name|escapejs }}",
-      "dose": "{{ rx.dose|escapejs }}",
-      "route": "{{ rx.route|escapejs }}",
-      "frequency": "{{ rx.frequency|escapejs }}",
-      "duration": "{{ rx.duration|escapejs }}",
-      "instructions": "{{ rx.instructions|escapejs }}"
-    }{% if not forloop.last %},{% endif %}
-    {% endfor %}
-  ];
+  <!-- ── Compact Patient Strip ── -->
+  <section class="dc-compact-hero">
+    <div class="dc-hero-main-row">
+      <!-- Left: Identity -->
+      <div class="dc-hero-id-cluster">
+        <div class="dc-hero-mini-avatar">{{ patient_ctx.initials }}</div>
+        <div class="dc-hero-title-group">
+          <div class="dc-hero-name-line">
+            <h2 class="dc-hero-name">{{ patient_ctx.name }}</h2>
+            <span class="dc-hero-demog">{{ patient_ctx.age }}y · {{ patient_ctx.gender }}</span>
+            {% if patient_ctx.blood_group and patient_ctx.blood_group != "—" %}
+              <span class="dc-hero-blood">{{ patient_ctx.blood_group }}</span>
+            {% endif %}
+          </div>
+          <div class="dc-hero-sub-meta">
+            <span>UHID: <strong>{{ patient_ctx.uhid|default:"—" }}</strong></span>
+            <span class="dc-meta-dot">·</span>
+            <span>Token: <strong>{{ patient_ctx.visit_token }}</strong></span>
+            <span class="dc-meta-dot">·</span>
+            <span>Ph: {{ patient_ctx.phone }}</span>
+          </div>
+        </div>
+      </div>
 
-  window.PREVIOUS_PRESCRIPTIONS = [
-    {% for rx in previous_prescriptions %}
-    {
-      "medicine_name": "{{ rx.medicine_name|escapejs }}",
-      "dose": "{{ rx.dose|escapejs }}",
-      "route": "{{ rx.route|escapejs }}",
-      "frequency": "{{ rx.frequency|escapejs }}",
-      "duration": "{{ rx.duration|escapejs }}",
-      "instructions": "{{ rx.instructions|escapejs }}"
-    }{% if not forloop.last %},{% endif %}
-    {% endfor %}
-  ];
-</script>
-<script src="{% static 'js/doctor_consultation.js' %}"></script>
+      <!-- Right: Clinical Flags & Badges -->
+      <div class="dc-hero-badges-cluster">
+        {% if patient_ctx.is_emergency %}
+          <span class="dc-strip-badge is-emergency">Emergency</span>
+        {% endif %}
+
+        {% if patient_ctx.triage_priority %}
+          <span class="dc-strip-badge {% if patient_ctx.triage_priority == 'emergency' %}is-emergency{% elif patient_ctx.triage_priority == 'urgent' %}is-urgent{% else %}is-routine{% endif %}">
+            Triage: {{ patient_ctx.triage_priority_display }}
+          </span>
+        {% endif %}
+
+        {% if assessment and assessment.saved %}
+          <span class="dc-strip-badge is-nurse-ready">Nurse Ready</span>
+        {% else %}
+          <span class="dc-strip-badge is-nurse-pending">Awaiting Nurse</span>
+        {% endif %}
+
+        {% if patient_ctx.allergies %}
+          <span class="dc-strip-badge is-allergy-alert">
+            ⚠ Allergies: {{ patient_ctx.allergies|join:", " }}
+          </span>
+        {% else %}
+          <span class="dc-strip-badge is-allergy-none" title="No known drug allergies">
+            NKDA ✓
+          </span>
+        {% endif %}
+
+        {% if patient_ctx.chronic_illnesses %}
+          <span class="dc-strip-badge is-chronic" title="Chronic Conditions">
+            {{ patient_ctx.chronic_illnesses|join:", " }}
+          </span>
+        {% endif %}
+
+        <!-- Quick Details Toggle -->
+        <button type="button" class="dc-hero-expand-btn" id="dcHeroToggle" aria-expanded="false" title="Toggle visit details">
+          <span>Details</span>
+          <svg class="dc-expand-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Collapsible Secondary Details Drawer -->
+    <div class="dc-hero-drawer" id="dcHeroDrawer" hidden>
+      <div class="dc-drawer-facts">
+        <div><span>Registered</span><strong>{{ patient_ctx.visit_timestamp }}</strong></div>
+        <div><span>Department</span><strong>{{ patient_ctx.department }}</strong></div>
+        <div><span>Visit type</span><strong>{{ patient_ctx.visit_type }}</strong></div>
+        <div><span>Waiting</span><strong>{{ patient_ctx.wait_label }}</strong></div>
+        {% if last_visit %}<div><span>Last visit</span><strong>{{ last_visit.date }} ({{ last_visit.diagnosis }})</strong></div>{% endif %}
+        {% if patient_ctx.active_medications %}
+          <div class="dc-drawer-span-full"><span>Current Meds</span><strong>{{ patient_ctx.active_medications|join:", " }}</strong></div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <div class="np-work dc-work">
+    <div class="dc-main">
+
+      <!-- ── Consultation form ── -->
+      <section class="np-card dc-form-card">
+        <form id="consultationForm" autocomplete="off"
+              data-patient-id="{{ selected_patient.pk }}"
+              data-consultation-id="{{ consultation.pk|default_if_none:'' }}"
+              data-save-url="{% url 'save_consultation' %}"
+              data-ai-url="{% url 'medgemma_draft' %}"
+              data-list-url="{% url 'doctor_consultation' %}"
+              data-patient-name="{{ patient_ctx.name }}"
+              data-patient-uhid="{{ patient_ctx.uhid }}"
+              data-patient-age-gender="{{ patient_ctx.age }} yrs · {{ patient_ctx.gender }}"
+              data-patient-token="{{ patient_ctx.visit_token }}"
+              data-patient-department="{{ patient_ctx.department }}"
+              data-patient-consultant="{{ patient_ctx.doctor }}">
+          {% csrf_token %}
+
+          <nav class="ia-tabs dc-tabs dc-steps" role="tablist" aria-label="Consultation steps">
+            <button type="button" class="ia-tab active" data-tab="assessment" role="tab" aria-selected="true"><span class="dc-step-num">1</span> Assessment</button>
+            <button type="button" class="ia-tab" data-tab="examination" role="tab" aria-selected="false"><span class="dc-step-num">2</span> Examination</button>
+            <button type="button" class="ia-tab" data-tab="diagnosis" role="tab" aria-selected="false"><span class="dc-step-num">3</span> Diagnosis</button>
+            <button type="button" class="ia-tab" data-tab="orders" role="tab" aria-selected="false"><span class="dc-step-num">4</span> Orders</button>
+            <button type="button" class="ia-tab" data-tab="prescription" role="tab" aria-selected="false"><span class="dc-step-num">5</span> Prescription</button>
+            <button type="button" class="ia-tab" data-tab="advice" role="tab" aria-selected="false"><span class="dc-step-num">6</span> Advice</button>
+          </nav>
+
+          <!-- ═══════════ STEP 1 · Assessment ═══════════ -->
+          <div class="ia-panel active" data-panel="assessment">
+            <div class="np-section-head">
+              <h3 class="np-section-title"><span class="np-step">1</span>Nurse assessment review</h3>
+              <span class="np-section-hint">{% if assessment %}Recorded by the nurse{% if assessment.updated_at %} · {{ assessment.updated_at }}{% endif %}{% else %}No triage assessment on file{% endif %}</span>
+            </div>
+
+            {% if assessment %}
+            <div class="dc-vitals-grid">
+              <div class="dc-vital {% if assessment.vital_flags.temperature %}is-alert{% endif %}">
+                <span class="dc-vital-k">Temperature</span>
+                <span class="dc-vital-v">{{ assessment.temperature|default:"—" }}<em>°C</em></span>
+              </div>
+              <div class="dc-vital {% if assessment.vital_flags.pulse %}is-alert{% endif %}">
+                <span class="dc-vital-k">Pulse</span>
+                <span class="dc-vital-v">{{ assessment.pulse|default:"—" }}<em>/min</em></span>
+              </div>
+              <div class="dc-vital {% if assessment.vital_flags.respiratory_rate %}is-alert{% endif %}">
+                <span class="dc-vital-k">Resp. rate</span>
+                <span class="dc-vital-v">{{ assessment.respiratory_rate|default:"—" }}<em>/min</em></span>
+              </div>
+              <div class="dc-vital {% if assessment.vital_flags.bp %}is-alert{% endif %}">
+                <span class="dc-vital-k">Blood pressure</span>
+                <span class="dc-vital-v">{% if assessment.bp_systolic %}{{ assessment.bp_systolic }}/{{ assessment.bp_diastolic }}{% else %}—{% endif %}<em>mmHg</em></span>
+              </div>
+              <div class="dc-vital {% if assessment.vital_flags.spo2 %}is-alert{% endif %}">
+                <span class="dc-vital-k">SpO₂</span>
+                <span class="dc-vital-v">{{ assessment.spo2|default:"—" }}<em>%</em></span>
+              </div>
+              <div class="dc-vital">
+                <span class="dc-vital-k">BMI</span>
+                <span class="dc-vital-v">{{ assessment.bmi|default:"—" }}<em>kg/m²</em></span>
+              </div>
+              <div class="dc-vital {% if assessment.vital_flags.rbs %}is-alert{% endif %}">
+                <span class="dc-vital-k">Random sugar</span>
+                <span class="dc-vital-v">{{ assessment.rbs|default:"—" }}<em>mg/dL</em></span>
+              </div>
+              <div class="dc-vital {% if assessment.vital_flags.pain_score %}is-alert{% endif %}">
+                <span class="dc-vital-k">Pain score</span>
+                <span class="dc-vital-v">{{ assessment.pain_score|default:"—" }}<em>/ 10</em></span>
+              </div>
+            </div>
+
+            <div class="dc-assessment-grid">
+              <div class="dc-summary-card">
+                <span class="dc-summary-k">Chief complaints</span>
+                {% if assessment.complaint_items %}
+                <ul class="dc-complaint-list">
+                  {% for complaint in assessment.complaint_items %}
+                  <li><span>{{ complaint.text }}</span>{% if complaint.duration %}<em>{{ complaint.duration }}</em>{% endif %}</li>
+                  {% endfor %}
+                </ul>
+                {% else %}
+                <p class="dc-summary-empty">No complaints recorded.</p>
+                {% endif %}
+              </div>
+              <div class="dc-summary-card">
+                <span class="dc-summary-k">History of present illness</span>
+                <p class="dc-summary-text">{{ assessment.hpi|default:"Not recorded."|linebreaksbr }}</p>
+              </div>
+              <div class="dc-summary-card">
+                <span class="dc-summary-k">Nurse summary</span>
+                <p class="dc-summary-text">{{ assessment.summary_note|default:"No handover note."|linebreaksbr }}</p>
+              </div>
+              <div class="dc-summary-card">
+                <span class="dc-summary-k">Examination at triage</span>
+                {% with ex=assessment.examination %}
+                <dl class="dc-mini-dl">
+                  <div><dt>General</dt><dd>{{ ex.general|default:"—" }}</dd></div>
+                  <div><dt>CVS</dt><dd>{{ ex.cvs|default:"—" }}</dd></div>
+                  <div><dt>Respiratory</dt><dd>{{ ex.respiratory|default:"—" }}</dd></div>
+                  <div><dt>Abdomen</dt><dd>{{ ex.abdomen|default:"—" }}</dd></div>
+                  <div><dt>CNS</dt><dd>{{ ex.cns|default:"—" }}</dd></div>
+                </dl>
+                {% endwith %}
+              </div>
+            </div>
+            {% else %}
+            <div class="dc-inline-empty">
+              <strong>No nurse assessment recorded yet.</strong>
+              <span>The patient can still be consulted. Record your own findings in the examination step.</span>
+            </div>
+            {% endif %}
+
+            <div class="np-section-head dc-subhead">
+              <h3 class="np-section-title"><span class="np-step">✎</span>Doctor's clinical note</h3>
+              <span class="np-section-hint">Your assessment, reasoning and plan for this visit.</span>
+            </div>
+
+            <div class="dc-note-tools">
+              <button type="button" class="np-chip" data-insert-note="Patient is conscious, oriented and haemodynamically stable.">General condition stable</button>
+              <button type="button" class="np-chip" data-insert-note="No acute distress at presentation.">No acute distress</button>
+              <button type="button" class="np-chip" data-insert-note="Systemic examination findings reviewed; see examination step.">Exam reviewed</button>
+              {% if assessment.summary_note %}
+              <button type="button" class="np-chip dc-chip-accent" id="useNurseNote">+ Copy nurse handover</button>
+              {% endif %}
+            </div>
+            <textarea id="clinicalNoteText" class="dc-textarea dc-note-textarea" rows="6" placeholder="Enter clinical impressions, objective observations and bedside assessment notes…">{{ consultation.clinical_note }}</textarea>
+
+            <details class="dc-ai-card">
+              <summary class="dc-ai-summary">
+                <span class="dc-ai-spark">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.7 4.6L18 8l-4.3 1.4L12 14l-1.7-4.6L6 8l4.3-1.4L12 2zM19 13l.9 2.4L22 16l-2.1.6L19 19l-.9-2.4L16 16l2.1-.6L19 13zM5 14l.8 2.2L8 17l-2.2.8L5 20l-.8-2.2L2 17l2.2-.8L5 14z"/></svg>
+                </span>
+                <span class="dc-ai-summary-text">
+                  <strong>AI Clinical Assistant</strong>
+                  <em>Draft a summary from the nurse vitals and complaints</em>
+                </span>
+                <span class="np-badge lav">AI Draft</span>
+              </summary>
+
+              <div class="dc-ai-body">
+                <div class="dc-ai-tabs" role="tablist">
+                  <button type="button" class="dc-ai-tab active" data-ai-tab="summary" role="tab" aria-selected="true">Summary</button>
+                  <button type="button" class="dc-ai-tab" data-ai-tab="differential" role="tab" aria-selected="false">Differential</button>
+                  <button type="button" class="dc-ai-tab" data-ai-tab="tests" role="tab" aria-selected="false">Suggested Tests</button>
+                </div>
+
+                <div class="dc-ai-content" id="aiContent">
+                  <p class="dc-ai-empty">Click <strong>Regenerate draft</strong> to build a clinical summary from the recorded vitals and complaints.</p>
+                </div>
+
+                <div class="dc-ai-actions">
+                  <button type="button" class="np-btn sm" id="aiGenerateBtn">
+                    <span class="dc-gen-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></span>
+                    Regenerate draft
+                  </button>
+                  <button type="button" class="np-btn sm teal" id="aiAcceptBtn">Use in note</button>
+                </div>
+
+                <p class="dc-ai-disclaimer">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                  This is an AI-generated draft. Review, edit and approve it before finalising the clinical note.
+                </p>
+              </div>
+            </details>
+
+            <div class="dc-step-footer">
+              <button type="button" class="np-btn" data-step-prev hidden>← Back</button>
+              <button type="button" class="np-btn teal" data-step-next>Next: Examination →</button>
+            </div>
+          </div>
+
+          <!-- ═══════════ STEP 2 · Examination ═══════════ -->
+          <div class="ia-panel" data-panel="examination" hidden>
+            <div class="np-section-head">
+              <h3 class="np-section-title"><span class="np-step">2</span>Physical &amp; systemic examination</h3>
+              <button type="button" class="np-btn sm" id="applyNormalExam">Apply all normal findings</button>
+            </div>
+
+            <div class="dc-subgroup">
+              <span class="dc-subgroup-title">General physical examination</span>
+              <div class="dc-gpe-grid">
+                <label class="dc-check-card"><input type="checkbox" class="dc-gpe-check" value="Pallor" {% if "Pallor" in consultation.examination.gpe|default:"" %}checked{% endif %}><span>Pallor</span></label>
+                <label class="dc-check-card"><input type="checkbox" class="dc-gpe-check" value="Icterus" {% if "Icterus" in consultation.examination.gpe|default:"" %}checked{% endif %}><span>Icterus</span></label>
+                <label class="dc-check-card"><input type="checkbox" class="dc-gpe-check" value="Cyanosis" {% if "Cyanosis" in consultation.examination.gpe|default:"" %}checked{% endif %}><span>Cyanosis</span></label>
+                <label class="dc-check-card"><input type="checkbox" class="dc-gpe-check" value="Clubbing" {% if "Clubbing" in consultation.examination.gpe|default:"" %}checked{% endif %}><span>Clubbing</span></label>
+                <label class="dc-check-card"><input type="checkbox" class="dc-gpe-check" value="Lymphadenopathy" {% if "Lymphadenopathy" in consultation.examination.gpe|default:"" %}checked{% endif %}><span>Lymphadenopathy</span></label>
+                <label class="dc-check-card"><input type="checkbox" class="dc-gpe-check" value="Pedal Edema" {% if "Pedal Edema" in consultation.examination.gpe|default:"" %}checked{% endif %}><span>Pedal edema</span></label>
+                <label class="dc-check-card"><input type="checkbox" class="dc-gpe-check" value="Febrile" {% if "Febrile" in consultation.examination.gpe|default:"" %}checked{% endif %}><span>Febrile</span></label>
+                <label class="dc-check-card"><input type="checkbox" class="dc-gpe-check" value="Dehydrated" {% if "Dehydrated" in consultation.examination.gpe|default:"" %}checked{% endif %}><span>Dehydrated</span></label>
+              </div>
+            </div>
+
+            <div class="dc-exam-grid">
+              <label class="dc-field">
+                <span class="dc-field-label">General</span>
+                <textarea class="dc-textarea" rows="3" data-exam="general" placeholder="Appearance, pallor, icterus, hydration…">{{ consultation.examination.general|default:"" }}</textarea>
+              </label>
+              <label class="dc-field">
+                <span class="dc-field-label">Cardiovascular (CVS)</span>
+                <textarea class="dc-textarea" rows="3" data-exam="cvs" placeholder="S1 S2 normal, no murmurs…">{{ consultation.examination.cvs|default:"" }}</textarea>
+              </label>
+              <label class="dc-field">
+                <span class="dc-field-label">Respiratory (RS)</span>
+                <textarea class="dc-textarea" rows="3" data-exam="respiratory" placeholder="Bilateral equal air entry, no added sounds…">{{ consultation.examination.respiratory|default:"" }}</textarea>
+              </label>
+              <label class="dc-field">
+                <span class="dc-field-label">Per abdomen (P/A)</span>
+                <textarea class="dc-textarea" rows="3" data-exam="abdomen" placeholder="Soft, non-tender, no organomegaly…">{{ consultation.examination.abdomen|default:"" }}</textarea>
+              </label>
+              <label class="dc-field">
+                <span class="dc-field-label">Central nervous system (CNS)</span>
+                <textarea class="dc-textarea" rows="3" data-exam="cns" placeholder="Conscious, oriented, no focal deficit…">{{ consultation.examination.cns|default:"" }}</textarea>
+              </label>
+              <label class="dc-field">
+                <span class="dc-field-label">Skin / ENT / other</span>
+                <textarea class="dc-textarea" rows="3" data-exam="other" placeholder="Rash, ENT findings, wounds, other systems…">{{ consultation.examination.other|default:"" }}</textarea>
+              </label>
+            </div>
+
+            <div class="dc-step-footer">
+              <button type="button" class="np-btn" data-step-prev>← Back</button>
+              <button type="button" class="np-btn teal" data-step-next>Next: Diagnosis →</button>
+            </div>
+          </div>
+
+          <!-- ═══════════ STEP 3 · Diagnosis & Plan ═══════════ -->
+          <div class="ia-panel" data-panel="diagnosis" hidden>
+            <div class="np-section-head">
+              <h3 class="np-section-title"><span class="np-step">3</span>Diagnosis &amp; clinical management plan</h3>
+              <span class="np-section-hint">Search ICD-10 to auto-fill the code.</span>
+            </div>
+
+            <div class="dc-diagnosis-grid">
+              <div class="dc-field dc-icd-field">
+                <label class="dc-field-label" for="primaryDiagnosisInput">Primary diagnosis <span class="dc-required">*</span></label>
+                <input id="primaryDiagnosisInput" class="dc-input" type="text" autocomplete="off"
+                       placeholder="Type a disease name or ICD-10 term…" value="{{ consultation.diagnosis_primary }}">
+                <div id="icdDropdownResults" class="dc-icd-results" hidden></div>
+              </div>
+              <label class="dc-field">
+                <span class="dc-field-label">ICD-10 code</span>
+                <input id="primaryIcdInput" class="dc-input dc-mono" type="text" placeholder="e.g. J06.9" value="{{ consultation.diagnosis_primary_icd }}">
+              </label>
+            </div>
+
+            <div class="dc-common-dx">
+              <span class="dc-subgroup-title">Common diagnoses</span>
+              <div class="dc-chip-row">
+                {% for dx in common_icd|slice:":8" %}
+                <button type="button" class="np-chip dc-common-dx-chip" data-icd-code="{{ dx.code }}" data-icd-desc="{{ dx.desc }}">{{ dx.desc }}</button>
+                {% endfor %}
+              </div>
+            </div>
+
+            <label class="dc-field dc-field-spaced">
+              <span class="dc-field-label">Secondary diagnoses</span>
+              <input id="secondaryDiagnosesInput" class="dc-input" type="text" placeholder="Comma separated — e.g. Type 2 Diabetes Mellitus, Hypertension" value="{{ secondary_diagnoses_text }}">
+            </label>
+
+            <div class="dc-subgroup">
+              <span class="dc-subgroup-title">Visit type</span>
+              <div class="dc-visit-types">
+                <label class="dc-visit-type">
+                  <input type="radio" name="visit_type" value="new_problem" {% if consultation.visit_type == 'new_problem' or not consultation.visit_type %}checked{% endif %}>
+                  <span>New problem</span>
+                </label>
+                <label class="dc-visit-type">
+                  <input type="radio" name="visit_type" value="follow_up_same" {% if consultation.visit_type == 'follow_up_same' %}checked{% endif %}>
+                  <span>Follow-up · same</span>
+                </label>
+                <label class="dc-visit-type">
+                  <input type="radio" name="visit_type" value="follow_up_diff" {% if consultation.visit_type == 'follow_up_diff' %}checked{% endif %}>
+                  <span>Follow-up · different</span>
+                </label>
+              </div>
+            </div>
+
+            <label class="dc-field dc-field-spaced">
+              <span class="dc-field-label">Treatment &amp; investigation plan</span>
+              <textarea id="treatmentPlanText" class="dc-textarea" rows="5" placeholder="Conservative management, planned investigations, monitoring and review…">{{ consultation.treatment_plan }}</textarea>
+            </label>
+
+            <div class="dc-step-footer">
+              <button type="button" class="np-btn" data-step-prev>← Back</button>
+              <button type="button" class="np-btn teal" data-step-next>Next: Orders →</button>
+            </div>
+          </div>
+
+          <!-- ═══════════ STEP 4 · Orders & Results ═══════════ -->
+          <div class="ia-panel" data-panel="orders" hidden>
+            <div class="np-section-head">
+              <h3 class="np-section-title"><span class="np-step">4</span>Investigations &amp; service orders</h3>
+              <span class="np-section-hint">Tick what should be collected or scheduled for this visit.</span>
+            </div>
+
+            {% if assessment.orders.laboratory or assessment.orders.radiology or assessment.orders.other %}
+            <section class="dc-subcard dc-nurse-orders">
+              <h4>Nurse-proposed requests</h4>
+              <p class="dc-helper-text">Select a request to confirm it, then save the consultation to send it to services.</p>
+              {% for kind, names in assessment.orders.items %}
+                {% for name in names %}
+                <label class="dc-order-option"><input type="checkbox" class="dc-order-check" data-type="{{ kind }}" data-name="{{ name }}"><span>{{ name }}</span></label>
+                {% endfor %}
+              {% endfor %}
+            </section>
+            {% endif %}
+
+            <div class="dc-order-layout">
+              <div>
+                <div class="dc-order-banks">
+                  {% for bank in order_banks %}
+                  <div class="dc-order-bank">
+                    <h4>{{ bank.title }}</h4>
+                    <div class="dc-order-options">
+                      {% for item in bank.items %}
+                      <label class="dc-order-option {% if item.checked %}is-checked{% endif %}">
+                        <input type="checkbox" class="dc-order-check" data-type="{{ bank.key }}" data-name="{{ item.name }}" data-price="{{ item.price|default:0 }}" {% if item.checked %}checked{% endif %}>
+                        <span>{{ item.name }}</span>
+                        {% if item.price %}<em class="dc-order-price">₹{{ item.price|floatformat:0 }}</em>{% endif %}
+                        {% if item.status %}<em class="dc-order-status">{{ item.status }}</em>{% endif %}
+                      </label>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+
+                {% if extra_orders %}
+                <div class="dc-order-bank dc-order-extra" id="extraOrdersBlock">
+                  <h4>Other orders on this visit</h4>
+                  <div class="dc-order-options" id="extraOrderList">
+                    {% for order in extra_orders %}
+                    <label class="dc-order-option is-checked">
+                      <input type="checkbox" class="dc-order-check" data-type="{{ order.order_type }}" data-name="{{ order.name }}" data-price="{{ order.price|default:0 }}" checked>
+                      <span>{{ order.name }}</span>
+                      {% if order.price %}<em class="dc-order-price">₹{{ order.price|floatformat:0 }}</em>{% endif %}
+                      <em class="dc-order-status">{{ order.status }}</em>
+                    </label>
+                    {% endfor %}
+                  </div>
+                </div>
+                {% else %}
+                <div class="dc-order-bank dc-order-extra" id="extraOrdersBlock" hidden>
+                  <h4>Other orders on this visit</h4>
+                  <div class="dc-order-options" id="extraOrderList"></div>
+                </div>
+                {% endif %}
+
+                <div class="dc-add-order">
+                  <select id="customOrderType" class="dc-input dc-select">
+                    <option value="laboratory">Laboratory</option>
+                    <option value="radiology">Radiology</option>
+                    <option value="other">Other service</option>
+                  </select>
+                  <select id="serviceCatalogueSelect" class="dc-input"><option value="">Choose a catalogue service…</option>{% for service in service_catalogue %}<option value="{{ service.pk }}" data-name="{{ service.name }}" data-price="{{ service.price|default:0 }}" data-type="{% if service.department.slug == 'laboratory' %}laboratory{% elif service.department.slug == 'radiology' %}radiology{% else %}other{% endif %}">{{ service.name }} · {{ service.department.name }}{% if service.price %} · ₹{{ service.price|floatformat:0 }}{% endif %}</option>{% endfor %}</select>
+                  <input id="customOrderName" class="dc-input" type="text" placeholder="Add a test or service…">
+                  <input id="customOrderPrice" class="dc-input" type="number" min="0" step="0.01" placeholder="Price ₹" aria-label="Custom order price">
+                  <button type="button" class="np-btn sm" id="addOrderBtn">+ Add order</button>
+                </div>
+              </div>
+
+              <aside class="dc-order-summary">
+                <div class="dc-subcard">
+                  <div class="dc-subcard-head">
+                    <h4>Current visit orders</h4>
+                    <span class="dc-count-pill" id="orderCount">{{ current_orders|length }}</span>
+                  </div>
+                  <ul class="dc-order-summary-list" id="orderSummaryList">
+                    {% for order in current_orders %}
+                    {% if order.status != "Cancelled" %}
+                    <li data-order-type="{{ order.order_type }}" data-order-name="{{ order.name }}">
+                      <span>{{ order.name }}</span>
+                      <em>{{ order.status }}</em>
+                    </li>
+                    {% endif %}
+                    {% empty %}
+                    <li class="dc-order-summary-empty">No orders selected yet.</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                <p class="dc-helper-text">Orders are sent to the service desks when you save the consultation.</p>
+              </aside>
+            </div>
+
+            <div class="np-section-head dc-subhead">
+              <h3 class="np-section-title"><span class="np-step">↧</span>Reports &amp; results</h3>
+              <a class="np-btn sm" href="{% url 'service_reports' %}">Open service reports &amp; doctor review</a>
+            </div>
+
+            {% if diagnostic_reports %}
+            <div class="dc-report-list">
+              {% for report in diagnostic_reports %}
+              <article class="dc-report-card">
+                <header class="dc-report-head">
+                  <div>
+                    <h4>{{ report.title }}</h4>
+                    {% if report.attachment and report.published_at %}
+                    <a href="{% url 'report_download' report.pk %}">Download report</a>
+                    <p>{{ report.summary }}</p>
+                    <span>{% if report.reviewed_at %}Reviewed{% else %}Awaiting doctor review{% endif %}</span>
+                    {% endif %}
+                    <span class="dc-report-meta">{{ report.get_category_display }} · {{ report.report_date|date:"d M Y, h:i A" }}</span>
+                  </div>
+                  <span class="dc-pill {% if report.status == 'Completed' or report.status == 'Verified' %}dc-pill-success{% else %}dc-pill-neutral{% endif %}">{{ report.status }}</span>
+                </header>
+                {% if report.details %}
+                <dl class="dc-report-details">
+                  {% for key, value in report.details.items %}
+                  <div><dt>{{ key }}</dt><dd>{{ value }}</dd></div>
+                  {% endfor %}
+                </dl>
+                {% else %}
+                <p class="dc-report-empty">No structured values attached to this report.</p>
+                {% endif %}
+              </article>
+              {% endfor %}
+            </div>
+            {% else %}
+            <div class="dc-inline-empty">
+              <strong>No diagnostic reports on file.</strong>
+              <span>Results will appear here once the laboratory or radiology desk uploads them.</span>
+            </div>
+            {% endif %}
+
+            <div class="dc-step-footer">
+              <button type="button" class="np-btn" data-step-prev>← Back</button>
+              <button type="button" class="np-btn teal" data-step-next>Next: Prescription →</button>
+            </div>
+          </div>
+
+          <!-- ═══════════ STEP 5 · Prescription ═══════════ -->
+          <div class="ia-panel" data-panel="prescription" hidden>
+            <div class="np-section-head">
+              <h3 class="np-section-title"><span class="np-step">5</span>Prescription</h3>
+              <span class="np-section-hint">Add medicines from the formulary or write a custom prescription.</span>
+            </div>
+
+            <div class="dc-rx-layout">
+              <div class="dc-rx-main">
+                <section class="dc-subcard">
+                  <div class="dc-subcard-head">
+                    <h4>Current prescription</h4>
+                    <div class="dc-subcard-actions">
+                      <button type="button" class="np-btn sm" id="btnCopyPreviousRx">Copy previous visit</button>
+                      <button type="button" class="np-btn sm" id="btnAddBlankRx">+ Add medicine</button>
+                    </div>
+                  </div>
+
+                  <div class="dc-rx-wrap">
+                    <table class="dc-rx-table" id="currentPrescriptionTable">
+                      <thead>
+                        <tr>
+                          <th class="dc-rx-index">#</th>
+                          <th>Medicine</th>
+                          <th>Dose</th>
+                          <th>Route</th>
+                          <th>Freq.</th>
+                          <th>Duration</th>
+                          <th>Units</th>
+                          <th>Instructions</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr><td colspan="9" class="dc-rx-empty">No medications prescribed yet. Search the formulary to add one.</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                <section class="dc-subcard">
+                  <div class="dc-subcard-head">
+                    <h4>Prescription print preview</h4>
+                    <span class="dc-subcard-hint">What the patient will receive</span>
+                  </div>
+                  <div id="prescriptionPreviewList" class="dc-rx-preview">
+                    <p class="dc-summary-empty">No items on this prescription.</p>
+                  </div>
+                </section>
+              </div>
+
+              <aside class="dc-formulary">
+                <section class="dc-subcard">
+                  <div class="dc-subcard-head">
+                    <h4>Hospital Formulary</h4>
+                  </div>
+
+                  <div class="dc-search-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                    <input id="drugSearchInput" type="search" placeholder="Search medicine by brand or generic…" autocomplete="off">
+                  </div>
+
+                  <div class="dc-cat-chips">
+                    <button type="button" class="dc-cat-pill active" data-cat="">All</button>
+                    <button type="button" class="dc-cat-pill" data-cat="Analgesics">Analgesics</button>
+                    <button type="button" class="dc-cat-pill" data-cat="Antibiotics">Antibiotics</button>
+                    <button type="button" class="dc-cat-pill" data-cat="Antihypertensives">Antihypertensives</button>
+                    <button type="button" class="dc-cat-pill" data-cat="Antidiabetics">Antidiabetics</button>
+                    <button type="button" class="dc-cat-pill" data-cat="GI Drugs">GI</button>
+                    <button type="button" class="dc-cat-pill" data-cat="Respiratory">Respiratory</button>
+                  </div>
+
+                  <div class="dc-drug-list" id="drugResultsList">
+                    {% for d in formulary|slice:":8" %}
+                    <div class="dc-drug-row">
+                      <div class="dc-drug-info">
+                        <strong>{{ d.name }}</strong>
+                        <span>{{ d.generic }} · {{ d.dose }}</span>
+                      </div>
+                      <button type="button" class="dc-drug-add"
+                              data-name="{{ d.name }}" data-generic="{{ d.generic }}" data-dose="{{ d.dose }}"
+                              data-route="{{ d.route }}" data-freq="{{ d.default_freq }}"
+                              data-dur="{{ d.default_dur }}" data-instructions="{{ d.instructions }}">+ Add</button>
+                    </div>
+                    {% endfor %}
+                  </div>
+                </section>
+              </aside>
+            </div>
+
+            <div class="dc-step-footer">
+              <button type="button" class="np-btn" data-step-prev>← Back</button>
+              <button type="button" class="np-btn teal" data-step-next>Next: Advice →</button>
+            </div>
+          </div>
+
+          <!-- ═══════════ STEP 6 · Advice & Follow-up ═══════════ -->
+          <div class="ia-panel" data-panel="advice" hidden>
+            <div class="np-section-head">
+              <h3 class="np-section-title"><span class="np-step">6</span>Advice &amp; follow-up</h3>
+              <span class="np-section-hint">Instructions the patient takes home.</span>
+            </div>
+
+            <label class="dc-field">
+              <span class="dc-field-label">Special advice / instructions</span>
+              <textarea id="specialAdviceText" class="dc-textarea" rows="4" placeholder="Diet, activity, warning signs, medication instructions…">{{ consultation.special_advice }}</textarea>
+            </label>
+
+            <div class="dc-subgroup">
+              <span class="dc-subgroup-title">Patient education</span>
+              <div class="dc-education-grid">
+                {% for education in education_presets %}
+                <label class="dc-check-card dc-education-card">
+                  <input type="checkbox" class="dc-education-check" value="{{ education }}" {% if education in patient_education %}checked{% endif %}>
+                  <span>{{ education }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="dc-followup-card">
+              <div class="dc-followup-head">
+                <label class="dc-followup-toggle">
+                  <input type="checkbox" id="markFollowUpCheck" {% if consultation.mark_follow_up %}checked{% endif %}>
+                  <span>
+                    <strong>Mark for follow-up</strong>
+                    <em>Add the patient to the follow-up review list.</em>
+                  </span>
+                </label>
+                <label class="dc-field dc-followup-select">
+                  <span class="dc-field-label">Review after</span>
+                  <select id="followUpDurationSelect" class="dc-input dc-select">
+                    <option value="3 days" {% if consultation.follow_up_after == '3 days' %}selected{% endif %}>3 days</option>
+                    <option value="5 days" {% if consultation.follow_up_after == '5 days' %}selected{% endif %}>5 days</option>
+                    <option value="1 week" {% if consultation.follow_up_after == '1 week' %}selected{% endif %}>1 week</option>
+                    <option value="2 weeks" {% if consultation.follow_up_after == '2 weeks' %}selected{% endif %}>2 weeks</option>
+                    <option value="1 month" {% if consultation.follow_up_after == '1 month' %}selected{% endif %}>1 month</option>
+                  </select>
+                </label>
+              </div>
+              <p class="dc-followup-hint" id="followUpDateHint">Pick a review interval to see the expected date.</p>
+            </div>
+
+            <div class="dc-step-footer">
+              <button type="button" class="np-btn" data-step-prev>← Back</button>
+              <button type="button" class="np-btn lime" data-action="complete">Complete consultation</button>
+            </div>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <!-- ── Right rail ── -->
+    <aside class="np-rail dc-rail">
+      <section class="dc-progress-card" id="progressCard">
+        <div class="dc-progress-label">Consultation progress</div>
+        <div class="dc-progress-value" id="progressValue">0%</div>
+        <div class="dc-progress-band" id="progressBand">In progress</div>
+        <div class="dc-progress-guidance" id="progressGuidance">Record the clinical note and diagnosis to close the visit.</div>
+        <div class="dc-progress-bar"><span id="progressBar" style="width: 0%"></span></div>
+      </section>
+
+      <section class="np-card dc-rail-card">
+        <div class="dc-rail-head">
+          <h3>Encounter checklist</h3>
+          <span class="dc-count-pill" id="checklistCount">0/6</span>
+        </div>
+        <ul class="dc-checklist" id="encounterChecklist">
+          <li data-check="note"><button type="button" class="dc-check-item" data-goto-tab="assessment"><span class="dc-check-dot"></span>Clinical note recorded</button></li>
+          <li data-check="exam"><button type="button" class="dc-check-item" data-goto-tab="examination"><span class="dc-check-dot"></span>Examination recorded</button></li>
+          <li data-check="diagnosis"><button type="button" class="dc-check-item" data-goto-tab="diagnosis"><span class="dc-check-dot"></span>Primary diagnosis set</button></li>
+          <li data-check="plan"><button type="button" class="dc-check-item" data-goto-tab="diagnosis"><span class="dc-check-dot"></span>Plan documented</button></li>
+          <li data-check="orders"><button type="button" class="dc-check-item" data-goto-tab="orders"><span class="dc-check-dot"></span>Investigations ordered</button></li>
+          <li data-check="rx"><button type="button" class="dc-check-item" data-goto-tab="prescription"><span class="dc-check-dot"></span>Prescription written</button></li>
+        </ul>
+      </section>
+
+      <section class="np-card dc-rail-card">
+        <div class="dc-rail-head">
+          <h3>Visit at a glance</h3>
+          <span class="dc-rail-token">{{ patient_ctx.visit_token }}</span>
+        </div>
+        <div class="dc-rail-facts">
+          <div><span>Status</span><strong>{{ consultation.get_status_display }}</strong></div>
+          <div><span>Visit type</span><strong>{{ consultation.get_visit_type_display }}</strong></div>
+          <div><span>Registered</span><strong>{{ patient_ctx.visit_timestamp }}</strong></div>
+          <div><span>Department</span><strong>{{ patient_ctx.department }}</strong></div>
+        </div>
+      </section>
+
+      {% if assessment %}
+      <section class="np-card dc-rail-card">
+        <div class="dc-rail-head">
+          <h3>Latest vitals</h3>
+          <button type="button" class="dc-rail-link" data-goto-tab="assessment">View all →</button>
+        </div>
+        <div class="dc-rail-vitals">
+          <div class="{% if assessment.vital_flags.temperature %}is-alert{% endif %}"><span>Temp</span><strong>{{ assessment.temperature|default:"—" }}°</strong></div>
+          <div class="{% if assessment.vital_flags.pulse %}is-alert{% endif %}"><span>Pulse</span><strong>{{ assessment.pulse|default:"—" }}</strong></div>
+          <div class="{% if assessment.vital_flags.bp %}is-alert{% endif %}"><span>BP</span><strong>{% if assessment.bp_systolic %}{{ assessment.bp_systolic }}/{{ assessment.bp_diastolic }}{% else %}—{% endif %}</strong></div>
+          <div class="{% if assessment.vital_flags.spo2 %}is-alert{% endif %}"><span>SpO₂</span><strong>{{ assessment.spo2|default:"—" }}%</strong></div>
+        </div>
+      </section>
+      {% endif %}
+
+      {% if assessment.summary_note %}
+      <section class="np-card dc-rail-card dc-handover-card">
+        <div class="dc-rail-head"><h3>Nurse handover</h3></div>
+        <p>{{ assessment.summary_note }}</p>
+      </section>
+      {% endif %}
+
+      <div class="dc-safety-box" id="safetyAlertCard" hidden></div>
+
+      <section class="np-card dc-rail-actions">
+        <div class="dc-save-state" id="saveState">No changes yet</div>
+        <button type="button" class="np-btn lime" data-action="complete">Complete consultation</button>
+        <button type="button" class="np-btn teal" data-action="send_pharmacy">Send to Pharmacy</button>
+        <button type="button" class="np-btn" data-action="draft">Save draft</button>
+        <button type="button" class="np-btn" data-print="prescription">Print prescription</button>
+        <a href="{% url 'opd_referrals' %}?patient={{ selected_patient.pk }}" class="np-btn">Refer to another doctor</a>
+        <span class="dc-rail-helper">Completing sends service and pharmacy charges to the registration desk.</span>
+        <span class="dc-rail-helper">⌘/Ctrl + S saves a draft</span>
+      </section>
+    </aside>
+  </div>
+</div>
 {% endif %}
 
+<!-- ── Toast ── -->
+<div class="dc-toast" id="iaToast" role="status" aria-live="polite" hidden></div>
+
+{% if selected_patient %}
+<!-- ── Print document (screen-hidden) ── -->
+<section class="dc-print-doc" id="dcPrintDoc" aria-hidden="true"></section>
+
+{{ prescriptions_payload|json_script:"dcPrescriptions" }}
+{{ previous_prescriptions_payload|json_script:"dcPreviousPrescriptions" }}
+{{ assessment|json_script:"dcAssessment" }}
+{% endif %}
 {% endblock %}
 
+{% block tail_scripts %}
+{% if selected_patient %}
+<script src="{% static 'js/doctor_consultation.js' %}?v=20261115-flow"></script>
+{% endif %}
+<script>
+/* ── Immersive-mode sidebar toggle ── */
+(function () {
+  var sidebar = document.getElementById('appSidebar');
+  var btn = document.getElementById('dcSidebarToggle');
+  if (!sidebar || !btn) return;
+
+  // Add tooltips to sidebar items when collapsed
+  var navItems = sidebar.querySelectorAll('.nav-item');
+  navItems.forEach(function (item) {
+    var label = item.querySelector('.nav-label');
+    if (label && label.textContent.trim()) {
+      item.setAttribute('data-tooltip', label.textContent.trim());
+    }
+  });
+
+  function setSidebarOpen(isOpen) {
+    var label = isOpen ? 'Collapse sidebar' : 'Expand sidebar';
+    document.body.classList.toggle('dc-sidebar-open', isOpen);
+    btn.setAttribute('aria-expanded', String(isOpen));
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+  }
+
+  btn.addEventListener('click', function () {
+    setSidebarOpen(btn.getAttribute('aria-expanded') === 'false');
+  });
+
+  /* Close on Escape */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && document.body.classList.contains('dc-sidebar-open')) {
+      setSidebarOpen(false);
+      btn.focus({ preventScroll: true });
+    }
+  });
+
+  /* Close when clicking outside sidebar */
+  document.addEventListener('click', function (e) {
+    if (document.body.classList.contains('dc-sidebar-open') && !sidebar.contains(e.target)) {
+      setSidebarOpen(false);
+    }
+  });
+})();
+
+/* ── Compact hero details toggle ── */
+(function () {
+  var toggle = document.getElementById('dcHeroToggle');
+  var drawer = document.getElementById('dcHeroDrawer');
+  if (!toggle || !drawer) return;
+  toggle.addEventListener('click', function () {
+    var isHidden = drawer.hidden;
+    drawer.hidden = !isHidden;
+    toggle.setAttribute('aria-expanded', String(isHidden));
+    toggle.classList.toggle('is-open', isHidden);
+  });
+})();
+</script>
+{% endblock %}

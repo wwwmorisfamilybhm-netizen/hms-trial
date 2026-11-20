@@ -59,13 +59,13 @@ def _patient_record(patient):
             photo_bytes = photo_file.read(MAX_PHOTO_BYTES + 1)
         if len(photo_bytes) > MAX_PHOTO_BYTES:
             raise BackupArchiveError(
-                f"Photo for MR #{patient.mr_number or patient.pk} exceeds the 20 MB backup limit."
+                f"Photo for UHID #{patient.uhid or patient.pk} exceeds the 20 MB backup limit."
             )
         photo_name = os.path.basename(patient.photo.name)
         photo_type = mimetypes.guess_type(photo_name)[0]
         if photo_type not in ALLOWED_PHOTO_TYPES:
             raise BackupArchiveError(
-                f"Photo for MR #{patient.mr_number or patient.pk} is not a supported image type."
+                f"Photo for UHID #{patient.uhid or patient.pk} is not a supported image type."
             )
         photo = {
             "filename": photo_name,
@@ -106,13 +106,13 @@ def build_patient_backup():
     """Return a ZIP containing one JSON file per patient plus a manifest."""
     output = io.BytesIO()
     file_hashes = {}
-    patients = Patient.objects.order_by("mr_number", "pk").iterator(chunk_size=200)
+    patients = Patient.objects.order_by("uhid", "pk").iterator(chunk_size=200)
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         patient_count = 0
         for patient in patients:
             patient_count += 1
             record = _patient_record(patient)
-            filename_key = patient.mr_number or f"patient-{patient.pk}"
+            filename_key = patient.uhid or f"patient-{patient.pk}"
             safe_key = "".join(char for char in filename_key if char.isalnum() or char in "-_")
             safe_key = safe_key[:80] or f"patient-{patient.pk}"
             archive_path = f"patients/{safe_key}-{patient.pk}.json"
@@ -243,7 +243,7 @@ def _restore_photo(patient, photo, photo_payload, saved_files):
         "image/gif": ".gif",
     }[photo["mime_type"]]
     patient.photo.save(
-        f"patient_{patient.mr_number or patient.pk}{extension}",
+        f"patient_{patient.uhid or patient.pk}{extension}",
         ContentFile(photo_payload),
         save=False,
     )
@@ -269,7 +269,7 @@ def _get_or_create_doctor(data):
 
 
 def import_patient_backup(upload):
-    """Validate and import new patients, skipping MR numbers already present."""
+    """Validate and import new patients, skipping UHIDs already present."""
     records = _read_archive(upload)
     created_count = 0
     skipped_count = 0
@@ -280,13 +280,17 @@ def import_patient_backup(upload):
                 source_id = record.get("source_patient_id")
                 if not isinstance(source_id, int) or source_id < 1:
                     raise BackupArchiveError("A patient record has an invalid source ID.")
-                values = _clean_model_values(Patient, record.get("patient"), excluded=("photo",))
-                mr_number = values.get("mr_number")
-                if mr_number and Patient.objects.filter(mr_number=mr_number).exists():
+                raw_patient = record.get("patient")
+                if isinstance(raw_patient, dict) and "mr_number" in raw_patient and "uhid" not in raw_patient:
+                    raw_patient = dict(raw_patient)
+                    raw_patient["uhid"] = raw_patient.pop("mr_number")
+                values = _clean_model_values(Patient, raw_patient, excluded=("photo",))
+                uhid = values.get("uhid")
+                if uhid and Patient.objects.filter(uhid=uhid).exists():
                     skipped_count += 1
                     continue
                 if Patient.objects.filter(pk=source_id).exists():
-                    # This also makes repeat imports of legacy patients without an MR number safe.
+                    # This also makes repeat imports of legacy patients without an UHID safe.
                     skipped_count += 1
                     continue
 

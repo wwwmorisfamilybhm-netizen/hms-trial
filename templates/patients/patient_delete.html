@@ -20,8 +20,8 @@
       ⚠️ You are about to permanently delete a patient record
     </h2>
     <div style="display:grid; grid-template-columns:170px 1fr; row-gap:8px; font-size:14px;">
-      <span style="color:#991b1b; font-weight:700;">MR Number</span>
-      <span style="font-weight:750; color:var(--ink);">#{{ patient.mr_number|default:patient.id }}</span>
+      <span style="color:#991b1b; font-weight:700;">UHID</span>
+      <span style="font-weight:750; color:var(--ink);">#{{ patient.uhid|default:patient.id }}</span>
 
       <span style="color:#991b1b; font-weight:700;">Patient Name</span>
       <span style="font-weight:750; color:var(--ink);">{{ patient.full_name }}</span>

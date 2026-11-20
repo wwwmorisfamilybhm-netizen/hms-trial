@@ -12,7 +12,12 @@ class UserProfile(models.Model):
         REGISTRATION_DESK = "registration_desk", "Registration Desk"
         OPD_ASSISTANT = "opd_assistant", "OPD Assistant"
         DOCTOR = "doctor", "Doctor"
-        NURSE = "nurse", "Nurse"
+        # The standalone Nurse designation was merged into OPD Assistant: the
+        # OPD assistant records triage/initial assessments as part of the desk
+        # role. Legacy profiles still storing "nurse" are mapped to
+        # opd_assistant at runtime (see core.views.normalize_designation).
+        SERVICE_STAFF = "service_staff", "Service Staff"
+        PHARMACY = "pharmacy", "Pharmacy"
         ADMIN = "admin", "Hospital Administrator"
 
     SPECIALTIES = [
@@ -42,6 +47,7 @@ class UserProfile(models.Model):
         verbose_name="Assigned Designation",
         help_text="Designation assigned to this user. Restricts access to matching dashboards and tools.",
     )
+    service_departments = models.ManyToManyField("patients.ServiceDepartment", blank=True, related_name="staff_profiles")
     notes = models.CharField(
         max_length=255,
         blank=True,

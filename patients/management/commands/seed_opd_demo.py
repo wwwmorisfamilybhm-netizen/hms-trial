@@ -50,9 +50,9 @@ class Command(BaseCommand):
             ("DEMO-OPD-009", "Ira", "Nair", 32, "F", False, ""),
         ]
         patients = []
-        for index, (mr_number, first, last, age, gender, emergency, allergies) in enumerate(records):
+        for index, (uhid, first, last, age, gender, emergency, allergies) in enumerate(records):
             patient, _ = Patient.objects.update_or_create(
-                mr_number=mr_number,
+                uhid=uhid,
                 defaults={
                     "first_name": first,
                     "last_name": last,

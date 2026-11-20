@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Nursing Tasks — OPD Desk{% endblock %}
+
+{% block heading %}
+<div class="np-head">
+  <div>
+    <div class="np-kicker">OPD Desk · Care Board</div>
+    <h1 class="np-title">Nursing Tasks</h1>
+    <p class="np-sub">Dressings, injections, monitoring rounds and sample collections for the ward &amp; OPD.</p>
+  </div>
+  <div class="np-head-actions">
+    <a href="{% url 'opd_assistant_dashboard' %}" class="np-btn">← OPD Desk</a>
+    <a href="{% url 'nurse_queue' %}" class="np-btn">Assessment queue</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="np-bento">
+  <div class="np-col">
+    <form class="np-filter" method="get">
+      <select name="status" aria-label="Filter tasks">
+        <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open tasks</option>
+        <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+        <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>In progress</option>
+        <option value="done" {% if status_filter == 'done' %}selected{% endif %}>Done</option>
+        <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+        <option value="" {% if status_filter == '' %}selected{% endif %}>All</option>
+      </select>
+      <button type="submit" class="np-btn sm primary">Apply</button>
+      <span style="margin-left:auto; font-size:12px; color:var(--muted);">{{ counts.open }} open · {{ counts.done_today }} done today</span>
+    </form>
+
+    <section class="np-card">
+      <div class="np-card-head"><h2 class="np-card-title"><span class="np-dot"></span>Task board</h2></div>
+      {% if tasks %}
+        {% for task in tasks %}
+          <div class="np-task {% if task.is_overdue %}overdue{% endif %}">
+            <div class="np-task-icon">
+              {% if task.kind == 'injection' %}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m18 2 4 4M17 7 7 17l-4 1 1-4L14 4zM15 9l2 2"/></svg>
+              {% elif task.kind == 'dressing' %}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8h16v8H4zM12 8v8M4 12h16"/></svg>
+              {% elif task.kind == 'sample' %}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 3h6M10 3v6l-4 9a2 2 0 0 0 2 3h8a2 2 0 0 0 2-3l-4-9V3"/></svg>
+              {% else %}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/></svg>
+              {% endif %}
+            </div>
+            <div class="np-task-body">
+              <div class="np-task-title">
+                {{ task.title }}
+                <span class="np-badge {% if task.status == 'done' %}routine{% elif task.status == 'in_progress' %}teal{% else %}muted{% endif %}">{{ task.get_status_display }}</span>
+                {% if task.priority == 'urgent' %}<span class="np-badge urgent">Urgent</span>{% endif %}
+                {% if task.is_overdue %}<span class="np-badge emergency">Overdue</span>{% endif %}
+              </div>
+              <div class="np-task-meta">
+                {{ task.patient.full_name }} · {{ task.get_kind_display }}
+                {% if task.due_at %} · due {{ task.due_at|date:"j M, H:i" }}{% endif %}
+                {% if task.notes %} · {{ task.notes|truncatechars:80 }}{% endif %}
+                {% if task.created_by %} · by {{ task.created_by.get_full_name|default:task.created_by.username }}{% endif %}
+              </div>
+            </div>
+            <div class="np-task-actions">
+              {% if task.status == 'pending' %}
+                <form method="post" action="{% url 'nurse_task_update' task.pk %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="status" value="in_progress">
+                  <button type="submit" class="np-btn sm">Start</button>
+                </form>
+              {% endif %}
+              {% if task.status != 'done' %}
+                <form method="post" action="{% url 'nurse_task_update' task.pk %}" style="display:flex; gap:6px;">
+                  {% csrf_token %}
+                  <input type="hidden" name="status" value="done">
+                  <input type="text" name="outcome" placeholder="Outcome (optional)" style="width:130px; padding:6px 9px; border-radius:9px; border:1px solid var(--line); font:inherit; font-size:12px;">
+                  <button type="submit" class="np-btn sm primary">Done</button>
+                </form>
+              {% elif task.outcome %}
+                <span style="font-size:12px; color:var(--muted); align-self:center;">{{ task.outcome }}</span>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="np-empty">No tasks in this view.</div>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="np-col">
+    <section class="np-card">
+      <div class="np-card-head"><h2 class="np-card-title">New nursing task</h2></div>
+      <form method="post">
+        {% csrf_token %}
+        <div class="np-field">
+          <label for="taskPatient">Patient</label>
+          <select id="taskPatient" name="patient_id" required>
+            <option value="">Select patient…</option>
+            {% for p in patients %}
+              <option value="{{ p.pk }}">{{ p.full_name }}{% if p.uhid %} · {{ p.uhid }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="np-field">
+          <label>Quick start</label>
+          <div class="np-chips" id="presetChips">
+            {% for kind, title in task_presets %}
+              <button type="button" class="np-chip" data-title="{{ title }}" data-kind="{{ kind }}">{{ title }}</button>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="np-field">
+          <label for="taskTitle">Task</label>
+          <input id="taskTitle" name="title" required placeholder="e.g. Dressing change — left leg">
+        </div>
+        <div class="np-grid-2">
+          <div class="np-field">
+            <label for="taskKind">Type</label>
+            <select id="taskKind" name="kind">
+              {% for value, label in kinds %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="np-field">
+            <label for="taskPriority">Priority</label>
+            <select id="taskPriority" name="priority">
+              {% for value, label in priorities %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="np-field">
+          <label for="taskDue">Due at (optional)</label>
+          <input id="taskDue" name="due_at" type="datetime-local">
+        </div>
+        <div class="np-field">
+          <label for="taskNotes">Notes</label>
+          <textarea id="taskNotes" name="notes" placeholder="Instructions, site, dose…"></textarea>
+        </div>
+        <label class="np-check" style="margin-bottom:12px;">
+          <input type="checkbox" name="assign_me" checked> Assign this task to me
+        </label>
+        <button type="submit" class="np-btn teal" style="width:100%; justify-content:center;">Create task</button>
+      </form>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  document.querySelectorAll("#presetChips [data-title]").forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      document.getElementById("taskTitle").value = chip.getAttribute("data-title");
+      document.getElementById("taskKind").value = chip.getAttribute("data-kind");
+      document.querySelectorAll("#presetChips [data-title]").forEach(function (c) { c.classList.remove("is-on"); });
+      chip.classList.add("is-on");
+    });
+  });
+})();
+</script>
+{% endblock %}

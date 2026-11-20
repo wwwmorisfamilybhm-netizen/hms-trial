@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
+from .storage import private_report_storage, report_upload_path, pharmacy_import_path
 
 
 class Patient(models.Model):
@@ -37,7 +38,7 @@ class Patient(models.Model):
     is_demo = models.BooleanField(default=False, help_text="Synthetic demonstration record; never use as real patient data.")
 
     # ── Registration-desk extended fields ──────────────────────────────────
-    mr_number = models.CharField(max_length=20, blank=True, verbose_name="MR Number")
+    uhid = models.CharField(max_length=20, blank=True, verbose_name="UHID")
     second_name = models.CharField(max_length=100, blank=True, verbose_name="Second Name")
     centre = models.CharField(
         max_length=80, blank=True, verbose_name="Centre",
@@ -131,12 +132,6 @@ class Patient(models.Model):
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
 
-    @property
-    def uhid(self):
-        """Unique hospital patient ID — prefers the registered MR number."""
-        if self.mr_number:
-            return self.mr_number
-        return f"UHID{self.pk:06d}" if self.pk else "UHID—"
 
     @property
     def age(self):
@@ -258,10 +253,20 @@ class PatientBill(models.Model):
         REGISTRATION = "registration", "Registration"
         DOCTOR = "doctor", "Doctor"
         APPOINTMENT = "appointment", "Appointment"
+        SERVICE = "service", "Service"
+        PHARMACY = "pharmacy", "Pharmacy"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         PAID = "paid", "Paid"
+        CANCELLED = "cancelled", "Cancelled"
+
+    class PaymentMethod(models.TextChoices):
+        CASH = "cash", "Cash"
+        CARD = "card", "Card"
+        UPI = "upi", "UPI"
+        CREDIT = "credit", "Credit"
+        OTHER = "other", "Other"
 
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="bills")
     source = models.CharField(max_length=20, choices=Source.choices)
@@ -269,12 +274,56 @@ class PatientBill(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    appointment = models.ForeignKey(
+        "appointments.Appointment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="bills",
+        verbose_name="Appointment / visit",
+    )
+    consultation = models.ForeignKey(
+        "ConsultationSession",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="bills",
+        verbose_name="Consultation",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="patient_bills_created",
+    )
+    paid_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="patient_bills_collected",
+        verbose_name="Payment collected by",
+    )
+    payment_method = models.CharField(
+        max_length=10,
+        choices=PaymentMethod.choices,
+        blank=True,
+        default="",
+        verbose_name="Payment method",
+    )
+    payment_reference = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        verbose_name="Payment reference",
+    )
+    payment_group = models.UUIDField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="Payment group",
+        help_text="Bills paid together in one cashier transaction share this reference.",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(null=True, blank=True)
@@ -290,6 +339,26 @@ class PatientBill(models.Model):
             raise ValidationError({"discount": "Discount cannot be negative."})
         if self.discount > self.amount:
             raise ValidationError({"discount": "Discount cannot exceed the bill amount."})
+        self._validate_pharmacy_snapshot()
+
+    def _validate_pharmacy_snapshot(self):
+        from django.core.exceptions import ValidationError
+        if self.pk:
+            previous = PatientBill.objects.filter(pk=self.pk).first()
+            issue = PharmacyIssue.objects.filter(bill_id=self.pk).first()
+            if issue and previous:
+                if self.status != previous.status:
+                    raise ValidationError("Use Pharmacy Billing to record payment; cancel unpaid issues in Pharmacy.")
+                if any(getattr(previous, field) != getattr(self, field) for field in ("amount", "discount", "patient_id", "source")):
+                    raise ValidationError("Prepared pharmacy bills have fixed prices and patient details.")
+                if issue.status == "dispensed" and self.status != "paid":
+                    raise ValidationError("Payment cannot be reset after medicine handover.")
+                if previous.status == "cancelled" and self.status != "cancelled":
+                    raise ValidationError("A cancelled bill cannot be reopened.")
+
+    def save(self, *args, **kwargs):
+        self._validate_pharmacy_snapshot()
+        super().save(*args, **kwargs)
 
     @property
     def amount_due(self):
@@ -379,6 +448,14 @@ class ConsultationSession(models.Model):
     patient = models.ForeignKey(
         Patient, on_delete=models.CASCADE, related_name="consultations", verbose_name="Patient"
     )
+    appointment = models.ForeignKey(
+        "appointments.Appointment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="consultations",
+        verbose_name="Appointment / visit",
+    )
     doctor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -432,6 +509,11 @@ class PrescriptionItem(models.Model):
         ConsultationSession, on_delete=models.CASCADE, related_name="prescriptions"
     )
     medicine_name = models.CharField(max_length=255, verbose_name="Medicine")
+    medicine = models.ForeignKey("Medicine", on_delete=models.PROTECT, null=True, blank=True)
+    prescribed_quantity = models.PositiveIntegerField(null=True, blank=True)
+    released_at = models.DateTimeField(null=True, blank=True)
+    legacy_dispensed_quantity = models.PositiveIntegerField(default=0)
+    reserved_quantity = models.PositiveIntegerField(default=0)
     dose = models.CharField(max_length=100, blank=True, default="", verbose_name="Dose")
     route = models.CharField(max_length=50, default="Oral", verbose_name="Route")
     frequency = models.CharField(max_length=50, default="OD", verbose_name="Frequency")
@@ -468,6 +550,25 @@ class PrescriptionItem(models.Model):
     def __str__(self):
         return f"{self.medicine_name} {self.dose} ({self.frequency})"
 
+    def _validate_snapshot(self):
+        from django.core.exceptions import ValidationError
+        previous = PrescriptionItem.objects.filter(pk=self.pk).first() if self.pk else None
+        if previous and (previous.released_at or previous.legacy_dispensed_quantity):
+            fields = ("consultation_id", "medicine_id", "medicine_name", "prescribed_quantity", "dose", "route", "frequency", "duration", "instructions", "released_at", "dispensed_quantity", "reserved_quantity", "dispense_status", "legacy_dispensed_quantity", "dispensed_by_id")
+            if any(getattr(previous, field) != getattr(self, field) for field in fields):
+                raise ValidationError("Released prescriptions are read-only; use pharmacy operations or create an amendment.")
+
+    def clean(self):
+        self._validate_snapshot()
+
+    def save(self, *args, **kwargs):
+        self._validate_snapshot()
+        super().save(*args, **kwargs)
+
+    @property
+    def remaining_quantity(self):
+        return max((self.prescribed_quantity or 0) - self.dispensed_quantity - self.reserved_quantity, 0)
+
 
 class ClinicalOrder(models.Model):
     """Laboratory, Radiology, or Procedure order placed during consultation."""
@@ -482,6 +583,28 @@ class ClinicalOrder(models.Model):
     )
     order_type = models.CharField(max_length=30, choices=OrderType.choices, default=OrderType.LABORATORY)
     name = models.CharField(max_length=255, verbose_name="Service / Test")
+    department = models.ForeignKey("ServiceDepartment", on_delete=models.PROTECT, null=True, blank=True)
+    service_definition = models.ForeignKey("ServiceDefinition", on_delete=models.PROTECT, null=True, blank=True)
+    price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        verbose_name="Price snapshot",
+        help_text="Price charged for this order; copied from the service catalogue when ordered.",
+    )
+    bill = models.ForeignKey(
+        "PatientBill",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="service_orders",
+        verbose_name="Service bill",
+    )
+    assigned_staff = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_service_orders")
+    priority = models.CharField(max_length=10, choices=[("routine", "Routine"), ("urgent", "Urgent")], default="routine")
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    completed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="completed_service_orders")
     status = models.CharField(max_length=30, default="Ordered", verbose_name="Status")
     result_summary = models.CharField(max_length=255, blank=True, default="", verbose_name="Result Summary")
     operational_details = models.JSONField(default=dict, blank=True)
@@ -499,6 +622,28 @@ class ClinicalOrder(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.status})"
+
+    def save(self, *args, **kwargs):
+        if self.service_definition_id:
+            self.department_id = self.service_definition.department_id
+        elif not self.department_id:
+            definition = ServiceDefinition.objects.filter(name__iexact=self.name, is_active=True).first()
+            if definition:
+                self.service_definition = definition
+                self.department_id = definition.department_id
+            elif self.order_type in ("laboratory", "radiology"):
+                self.department = ServiceDepartment.objects.filter(slug=self.order_type).first()
+        if self.service_definition_id and not self.price:
+            self.price = self.service_definition.price
+        super().save(*args, **kwargs)
+
+    @property
+    def payment_pending(self):
+        return bool(self.bill_id and self.bill.status == PatientBill.Status.PENDING)
+
+    @property
+    def is_paid(self):
+        return not self.bill_id or self.bill.status == PatientBill.Status.PAID
 
 
 class OPDAuditEvent(models.Model):
@@ -593,6 +738,13 @@ class DiagnosticReport(models.Model):
     )
     category = models.CharField(max_length=30, choices=Category.choices, default=Category.LABORATORY)
     title = models.CharField(max_length=255, verbose_name="Report Title")
+    order = models.ForeignKey(ClinicalOrder, on_delete=models.PROTECT, null=True, blank=True, related_name="reports")
+    summary = models.TextField(blank=True)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="published_service_reports")
+    published_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="reviewed_service_reports")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    attachment = models.FileField(storage=private_report_storage, upload_to=report_upload_path, blank=True)
     status = models.CharField(max_length=30, default="Completed", verbose_name="Status")
     details = models.JSONField(default=dict, blank=True, verbose_name="Report Details")
     report_date = models.DateTimeField(auto_now_add=True, verbose_name="Report Date")
@@ -605,3 +757,389 @@ class DiagnosticReport(models.Model):
     def __str__(self):
         return f"{self.title} — {self.patient.full_name} ({self.category})"
 
+
+
+class NurseQueueTicket(models.Model):
+    """Triage ticket that moves a visit between the OPD Desk and the Nurse Desk.
+
+    Flow: OPD Desk → *waiting* (nurse queue) → *in_assessment* → *completed*
+    (returned to the OPD Desk for doctor allocation). "recalled" keeps the
+    ticket alive for a repeat vitals round without the visit returning to the
+    OPD Desk.
+    """
+
+    class Status(models.TextChoices):
+        WAITING = "waiting", "Waiting in nurse queue"
+        IN_ASSESSMENT = "in_assessment", "In assessment"
+        COMPLETED = "completed", "Assessed · back at OPD Desk"
+        RECALLED = "recalled", "Recalled for re-assessment"
+        CANCELLED = "cancelled", "Cancelled"
+
+    class Priority(models.TextChoices):
+        ROUTINE = "routine", "Routine"
+        URGENT = "urgent", "Urgent"
+        EMERGENCY = "emergency", "Emergency"
+
+    class Source(models.TextChoices):
+        OPD_DESK = "opd_desk", "OPD Desk allocation"
+        REGISTRATION = "registration", "Registration intake"
+        EMERGENCY = "emergency", "Emergency intake"
+
+    patient = models.ForeignKey(
+        Patient, on_delete=models.CASCADE, related_name="nurse_tickets",
+        verbose_name="Patient",
+    )
+    appointment = models.ForeignKey(
+        "appointments.Appointment", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="nurse_tickets",
+    )
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.WAITING, db_index=True,
+    )
+    priority = models.CharField(
+        max_length=12, choices=Priority.choices, default=Priority.ROUTINE, db_index=True,
+    )
+    source = models.CharField(max_length=20, choices=Source.choices, default=Source.OPD_DESK)
+    visit_note = models.CharField(
+        max_length=255, blank=True, default="",
+        verbose_name="Allocation note", help_text="Reason / instructions from the OPD Desk.",
+    )
+
+    sent_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="nurse_tickets_sent",
+    )
+    sent_at = models.DateTimeField(auto_now_add=True)
+    claimed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="nurse_tickets_claimed",
+    )
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    #: Minutes the nurse estimates before the visit is ready for the OPD Desk.
+    eta_minutes = models.PositiveSmallIntegerField(null=True, blank=True)
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="nurse_tickets_completed",
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+    returned_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="Returned to OPD Desk at",
+    )
+    assessment = models.ForeignKey(
+        InitialAssessment, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="tickets",
+    )
+    escalated = models.BooleanField(default=False, verbose_name="Escalated to doctor / emergency")
+    response_notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-sent_at"]
+        verbose_name = "Nurse Queue Ticket"
+        verbose_name_plural = "Nurse Queue Tickets"
+        indexes = [models.Index(fields=["status", "priority"])]
+
+    def __str__(self):
+        return f"NQ-{self.pk or 'new'} · {self.patient.full_name} ({self.get_status_display()})"
+
+    @property
+    def ticket_number(self):
+        return f"NQ-{self.pk:05d}" if self.pk else "NQ-NEW"
+
+    @property
+    def is_open(self):
+        return self.status in (
+            self.Status.WAITING, self.Status.IN_ASSESSMENT, self.Status.RECALLED,
+        )
+
+    @property
+    def wait_minutes(self):
+        """Minutes since the OPD Desk sent this visit (stops when assessment starts)."""
+        from django.utils import timezone
+        end = self.claimed_at or timezone.now()
+        if not self.sent_at:
+            return 0
+        return max(int((end - self.sent_at).total_seconds() // 60), 0)
+
+
+class NurseTask(models.Model):
+    """Nursing to-do item (dressing, injection, monitoring, BP check …)."""
+
+    class Kind(models.TextChoices):
+        VITALS = "vitals", "Vitals check"
+        DRESSING = "dressing", "Dressing / wound care"
+        INJECTION = "injection", "Injection"
+        MEDICATION = "medication", "Medication administration"
+        MONITORING = "monitoring", "Monitoring round"
+        SAMPLE = "sample", "Sample collection"
+        OTHER = "other", "Other nursing task"
+
+    class Priority(models.TextChoices):
+        ROUTINE = "routine", "Routine"
+        URGENT = "urgent", "Urgent"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        IN_PROGRESS = "in_progress", "In progress"
+        DONE = "done", "Done"
+        SKIPPED = "cancelled", "Cancelled"
+
+    patient = models.ForeignKey(
+        Patient, on_delete=models.CASCADE, related_name="nurse_tasks", verbose_name="Patient",
+    )
+    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.VITALS)
+    title = models.CharField(max_length=255)
+    notes = models.TextField(blank=True, default="")
+    outcome = models.CharField(max_length=255, blank=True, default="")
+    priority = models.CharField(
+        max_length=12, choices=Priority.choices, default=Priority.ROUTINE,
+    )
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True,
+    )
+    due_at = models.DateTimeField(null=True, blank=True)
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="nurse_tasks_assigned",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="nurse_tasks_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="nurse_tasks_completed",
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["status", "due_at", "-created_at"]
+        verbose_name = "Nurse Task"
+        verbose_name_plural = "Nurse Tasks"
+
+    def __str__(self):
+        return f"{self.title} — {self.patient.full_name} ({self.get_status_display()})"
+
+    @property
+    def is_overdue(self):
+        from django.utils import timezone
+        return bool(
+            self.due_at
+            and self.status in (self.Status.PENDING, self.Status.IN_PROGRESS)
+            and self.due_at < timezone.now()
+        )
+
+
+class ServiceDepartment(models.Model):
+    slug = models.SlugField(unique=True)
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class ServiceDefinition(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    department = models.ForeignKey(ServiceDepartment, on_delete=models.PROTECT, related_name="services")
+    price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        verbose_name="Price (₹)",
+        help_text="Amount charged at the registration desk for this service.",
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} · {self.department.name}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.price is not None and self.price < Decimal("0"):
+            raise ValidationError({"price": "Price cannot be negative."})
+
+
+class Medicine(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    generic_name = models.CharField(max_length=255, blank=True)
+    strength = models.CharField(max_length=100, blank=True)
+    form = models.CharField(max_length=50, default="Tablet")
+    unit = models.CharField(max_length=30, choices=[("tablet", "Tablet"), ("capsule", "Capsule"), ("bottle", "Bottle"), ("tube", "Tube"), ("vial", "Vial"), ("unit", "Unit")], default="tablet")
+    pack_size = models.PositiveIntegerField(default=1)
+    reorder_level = models.PositiveIntegerField(default=10)
+    is_active = models.BooleanField(default=True)
+
+    manufacturer = models.CharField(max_length=200, blank=True)
+    barcode = models.CharField(max_length=100, blank=True)
+    photo = models.ImageField(upload_to="medicine_photos/", blank=True)
+    photo_source = models.URLField(max_length=2000, blank=True)
+    photo_approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="medicine_photos_approved")
+    photo_approved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [models.CheckConstraint(condition=models.Q(pack_size__gt=0), name="medicine_pack_positive")]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def available_quantity(self):
+        from django.utils import timezone
+        from django.db.models import Sum, F
+        return self.batches.filter(expiry_date__gte=timezone.localdate()).aggregate(n=Sum(F("on_hand") - F("reserved")))["n"] or 0
+
+
+class MedicineBatch(models.Model):
+    medicine = models.ForeignKey(Medicine, on_delete=models.PROTECT, related_name="batches")
+    batch_number = models.CharField(max_length=100)
+    expiry_date = models.DateField()
+    supplier = models.CharField(max_length=200)
+    invoice_reference = models.CharField(max_length=100)
+    purchase_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    selling_price = models.DecimalField(max_digits=10, decimal_places=2)
+    on_hand = models.PositiveIntegerField(default=0)
+    reserved = models.PositiveIntegerField(default=0)
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["expiry_date", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["medicine", "batch_number"], name="medicine_batch_unique"),
+            models.CheckConstraint(condition=models.Q(reserved__lte=models.F("on_hand")), name="batch_reservation_within_stock"),
+            models.CheckConstraint(condition=models.Q(purchase_cost__gte=0, selling_price__gte=0), name="batch_prices_nonnegative"),
+        ]
+
+    @property
+    def available(self):
+        return self.on_hand - self.reserved
+
+    def __str__(self):
+        return f"{self.medicine.name} · {self.batch_number}"
+
+
+class PharmacyIssue(models.Model):
+    class Status(models.TextChoices):
+        AWAITING_PAYMENT = "awaiting_payment", "Awaiting payment"
+        DISPENSED = "dispensed", "Dispensed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    consultation = models.ForeignKey(ConsultationSession, on_delete=models.PROTECT, related_name="pharmacy_issues")
+    bill = models.OneToOneField(PatientBill, on_delete=models.PROTECT, related_name="pharmacy_issue")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.AWAITING_PAYMENT)
+    request_key = models.UUIDField(unique=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="pharmacy_issues_created")
+    dispensed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="pharmacy_issues_handed_over")
+    created_at = models.DateTimeField(auto_now_add=True)
+    dispensed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    @property
+    def stale(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        return self.status == "awaiting_payment" and self.bill.status == "pending" and self.created_at < timezone.now() - timedelta(hours=24)
+
+    @property
+    def ready(self):
+        return self.status == "awaiting_payment" and self.bill.status == "paid"
+
+
+class PharmacyIssueLine(models.Model):
+    issue = models.ForeignKey(PharmacyIssue, on_delete=models.PROTECT, related_name="lines")
+    prescription = models.ForeignKey(PrescriptionItem, on_delete=models.PROTECT, related_name="issue_lines")
+    medicine = models.ForeignKey(Medicine, on_delete=models.PROTECT)
+    quantity = models.PositiveIntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    medicine_name = models.CharField(max_length=255)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(quantity__gt=0, unit_price__gte=0), name="issue_line_values_positive")]
+
+    @property
+    def total(self):
+        return self.quantity * self.unit_price
+
+
+class BatchAllocation(models.Model):
+    line = models.ForeignKey(PharmacyIssueLine, on_delete=models.PROTECT, related_name="allocations")
+    batch = models.ForeignKey(MedicineBatch, on_delete=models.PROTECT)
+    quantity = models.PositiveIntegerField()
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(quantity__gt=0), name="allocation_quantity_positive")]
+
+
+class ImmutableLedgerQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Stock movements are append-only; create a correcting adjustment.")
+
+    def delete(self):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Stock movements cannot be deleted.")
+
+
+class StockMovement(models.Model):
+    batch = models.ForeignKey(MedicineBatch, on_delete=models.PROTECT, related_name="movements")
+    quantity = models.IntegerField()
+    kind = models.CharField(max_length=12, choices=[("receipt", "Receipt"), ("issue", "Issue"), ("adjustment", "Adjustment")])
+    reason = models.CharField(max_length=255)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    issue = models.ForeignKey(PharmacyIssue, on_delete=models.PROTECT, null=True, blank=True)
+    request_key = models.UUIDField(unique=True, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    objects = ImmutableLedgerQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        if self.pk:
+            raise ValidationError("Stock movements are append-only.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        raise ValidationError("Stock movements cannot be deleted.")
+
+
+class MedicineImport(models.Model):
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="medicine_imports")
+    source = models.FileField(storage=private_report_storage, upload_to=pharmacy_import_path)
+    filename = models.CharField(max_length=255)
+    fingerprint = models.CharField(max_length=64, db_index=True)
+    kind = models.CharField(max_length=12, choices=[("catalogue", "Medicines only"), ("stock", "Medicines and stock")])
+    columns = models.JSONField(default=list)
+    raw_rows = models.JSONField(default=list)
+    mapping = models.JSONField(default=dict)
+    rows = models.JSONField(default=list)
+    result = models.JSONField(default=dict)
+    revision = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    committed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+
+
+class MedicineImportReceipt(models.Model):
+    draft = models.ForeignKey(MedicineImport, on_delete=models.PROTECT, related_name="receipts")
+    medicine = models.ForeignKey(Medicine, on_delete=models.PROTECT)
+    row_number = models.PositiveIntegerField()
+    signature = models.CharField(max_length=64, db_index=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["draft", "row_number"], name="medicine_import_receipt_row_unique"),
+        ]

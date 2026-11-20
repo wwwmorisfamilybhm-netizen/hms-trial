@@ -4,68 +4,483 @@
 {% block title %}{{ page_title }} · OPD Management{% endblock %}
 
 {% block heading %}
-<div class="opd-page-head">
-  <div><p class="opd-eyebrow">OPD MANAGEMENT{% if today %} · {{ today|date:"l, j F" }}{% endif %}</p><h1>{{ page_title }}</h1><p class="page-sub">{% if page_kind == "patient_queue" %}Select a visit to review its current location, alerts, orders, and activity.{% else %}Review service requests and update their operational status.{% endif %}</p></div>
-  <a class="opd-action secondary" href="{% url 'opd_assistant_dashboard' %}">Back to dashboard</a>
+<div class="mb-header">
+  <div>
+    <div class="mb-welcome">OPD Management{% if today %} · {{ today|date:"l, j F" }}{% endif %}</div>
+    <h1 class="mb-desk-name">{{ page_title }}</h1>
+    <p class="page-sub" style="margin:6px 0 0; color:var(--mb-text-muted); font-size:13px;">Select a visit to review its current location, alerts, orders, and activity.</p>
+  </div>
+  <div class="mb-header-tools">
+    <a href="{% if request.session.designation == 'admin' %}{% url 'admin_dashboard' %}{% else %}{% url 'opd_assistant_dashboard' %}{% endif %}" class="mb-btn-action ghost">Back to dashboard</a>
+  </div>
 </div>
 {% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/opd_dashboard.css' %}">
-
 {% if page_kind == "patient_queue" %}
-<div class="opd-workspace-grid">
-  <section class="opd-panel">
-    <form class="opd-queue-search" method="get"><label class="opd-search">Search by name, UHID, visit<input type="search" name="q" value="{{ query }}" placeholder="Start typing to search"></label><button class="opd-button" type="submit">Search</button></form>
-    {% if rows.object_list %}<div class="opd-queue-list">
-      {% for row in rows %}<a class="opd-queue-item {% if selected.patient.pk == row.patient.pk %}is-selected{% endif %}" href="?patient={{ row.patient.pk }}&q={{ query|urlencode }}">
-        <span class="opd-queue-avatar">{{ row.patient.first_name|slice:":1"|upper }}{{ row.patient.last_name|slice:":1"|upper }}</span><span class="opd-queue-person"><strong>{{ row.patient.full_name }}</strong><small>{{ row.patient.uhid }} · {{ row.visit_number }}</small></span><span class="opd-status status-{{ row.status|slugify }}">{{ row.status }}</span>
-      </a>{% endfor %}
-    </div>{% else %}<div class="opd-empty"><strong>Queue is clear</strong><p>No visits match this search.</p></div>{% endif %}
-  </section>
-  <section class="opd-panel opd-detail-panel">
-    {% if selected %}
-      <div class="opd-patient-heading"><span class="opd-queue-avatar large">{{ selected.patient.first_name|slice:":1"|upper }}{{ selected.patient.last_name|slice:":1"|upper }}</span><div><h2>{{ selected.patient.full_name }}{% if selected.patient.is_demo %} <span class="opd-demo-tag">DEMO RECORD</span>{% endif %}</h2><p>{{ selected.patient.uhid }} · {{ selected.visit_number }}</p></div></div>
-      <dl class="opd-facts"><dt>Age / Sex</dt><dd>{{ selected.patient.age|default:"—" }} / {{ selected.patient.get_gender_display|default:"—" }}</dd><dt>Visit arrival</dt><dd>{{ selected.patient.created_at|date:"j M Y, H:i" }}</dd><dt>Appointment</dt><dd>{% if selected.appointment %}{{ selected.appointment.date|date:"j M Y" }} · {{ selected.appointment.start_time|date:"H:i" }} · Dr. {{ selected.appointment.doctor.full_name }}{% else %}—{% endif %}</dd><dt>Current location</dt><dd>{{ selected.location }}</dd><dt>Assigned doctor</dt><dd>{% if selected.doctor %}{{ selected.doctor.get_full_name|default:selected.doctor.username }}{% else %}Unassigned{% endif %}</dd><dt>Billing</dt><dd>{{ selected.billing }}</dd></dl>
-      {% if selected.alert %}<div class="opd-alert-box"><strong>Attention</strong><span>{{ selected.alert }}</span>{% if selected.patient.allergies %}<span>Recorded allergies: {{ selected.patient.allergies }}</span>{% endif %}</div>{% endif %}
-      {% if selected.status == "Pending Assignment" %}<div class="opd-alert-box"><strong>Pending assignment</strong><span>This visit arrived via an appointment. Assign a doctor to move it out of the pool.</span></div>{% endif %}
-      <form class="opd-assign-form" method="post" action="{% url 'assign_doctor' selected.patient.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><label>Assign doctor<select name="doctor_id"><option value="">— Unassigned —</option>{% for doctor in doctors %}<option value="{{ doctor.pk }}" {% if selected.doctor_id == doctor.pk %}selected{% endif %}>{{ doctor.get_full_name|default:doctor.username }}</option>{% endfor %}</select></label><button class="opd-button" type="submit">Save assignment</button></form>
-      <div class="opd-detail-actions">{% if not selected.assessment %}<a class="opd-button" href="{% url 'initial_assessment' %}?patient={{ selected.patient.pk }}">Open initial assessment</a>{% else %}<a class="opd-button" href="{% url 'initial_assessment' %}?patient={{ selected.patient.pk }}">Review assessment</a>{% endif %}<a class="opd-button secondary" href="{% url 'opd_referrals' %}?patient={{ selected.patient.pk }}">Refer to another doctor</a></div>
-      <h3>Visit activity</h3><ol class="opd-timeline"><li><time>{{ selected.patient.created_at|date:"H:i" }}</time><span>Visit registered</span></li>{% if selected.appointment %}<li><time>{{ selected.appointment.start_time|date:"H:i" }}</time><span>Appointment booked · Dr. {{ selected.appointment.doctor.full_name }}</span></li>{% endif %}{% if selected.assessment %}<li><time>{{ selected.assessment.updated_at|date:"H:i" }}</time><span>Initial assessment saved</span></li>{% endif %}{% if selected.consultation %}<li><time>{{ selected.consultation.updated_at|date:"H:i" }}</time><span>Consultation {{ selected.consultation.get_status_display|lower }}</span></li>{% for order in selected.consultation.orders.all %}<li><time>{{ order.created_at|date:"H:i" }}</time><span>{{ order.name }} · {{ order.status }}</span></li>{% endfor %}{% endif %}</ol>
-    {% else %}<div class="opd-empty"><strong>Select a visit</strong><p>Patient and visit details will appear here.</p></div>{% endif %}
-  </section>
+<style>
+  /* ── Visit Journey Card (selected-patient panel) ── */
+  .jc-card{display:flex;flex-direction:column;gap:14px}
+  .jc-id{display:flex;gap:12px;align-items:flex-start}
+  .jc-avatar{width:48px;height:48px;border-radius:15px;background:#e6e1fb;color:#554a8f;font-size:16px;font-weight:800;display:grid;place-items:center;flex-shrink:0;border:1px solid rgba(155,135,248,.3)}
+  .jc-avatar.is-emergency{background:#fee2e2;border-color:#fca5a5;color:#b91c1c}
+  .jc-name-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .jc-name{margin:0;font-size:18px;font-weight:800;color:var(--mb-text-dark);letter-spacing:-.3px}
+  .jc-badge{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .jc-badge.red{background:#fee2e2;color:#b91c1c}
+  .jc-badge.amber{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
+  .jc-id-meta{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text-muted);margin-top:3px;flex-wrap:wrap}
+  .jc-uhid{border:none;background:#f1effc;color:#634be2;font:inherit;font-weight:800;cursor:pointer;padding:2px 8px;border-radius:6px;font-variant-numeric:tabular-nums}
+  .jc-uhid:hover{background:#e3dcfd}
+  .jc-dot{color:#c7c5d8;font-weight:800}
+  .jc-appt{font-size:11px;color:var(--mb-text-muted)}
+  .jc-wait-pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#71717a;background:#f4f3fb;border-radius:999px;padding:3px 10px;margin-top:7px}
+  .jc-pulse-dot{width:6px;height:6px;border-radius:50%;background:#f59e0b;animation:jcPulse 1.8s infinite}
+  @keyframes jcPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.35)}}
+  .jc-rail{display:flex;padding:12px 4px 6px;border-top:1px solid #f1eefb;border-bottom:1px solid #f1eefb}
+  .jc-rail.is-cancelled{opacity:.45;filter:grayscale(1)}
+  .jc-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;min-width:0}
+  .jc-step:not(:last-child)::before{content:"";position:absolute;top:5.5px;left:calc(50% + 11px);right:calc(-50% + 11px);height:2px;background:#e6e2f7}
+  .jc-step.done:not(:last-child)::before{background:#9b87f8}
+  .jc-node{width:13px;height:13px;border-radius:50%;background:#fff;border:2.5px solid #dcdce2;position:relative;z-index:1}
+  .jc-step.done .jc-node{background:#7660ea;border-color:#7660ea}
+  .jc-step.current .jc-node{border-color:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.18);animation:jcPulse 1.8s infinite}
+  .jc-step-label{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.35px;color:#9d9da8;text-align:center;line-height:1.2}
+  .jc-step.current .jc-step-label{color:#b45309}
+  .jc-step.done .jc-step-label{color:#554a8f}
+  .jc-step-time{font-size:8.5px;color:#a1a1aa;font-variant-numeric:tabular-nums}
+  .jc-step-note{font-size:8.5px;color:#554a8f;font-weight:750;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .jc-now{border:1px solid rgba(155,135,248,.22);border-radius:16px;background:#faf9fe;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .jc-now-kicker{font-size:9.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#634be2;background:#ede9fe;padding:2px 9px;border-radius:999px}
+  .jc-now-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+  .jc-now-head strong{color:var(--mb-text-dark);font-weight:800;letter-spacing:-.2px}
+  .jc-muted{font-size:12px;color:var(--mb-text-muted);line-height:1.5}
+  .jc-red{color:#b91c1c}
+  .jc-pill-group{display:flex;gap:6px;flex-wrap:wrap}
+  .jc-pill{position:relative;flex:1;min-width:82px}
+  .jc-pill input{position:absolute;opacity:0;inset:0;cursor:pointer}
+  .jc-pill span{display:flex;justify-content:center;padding:8px 10px;border-radius:12px;border:1.5px solid #dcdce2;background:#fff;font-size:12px;font-weight:750;color:#56565c;cursor:pointer;transition:all .15s ease}
+  .jc-pill span:hover{border-color:#9b87f8}
+  .jc-pill input:checked+span{background:#7660ea;border-color:#7660ea;color:#fff}
+  .jc-pill.is-red input:checked+span{background:#dc2626;border-color:#dc2626}
+  .jc-cta{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:11px 14px;border-radius:12px;border:none;background:#d4f150;color:#1b1c26;font:inherit;font-size:13px;font-weight:800;cursor:pointer;text-decoration:none;transition:all .15s ease}
+  .jc-cta:hover{filter:brightness(.96);transform:translateY(-1px);text-decoration:none}
+  .jc-cta.teal{background:#0f766e;color:#fff}
+  .jc-cta.is-link{background:#fff;border:1.5px solid #9b87f8;color:#553ccb}
+  .jc-ghost{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;border:1px solid rgba(155,135,248,.28);background:#fff;color:#554a8f;font:inherit;font-size:11.5px;font-weight:750;cursor:pointer;text-decoration:none;transition:all .15s ease}
+  .jc-ghost:hover{background:#f6f4fd;text-decoration:none}
+  .jc-chip-row{display:flex;flex-direction:column;gap:8px}
+  .jc-chip-form{margin:0}
+  .jc-doc-chip{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:14px;border:1.5px solid #e6e2f7;background:#fff;cursor:pointer;font:inherit;text-align:left;transition:all .15s ease}
+  .jc-doc-chip:hover{border-color:#7660ea;background:#faf8ff;transform:translateY(-1px);box-shadow:0 6px 16px rgba(99,75,226,.08)}
+  .jc-doc-avatar{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,#ede9fe,#ded7fc);color:#553ccb;font-size:12px;font-weight:800;display:grid;place-items:center;flex-shrink:0}
+  .jc-doc-info{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .jc-doc-name{font-size:12.5px;font-weight:800;color:var(--mb-text-dark)}
+  .jc-doc-meta{font-size:10.5px;color:var(--mb-text-muted)}
+  .jc-doc-more{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:14px;border:1.5px dashed #dcdce2;cursor:pointer}
+  .jc-doc-more select{border:none;background:transparent;font:inherit;font-size:12px;font-weight:700;color:#554a8f;flex:1;outline:none;cursor:pointer}
+  .jc-hint{font-size:11px;color:var(--mb-text-muted);font-style:italic;line-height:1.5}
+  .jc-secondary-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .jc-vitals{display:flex;flex-direction:column;gap:9px;padding:12px 14px;border-radius:16px;background:#fff;border:1px solid #f1eefb}
+  .jc-vitals-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .jc-vitals-title{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#9d9da8}
+  .jc-score{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;background:#f4f3fb;color:#56565c}
+  .jc-score .jc-score-dot{width:8px;height:8px;border-radius:50%;background:#22c55e}
+  .jc-score.semi-urgent{background:#fff7ed;color:#b45309}
+  .jc-score.semi-urgent .jc-score-dot{background:#f59e0b}
+  .jc-score.emergency{background:#fee2e2;color:#b91c1c}
+  .jc-score.emergency .jc-score-dot{background:#dc2626}
+  .jc-vitals-grid{display:flex;gap:8px;flex-wrap:wrap}
+  .jc-vital{display:inline-flex;align-items:baseline;gap:4px;padding:6px 10px;border-radius:10px;background:#f8f7fd;border:1px solid #eeeaf9;font-size:10.5px;color:var(--mb-text-muted);font-weight:700}
+  .jc-vital b{font-size:13px;color:var(--mb-text-dark);font-variant-numeric:tabular-nums}
+  .jc-vitals-alerts{display:flex;gap:6px;flex-wrap:wrap}
+  .jc-vitals-alerts span{font-size:10.5px;font-weight:800;color:#b91c1c;background:#fee2e2;padding:3px 9px;border-radius:999px}
+  .jc-details{border:1px solid #f1eefb;border-radius:12px;overflow:hidden}
+  .jc-details+.jc-details{margin-top:8px}
+  .jc-details summary{cursor:pointer;padding:10px 14px;font-size:12.5px;font-weight:800;color:var(--mb-text-dark);list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none}
+  .jc-details summary::-webkit-details-marker{display:none}
+  .jc-details summary::after{content:"⌄";color:#9d9da8;font-size:14px}
+  .jc-details[open] summary::after{content:"⌃"}
+  .jc-details-body{padding:2px 14px 12px;font-size:12px;color:var(--mb-text-muted)}
+  .jc-details-body ul{margin:0;padding-left:16px}
+  .jc-details-body ol{margin:0;padding-left:18px;font-size:12.5px}
+  .jc-sticky{position:sticky;bottom:0;margin-top:2px;padding:12px 0 2px;background:linear-gradient(180deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.96) 26%,#fff 60%);border-radius:14px 14px 0 0}
+  .jc-override{border:1px dashed #fecdd3;border-radius:12px;background:#fff1f2}
+  .jc-override summary{color:#b91c1c;font-size:12px;font-weight:800;cursor:pointer;padding:10px 12px;list-style:none}
+  .jc-override summary::-webkit-details-marker{display:none}
+  .jc-override-body{padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}
+</style>
+<div class="mb-bento">
+  <div class="mb-main-col">
+    <section class="mb-side-card-white">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+        <a href="?allocation=all&service={{ service_filter|urlencode }}&q={{ query|urlencode }}" class="mb-btn-action {% if allocation_filter == 'all' %}lime{% else %}ghost{% endif %}" style="padding:6px 12px; font-size:12px;">Central Pool (All) · {{ allocation_counts.all|default:"0" }}</a>
+        <a href="?allocation=nurse&service={{ service_filter|urlencode }}&q={{ query|urlencode }}" class="mb-btn-action {% if allocation_filter == 'nurse' %}lime{% else %}ghost{% endif %}" style="padding:6px 12px; font-size:12px;">Awaiting Assessment · {{ allocation_counts.nurse|default:"0" }}</a>
+        <a href="?allocation=doctor&service={{ service_filter|urlencode }}&q={{ query|urlencode }}" class="mb-btn-action {% if allocation_filter == 'doctor' %}lime{% else %}ghost{% endif %}" style="padding:6px 12px; font-size:12px;">Doctor Allocation · {{ allocation_counts.doctor|default:"0" }}</a>
+        <a href="?allocation=services&service={{ service_filter|urlencode }}&q={{ query|urlencode }}" class="mb-btn-action {% if allocation_filter == 'services' %}lime{% else %}ghost{% endif %}" style="padding:6px 12px; font-size:12px;">Services · {{ allocation_counts.services|default:"0" }}</a>
+        <a href="?allocation=payment&service={{ service_filter|urlencode }}&q={{ query|urlencode }}" class="mb-btn-action {% if allocation_filter == 'payment' %}lime{% else %}ghost{% endif %}" style="padding:6px 12px; font-size:12px;">Payment pending · {{ allocation_counts.payment|default:"0" }}</a>
+      </div>
+      <form class="mb-filter-bar" method="get">
+        <input type="hidden" name="allocation" value="{{ allocation_filter }}">
+        <div class="mb-filter-search-wrap">
+          <input type="search" name="q" value="{{ query }}" placeholder="Search by name, UHID, visit" aria-label="Search patient queue">
+        </div>
+        <select name="service" aria-label="Filter by service">
+          <option value="all" {% if service_filter == "all" %}selected{% endif %}>All services</option>
+          <option value="laboratory" {% if service_filter == "laboratory" %}selected{% endif %}>Laboratory</option>
+          <option value="radiology" {% if service_filter == "radiology" %}selected{% endif %}>Radiology</option>
+          <option value="pharmacy" {% if service_filter == "pharmacy" %}selected{% endif %}>Pharmacy</option>
+          <option value="procedure" {% if service_filter == "procedure" %}selected{% endif %}>Procedure room</option>
+        </select>
+        <div class="mb-filter-actions">
+          <button class="mb-btn-action lime" type="submit">Filter</button>
+        </div>
+      </form>
+      {% if rows.object_list %}
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          {% for row in rows %}
+            <a class="mb-queue-row {% if selected.patient.pk == row.patient.pk %}active{% endif %}" href="?patient={{ row.patient.pk }}&q={{ query|urlencode }}" style="text-decoration:none;">
+              <div class="mb-q-left">
+                <span class="mb-q-idx">{{ row.patient.first_name|slice:":1" }}{{ row.patient.last_name|slice:":1" }}</span>
+                <div class="mb-q-info">
+                  <div class="mb-q-patient">{{ row.patient.full_name }}</div>
+                  <div class="mb-q-doc">{{ row.patient.uhid }} · {{ row.visit_number }} · {{ row.status }}</div>
+                </div>
+              </div>
+              <span class="mb-status-tag {{ row.status|slugify }}">{{ row.status }}</span>
+              {% if row.pre_visit_pending %}<span class="mb-status-tag" style="background:#fff1f2; color:#b91c1c;">Payment pending</span>
+              {% elif row.in_nurse_queue %}<span class="mb-status-tag" style="background:#fff7ed; color:#9a3412;">In assessment</span>
+              {% elif row.status == "Assessment" %}<span class="mb-status-tag" style="background:#eef8f2; color:#1e7048;">Awaiting assessment</span>
+              {% elif row.post_visit_pending %}<span class="mb-status-tag" style="background:#fff1f2; color:#b91c1c;">Cashier</span>
+              {% endif %}
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div style="padding:24px; text-align:center; color:var(--mb-text-muted);">Queue is clear. No visits match this search.</div>
+      {% endif %}
+    </section>
+  </div>
+  <aside class="mb-side-col">
+    <section class="mb-side-card-white">
+      {% if selected %}
+        <div class="jc-card">
+
+          <!-- 1. Identity strip -->
+          <div class="jc-id">
+            <div class="jc-avatar {% if selected.patient.is_emergency %}is-emergency{% endif %}">{{ selected.patient.first_name|slice:":1" }}{{ selected.patient.last_name|slice:":1" }}</div>
+            <div style="min-width:0; flex:1;">
+              <div class="jc-name-row">
+                <h2 class="jc-name">{{ selected.patient.full_name }}{% if selected.patient.is_demo %} <span class="mb-badge-soft">DEMO</span>{% endif %}</h2>
+                {% if selected.patient.is_emergency %}<span class="jc-badge red">Emergency</span>{% endif %}
+                {% if selected.patient.allergies %}<span class="jc-badge amber" title="Allergies: {{ selected.patient.allergies }}">⚠ Allergy</span>{% endif %}
+              </div>
+              <div class="jc-id-meta">
+                <button type="button" class="jc-uhid" data-copy="{{ selected.patient.uhid }}" title="Copy UHID to clipboard">{{ selected.patient.uhid|default:"No UHID" }} ⧉</button>
+                <span class="jc-dot">·</span>
+                <span>{{ selected.visit_number }}</span>
+                <span class="jc-dot">·</span>
+                <span>{{ selected.patient.age|default:"—" }}/{{ selected.patient.get_gender_display|default:"—" }}</span>
+              </div>
+              {% if selected.appointment %}
+                <div class="jc-appt">Appointment {{ selected.appointment.date|date:"j M" }} · {{ selected.appointment.start_time|date:"H:i" }}{% if selected.appointment.doctor %} · Dr. {{ selected.appointment.doctor.full_name }}{% else %} · doctor to be assigned{% endif %}</div>
+              {% endif %}
+              <div class="jc-wait-pill">
+                <span class="jc-pulse-dot"></span>
+                Waiting {{ selected.patient.created_at|timesince }}
+                {% if selected.assessment and selected.assessment.completed_at %} · assessed {{ selected.assessment.completed_at|timesince }} ago{% endif %}
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Journey rail -->
+          <div class="jc-rail {% if selected.status == 'Cancelled' %}is-cancelled{% endif %}">
+            {% for step in selected.journey %}
+              <div class="jc-step {{ step.state }}">
+                <span class="jc-node"></span>
+                <span class="jc-step-label">{{ step.label }}</span>
+                {% if step.state == "done" and step.time %}<span class="jc-step-time">{{ step.time|date:"H:i" }}</span>{% endif %}
+                {% if step.note %}<span class="jc-step-note" title="{{ step.note }}">{{ step.note }}</span>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+
+          <!-- 3. NOW action card -->
+          <div class="jc-now">
+            <div class="jc-now-head">
+              <span class="jc-now-kicker">Now</span>
+              {% if selected.pre_visit_pending %}
+                <strong>Collect the registration payment</strong>
+              {% elif selected.in_nurse_queue and not selected.consultation %}
+                <strong>Resume the initial assessment</strong>
+              {% elif selected.status == "Assessment" %}
+                <strong>Record the initial assessment</strong>
+              {% elif selected.needs_doctor %}
+                <strong>Initial assessment complete — awaiting doctor allocation</strong>
+              {% elif selected.consultation %}
+                <strong>Consultation {{ selected.consultation.get_status_display|lower }}</strong>
+              {% elif selected.status == "Completed" %}
+                <strong>Visit completed</strong>
+              {% else %}
+                <strong>{{ selected.status }} · {{ selected.location }}</strong>
+              {% endif %}
+            </div>
+
+            {% if selected.pre_visit_pending %}
+              <div class="jc-muted jc-red">
+                The pre-visit bill is collected at the Registration Desk — the initial assessment unlocks after payment.
+                {% if selected.patient.is_emergency %}<br>Emergency intake: payment may be collected later.{% endif %}
+              </div>
+              <div class="jc-muted">Billing: {{ selected.billing }} · {{ selected.payment_label }}</div>
+
+            {% elif selected.in_nurse_queue and not selected.consultation %}
+              <div class="jc-muted">
+                <strong style="color:#0f766e;">{{ selected.nurse_ticket.ticket_number }} · triage in progress</strong> —
+                {{ selected.nurse_ticket.get_status_display|lower }} · waiting {{ selected.nurse_ticket.wait_minutes }} min
+                {% if selected.nurse_ticket.claimed_by %} · in hand: {{ selected.nurse_ticket.claimed_by.get_full_name|default:selected.nurse_ticket.claimed_by.username }}{% endif %}
+                {% if selected.nurse_ticket.visit_note %} · “{{ selected.nurse_ticket.visit_note }}”{% endif %}
+              </div>
+              <div class="jc-secondary-row">
+                <a class="jc-ghost" href="{% url 'nurse_queue' %}">Open assessment queue</a>
+              </div>
+              <div class="jc-sticky">
+                <a class="jc-cta teal" href="{% url 'nurse_triage' %}?ticket={{ selected.nurse_ticket.pk }}">Resume assessment →</a>
+              </div>
+
+            {% elif selected.status == "Assessment" %}
+              <form method="post" action="{% url 'opd_send_to_nurse' %}" style="display:flex;flex-direction:column;gap:10px;">
+                {% csrf_token %}
+                <input type="hidden" name="patient_id" value="{{ selected.patient.pk }}">
+                {% if selected.appointment %}<input type="hidden" name="appointment_id" value="{{ selected.appointment.pk }}">{% endif %}
+                <div class="jc-pill-group" aria-label="Assessment priority">
+                  <label class="jc-pill"><input type="radio" name="priority" value="routine" checked><span>Routine</span></label>
+                  <label class="jc-pill"><input type="radio" name="priority" value="urgent"><span>Urgent</span></label>
+                  <label class="jc-pill is-red"><input type="radio" name="priority" value="emergency"><span>Emergency</span></label>
+                </div>
+                <div class="jc-sticky">
+                  <button type="submit" class="jc-cta">Record assessment →</button>
+                </div>
+              </form>
+
+            {% elif selected.needs_doctor %}
+              <div class="jc-chip-row">
+                {% for doctor in doctors|slice:":4" %}
+                  <form method="post" action="{% url 'assign_doctor' selected.patient.pk %}" class="jc-chip-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="doctor_id" value="{{ doctor.pk }}">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="jc-doc-chip" title="Assign Dr. {{ doctor.get_full_name|default:doctor.username }} to this visit">
+                      <span class="jc-doc-avatar">{{ doctor.first_name|slice:":1" }}{{ doctor.last_name|slice:":1" }}</span>
+                      <span class="jc-doc-info">
+                        <span class="jc-doc-name">Dr. {{ doctor.get_full_name|default:doctor.username }}</span>
+                        <span class="jc-doc-meta">{% if doctor.profile.specialty %}{{ doctor.profile.get_specialty_display }}{% else %}General Medicine{% endif %} · {{ doctor.patients_today }} today</span>
+                      </span>
+                    </button>
+                  </form>
+                {% endfor %}
+                {% if doctors|length > 4 %}
+                  <form method="post" action="{% url 'assign_doctor' selected.patient.pk %}" class="jc-chip-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <label class="jc-doc-more">
+                      <span class="jc-doc-avatar">＋</span>
+                      <select name="doctor_id" onchange="if(this.value) this.form.submit();">
+                        <option value="">More doctors…</option>
+                        {% for doctor in doctors|slice:"4:" %}
+                          <option value="{{ doctor.pk }}">Dr. {{ doctor.get_full_name|default:doctor.username }}</option>
+                        {% endfor %}
+                      </select>
+                    </label>
+                  </form>
+                {% endif %}
+              </div>
+              <div class="jc-hint">…or leave the visit in the pool — doctors pick up unassigned visits from their own consultation queue.</div>
+              <div class="jc-secondary-row">
+                <button type="button" class="jc-ghost recheck-assessment" data-patient="{{ selected.patient.pk }}" title="Send this visit back to the triage workstation for a repeat assessment">↺ Re-check assessment</button>
+                <a class="jc-ghost" href="{% url 'initial_assessment' %}?patient={{ selected.patient.pk }}">Review assessment</a>
+              </div>
+              <form method="post" action="{% url 'assign_doctor' selected.patient.pk %}" class="jc-sticky" style="display:flex;gap:8px;">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <select name="doctor_id" style="flex:1; padding:9px 12px; border-radius:12px; border:1.5px solid #dcdce2; font:inherit; font-size:12px;">
+                  <option value="">Assign a doctor…</option>
+                  {% for doctor in doctors %}
+                    <option value="{{ doctor.pk }}">Dr. {{ doctor.get_full_name|default:doctor.username }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="jc-cta" style="width:auto; padding:11px 18px;">Assign</button>
+              </form>
+
+            {% elif selected.doctor and selected.status == "Doctor Allocation" %}
+              <div class="jc-muted">
+                Assigned to <strong>Dr. {{ selected.doctor.get_full_name|default:selected.doctor.username }}</strong>
+                — the consultation starts from the doctor's desk.
+              </div>
+              <div class="jc-sticky">
+                <a class="jc-cta is-link" href="?allocation=services&q={{ query|urlencode }}">Track in service queues →</a>
+              </div>
+
+            {% elif selected.consultation %}
+              <div class="jc-muted">
+                {% if selected.consultation.doctor %}
+                  With <strong>Dr. {{ selected.consultation.doctor.get_full_name|default:selected.consultation.doctor.username }}</strong>
+                  since {{ selected.consultation.created_at|date:"H:i" }} —
+                {% endif %}
+                {{ selected.status }} · {{ selected.location }}.
+              </div>
+              {% if selected.consultation.status == "completed" %}
+                <div class="jc-muted">Billing: {{ selected.billing }} · {{ selected.payment_label }}</div>
+              {% endif %}
+              <div class="jc-sticky">
+                <a class="jc-cta is-link" href="?allocation=services&q={{ query|urlencode }}">Track in service queues →</a>
+              </div>
+
+            {% else %}
+              <div class="jc-muted">{{ selected.status }} · {{ selected.location }} — billing: {{ selected.billing }} · {{ selected.payment_label }}</div>
+              <div class="jc-sticky">
+                <a class="jc-cta is-link" href="?allocation=services&q={{ query|urlencode }}">Track in service queues →</a>
+              </div>
+            {% endif %}
+          </div>
+
+          <!-- Emergency override (kept compact) -->
+          {% if selected.patient.is_emergency %}
+            <details class="jc-override">
+              <summary>Emergency — allocate a doctor directly</summary>
+              <form class="jc-override-body" method="post" action="{% url 'assign_doctor' selected.patient.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <select name="doctor_id" style="padding:8px 12px; border-radius:10px; border:1px solid #fca5a5; font:inherit; font-size:12px;">
+                  <option value="">— Select doctor —</option>
+                  {% for doctor in doctors %}
+                    <option value="{{ doctor.pk }}">Dr. {{ doctor.get_full_name|default:doctor.username }}</option>
+                  {% endfor %}
+                </select>
+                <button class="jc-ghost" type="submit" style="border-color:#fca5a5; color:#b91c1c; justify-content:center;">Allocate directly to doctor</button>
+              </form>
+            </details>
+          {% endif %}
+
+          <!-- 4. Vitals snapshot -->
+          {% if selected.assessment %}
+            <div class="jc-vitals">
+              <div class="jc-vitals-head">
+                <span class="jc-vitals-title">Vitals &amp; triage score</span>
+                <span class="jc-score {{ selected.priority_band.label|slugify }}">
+                  <span class="jc-score-dot"></span>
+                  score {{ selected.priority_score }} · {{ selected.priority_band.label }}
+                </span>
+              </div>
+              <div class="jc-vitals-grid">
+                {% if selected.assessment.pulse %}<span class="jc-vital"><b>{{ selected.assessment.pulse }}</b> bpm</span>{% endif %}
+                {% if selected.assessment.bp_systolic %}<span class="jc-vital"><b>{{ selected.assessment.bp_systolic }}/{{ selected.assessment.bp_diastolic }}</b> BP</span>{% endif %}
+                {% if selected.assessment.spo2 %}<span class="jc-vital"><b>{{ selected.assessment.spo2 }}%</b> SpO₂</span>{% endif %}
+                {% if selected.assessment.temperature %}<span class="jc-vital"><b>{{ selected.assessment.temperature }}</b> °C</span>{% endif %}
+                {% if selected.assessment.rbs %}<span class="jc-vital"><b>{{ selected.assessment.rbs }}</b> RBS</span>{% endif %}
+                {% if selected.assessment.pain_score %}<span class="jc-vital"><b>{{ selected.assessment.pain_score }}</b> pain</span>{% endif %}
+              </div>
+              {% if selected.vitals_alerts %}
+                <div class="jc-vitals-alerts">
+                  {% for alert in selected.vitals_alerts %}<span>⚠ {{ alert }}</span>{% endfor %}
+                </div>
+              {% endif %}
+              <a class="jc-ghost" style="align-self:flex-start;" href="{% url 'initial_assessment' %}?patient={{ selected.patient.pk }}">Review assessment record</a>
+            </div>
+          {% endif %}
+
+          <!-- 5. Collapsible details -->
+          <div>
+            <details class="jc-details">
+              <summary>Published service reports ({{ selected_reports|length }})</summary>
+              <div class="jc-details-body">
+                <ul>
+                  {% for report in selected_reports %}
+                    <li><a href="{% url 'report_download' report.pk %}">{{ report.title }}</a> · {% if report.reviewed_at %}Reviewed{% else %}Awaiting doctor review{% endif %}</li>
+                  {% empty %}
+                    <li>No published reports yet.</li>
+                  {% endfor %}
+                </ul>
+                <a href="{% url 'service_reports' %}" style="font-weight:750; color:#553ccb; text-decoration:none;">Open report worklist →</a>
+              </div>
+            </details>
+            <details class="jc-details">
+              <summary>Visit activity</summary>
+              <div class="jc-details-body">
+                <ol>
+                  <li><time>{{ selected.patient.created_at|date:"H:i" }}</time> Visit registered</li>
+                  {% if selected.appointment %}<li><time>{{ selected.appointment.start_time|date:"H:i" }}</time> Appointment booked{% if selected.appointment.doctor %} · Dr. {{ selected.appointment.doctor.full_name }}{% else %} · Unassigned{% endif %}</li>{% endif %}
+                  {% if selected.assessment %}<li><time>{{ selected.assessment.updated_at|date:"H:i" }}</time> Initial assessment saved</li>{% endif %}
+                  {% if selected.consultation %}<li><time>{{ selected.consultation.updated_at|date:"H:i" }}</time> Consultation {{ selected.consultation.get_status_display|lower }}</li>{% for order in selected.consultation.orders.all %}<li><time>{{ order.created_at|date:"H:i" }}</time> {{ order.name }} · {{ order.status }}</li>{% endfor %}{% endif %}
+                </ol>
+              </div>
+            </details>
+          </div>
+
+        </div>
+      {% else %}
+        <div style="padding:24px; text-align:center; color:var(--mb-text-muted);">Select a visit to view details.</div>
+      {% endif %}
+    </section>
+  </aside>
 </div>
-{% else %}
-<div class="opd-service-grid">
-  {% if service == "pharmacy" %}
-  <section class="opd-panel">
-    <div class="opd-panel-head"><div><h2>Prescription queue</h2><p>{{ prescriptions.paginator.count }} medication items</p></div></div>
-    <form class="opd-queue-search" method="get"><label class="opd-search">Search medicine or patient<input type="search" name="q" value="{{ query }}" placeholder="Name, UHID, medication"></label><label>Status<select name="status"><option value="">All statuses</option><option value="ordered" {% if status_filter == "ordered" %}selected{% endif %}>Ordered</option><option value="partial" {% if status_filter == "partial" %}selected{% endif %}>Partially dispensed</option><option value="dispensed" {% if status_filter == "dispensed" %}selected{% endif %}>Dispensed</option><option value="unavailable" {% if status_filter == "unavailable" %}selected{% endif %}>Unavailable</option></select></label><button class="opd-button" type="submit">Filter</button></form>
-    {% if prescriptions.object_list %}<div class="opd-table-wrap"><table class="opd-flow-table"><thead><tr><th>Patient</th><th>Prescription item</th><th>Stock</th><th>Dispense</th><th>Payment</th><th>Action</th></tr></thead><tbody>{% for item in prescriptions %}<tr><td>{{ item.consultation.patient.full_name }}<small>{{ item.consultation.patient.uhid }} · {{ item.consultation.visit_token }}</small></td><td><strong>{{ item.medicine_name }}</strong><small>{{ item.dose }} · {{ item.route }} · {{ item.frequency }} · {{ item.duration }}{% if item.instructions %} · {{ item.instructions }}{% endif %}</small></td><td>{{ item.get_stock_status_display }}</td><td>{{ item.get_dispense_status_display }}<small>{{ item.dispensed_quantity }} dispensed</small></td><td>{% if item.payment_pending %}<span class="opd-alert">Awaiting payment</span>{% else %}Clear{% endif %}</td><td><a class="opd-row-action" href="?prescription={{ item.pk }}&q={{ query|urlencode }}">Open</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="opd-empty"><strong>No prescriptions in this queue</strong><p>Items will appear when a doctor writes a prescription.</p></div>{% endif %}
-  </section>
-  <section class="opd-panel opd-detail-panel">{% if selected_prescription %}<p class="opd-eyebrow">PHARMACY · {{ selected_prescription.consultation.visit_token }}</p><h2>{{ selected_prescription.medicine_name }}</h2><p><a href="{% url 'opd_patient_queue' %}?patient={{ selected_prescription.consultation.patient.pk }}">{{ selected_prescription.consultation.patient.full_name }} · {{ selected_prescription.consultation.patient.uhid }}</a></p><dl class="opd-facts"><dt>Dose</dt><dd>{{ selected_prescription.dose|default:"—" }}</dd><dt>Route</dt><dd>{{ selected_prescription.route }}</dd><dt>Frequency</dt><dd>{{ selected_prescription.frequency }}</dd><dt>Duration</dt><dd>{{ selected_prescription.duration }}</dd><dt>Instructions</dt><dd>{{ selected_prescription.instructions|default:"—" }}</dd><dt>Billing</dt><dd>{% if selected_prescription.payment_pending %}Awaiting payment{% else %}No pending bill{% endif %}</dd></dl>{% if selected_prescription.payment_pending %}<div class="opd-alert-box"><strong>Payment pending</strong><span>Full dispensing is blocked until billing is settled.</span></div>{% endif %}<form method="post" action="{% url 'opd_prescription_update' selected_prescription.pk %}" class="opd-order-form">{% csrf_token %}<label>Stock availability<select name="stock_status"><option value="available" {% if selected_prescription.stock_status == "available" %}selected{% endif %}>Available</option><option value="low" {% if selected_prescription.stock_status == "low" %}selected{% endif %}>Low stock</option><option value="unavailable" {% if selected_prescription.stock_status == "unavailable" %}selected{% endif %}>Unavailable</option></select></label><label>Dispense status<select name="dispense_status"><option value="ordered" {% if selected_prescription.dispense_status == "ordered" %}selected{% endif %}>Ordered</option><option value="partial" {% if selected_prescription.dispense_status == "partial" %}selected{% endif %}>Partially dispensed</option><option value="dispensed" {% if selected_prescription.dispense_status == "dispensed" %}selected{% endif %}>Dispensed</option><option value="unavailable" {% if selected_prescription.dispense_status == "unavailable" %}selected{% endif %}>Unavailable</option></select></label><label>Quantity dispensed<input type="number" name="dispensed_quantity" min="0" max="999" value="{{ selected_prescription.dispensed_quantity }}"></label><button class="opd-button" type="submit" onclick="return confirm('Save this dispense update?')">Save dispense update</button></form>{% else %}<div class="opd-empty"><strong>Select a prescription</strong><p>Medication details, stock, billing, and dispense controls appear here.</p></div>{% endif %}</section>
-  {% else %}
-  <section class="opd-panel">
-    <div class="opd-panel-head"><div><h2>Service orders</h2><p>{{ orders.paginator.count }} orders in this queue</p></div></div>
-    <form class="opd-queue-search" method="get"><label class="opd-search">Search order or patient<input type="search" name="q" value="{{ query }}" placeholder="Patient name, UHID, order"></label><label>Status<select name="status"><option value="">All statuses</option><option {% if status_filter == "Ordered" %}selected{% endif %}>Ordered</option><option {% if status_filter == "In Progress" %}selected{% endif %}>In Progress</option><option {% if status_filter == "Review Required" %}selected{% endif %}>Review Required</option><option {% if status_filter == "Completed" %}selected{% endif %}>Completed</option></select></label><button class="opd-button" type="submit">Filter</button></form>
-    {% if orders.object_list %}<div class="opd-table-wrap"><table class="opd-flow-table"><thead><tr><th>Patient / Visit</th><th>Service</th><th>Priority</th><th>Ordered by</th><th>Ordered</th><th>Status</th><th>Action</th></tr></thead><tbody>{% for order in orders %}<tr><td><strong>{{ order.consultation.patient.full_name }}</strong><small>{{ order.consultation.patient.uhid }} · {{ order.consultation.visit_token }}</small></td><td>{{ order.name }}<small>{{ order.get_order_type_display }}</small></td><td>{% if order.consultation.patient.is_emergency %}<span class="opd-alert">Urgent</span>{% else %}Routine{% endif %}</td><td>{% if order.consultation.doctor %}{{ order.consultation.doctor.get_full_name|default:order.consultation.doctor.username }}{% else %}—{% endif %}</td><td>{{ order.created_at|date:"j M, H:i" }}</td><td><span class="opd-status status-{{ order.status|slugify }}">{{ order.status }}</span></td><td><a class="opd-row-action" href="?order={{ order.pk }}&q={{ query|urlencode }}">Open</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="opd-empty"><strong>No service orders</strong><p>Orders will appear here when added to a consultation.</p></div>{% endif %}
-  </section>
-  <section class="opd-panel opd-detail-panel">
-    {% if selected_order %}<p class="opd-eyebrow">{{ selected_order.get_order_type_display }}</p><h2>{{ selected_order.name }}</h2><p><a href="{% url 'opd_patient_queue' %}?patient={{ selected_order.consultation.patient.pk }}">{{ selected_order.consultation.patient.full_name }} · {{ selected_order.consultation.visit_token }}</a></p>
-      {% if service == "radiology" or service == "cardiology" %}<div class="opd-preview-placeholder"><strong>Preview unavailable</strong><span>Demo workspace: no clinical image or tracing is attached.</span></div>{% endif %}
-      {% if service == "laboratory" %}<p class="opd-note">Enter results only from a verified laboratory report. Reference ranges and abnormal flags are not configured in this demo.</p>{% endif %}
-      <form method="post" action="{% url 'opd_order_update' selected_order.pk %}" class="opd-order-form">{% csrf_token %}<input type="hidden" name="service" value="{{ service }}"><label>Status<select name="status"><option {% if selected_order.status == "Ordered" %}selected{% endif %}>Ordered</option><option {% if selected_order.status == "In Progress" %}selected{% endif %}>In Progress</option><option {% if selected_order.status == "Review Required" %}selected{% endif %}>Review Required</option><option {% if selected_order.status == "Completed" %}selected{% endif %}>Completed</option><option {% if selected_order.status == "Cancelled" %}selected{% endif %}>Cancelled</option></select></label>
-        {% if service == "radiology" %}<label>Body part / study<input name="body_part" value="{{ selected_order.operational_details.body_part|default:selected_order.name }}" maxlength="255"></label><label>Preparation status<select name="preparation_status"><option value="not-required">Not required</option><option value="pending" {% if selected_order.operational_details.preparation_status == "pending" %}selected{% endif %}>Pending</option><option value="complete" {% if selected_order.operational_details.preparation_status == "complete" %}selected{% endif %}>Complete</option></select></label><label>Preparation notes<input name="preparation_note" value="{{ selected_order.operational_details.preparation_note }}" maxlength="255"></label>{% endif %}
-        {% if service == "laboratory" %}<label>Specimen / collection status<select name="specimen_status"><option value="not-collected">Not collected</option><option value="collected" {% if selected_order.operational_details.specimen_status == "collected" %}selected{% endif %}>Collected</option><option value="received" {% if selected_order.operational_details.specimen_status == "received" %}selected{% endif %}>Received by lab</option></select></label>{% endif %}
-        {% if service == "cardiology" %}<label>ECG acquisition status<select name="acquisition_status"><option value="pending">Pending</option><option value="acquired" {% if selected_order.operational_details.acquisition_status == "acquired" %}selected{% endif %}>Acquired</option></select></label>{% endif %}
-        {% if service == "physiotherapy" or service == "counselling" %}<label>Session date and time<input type="datetime-local" name="session_datetime" value="{{ selected_order.operational_details.session_datetime }}"></label>{% endif %}
-        {% if service == "procedure-room" %}<label>Assigned room<input name="room" value="{{ selected_order.operational_details.room }}" maxlength="255"></label><label>Assigned staff<input name="assigned_staff" value="{{ selected_order.operational_details.assigned_staff }}" maxlength="255"></label><label class="opd-check"><input type="checkbox" name="consent_confirmed" {% if selected_order.operational_details.consent_confirmed %}checked{% endif %}> Consent confirmed</label><label class="opd-check"><input type="checkbox" name="preparation_complete" {% if selected_order.operational_details.preparation_complete %}checked{% endif %}> Preparation checklist complete</label><label>Post-procedure instructions<input name="post_instructions" value="{{ selected_order.operational_details.post_instructions }}" maxlength="255"></label>{% endif %}
-        {% if service != "counselling" %}<label>{% if service == "cardiology" %}Interpretation / result{% elif service == "physiotherapy" %}Progress notes{% else %}Result / operational note{% endif %}<textarea name="result_summary" rows="4" maxlength="255">{{ selected_order.result_summary }}</textarea></label>{% else %}<p class="opd-note">Counselling notes are restricted to the destination clinician and are not shown in the OPD Assistant queue.</p>{% endif %}
-        <button class="opd-button" type="submit" onclick="return confirm('Update this service order?')">Save order update</button></form>
-      <a class="opd-text-link" href="{% url 'opd_patient_queue' %}?patient={{ selected_order.consultation.patient.pk }}">Return to patient queue</a>
-    {% else %}<div class="opd-empty"><strong>Select an order</strong><p>Order details and available actions appear here.</p></div>{% endif %}
-  </section>
-  {% endif %}
-</div>
+<script>
+  // Re-check assessment: reopen the visit's triage ticket and jump straight
+  // into the workstation (it auto-claims the reopened ticket).
+  (function () {
+    document.querySelectorAll(".recheck-assessment").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        if (!confirm("Send this visit back for a repeat assessment?")) return;
+        btn.disabled = true;
+        fetch("{% url 'initial_assessment_requeue' %}", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token }}",
+          },
+          body: JSON.stringify({
+            patient_id: btn.getAttribute("data-patient"),
+            reason: "Re-assessment requested from the OPD Desk",
+          }),
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.ok) {
+              window.location.href = "{% url 'nurse_triage' %}?ticket=" + data.ticket_id;
+            } else {
+              alert(data.error || "Could not reopen the assessment.");
+              btn.disabled = false;
+            }
+          })
+          .catch(function () { btn.disabled = false; });
+      });
+    });
+  })();
+  (function () {
+    // Copy UHID: one tap puts the number on the clipboard for billing/search.
+    document.querySelectorAll(".jc-uhid[data-copy]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var value = btn.getAttribute("data-copy") || "";
+        var done = function () {
+          var old = btn.innerHTML;
+          btn.innerHTML = "Copied ✓";
+          setTimeout(function () { btn.innerHTML = old; }, 1200);
+        };
+        if (!value) { done(); return; }
+        // Optimistic feedback first — clipboard permission prompts can hang.
+        done();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(value).catch(function () {});
+        } else {
+          var input = document.createElement("textarea");
+          input.value = value;
+          document.body.appendChild(input);
+          input.select();
+          try { document.execCommand("copy"); } catch (e) {}
+          document.body.removeChild(input);
+        }
+      });
+    });
+  })();
+</script>
 {% endif %}
 {% endblock %}

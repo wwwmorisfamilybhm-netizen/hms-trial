@@ -239,10 +239,50 @@ class PatientRegistrationForm(forms.ModelForm):
         return patient
 
 
+class PatientEditForm(PatientRegistrationForm):
+    photo = forms.ImageField(label="Patient photo", required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["photo"].widget.template_name = "patients/widgets/edit_photo.html"
+        self.fields["date_of_birth"].widget.format = "%Y-%m-%d"
+        for part in ("years", "months", "days"):
+            field = self.fields[f"age_{part}"]
+            field.label = part.title()
+            field.initial = None
+
+        for name, label in (
+            ("second_name", "Middle name"),
+            ("marital_status", "Marital status"),
+            ("phone", "Phone number"),
+            ("care_of", "Care of (C/O)"),
+            ("aadhar_no", "Aadhaar number"),
+            ("abha_no", "ABHA number"),
+            ("pin_code", "PIN code"),
+            ("patient_category", "Patient category"),
+            ("billing_type", "Billing type"),
+            ("payment_type", "Payment method"),
+            ("reg_fee", "Registration fee (₹)"),
+            ("con_fee", "Consultation fee (₹)"),
+            ("discount", "Discount (₹)"),
+            ("reference_no", "Reference number"),
+            ("mlc", "Medico-legal case (MLC)"),
+        ):
+            self.fields[name].label = label
+        self.fields["phone"].widget.attrs["inputmode"] = "tel"
+        self.fields["reg_fee"].help_text = "Amount recorded at registration."
+
+        # Keep the saved category selectable even if its configuration was deleted.
+        category = self.fields["patient_category"]
+        code = self.instance.patient_category
+        if code and not category.valid_value(code):
+            category.choices = [*category.choices, (code, code)]
+
+
 class EmergencyRegistrationForm(forms.Form):
     """Fast emergency intake form.
 
-    Captures only the essentials (name, age, sex, MR number) so the patient can
+    Captures only the essentials (name, age, sex, UHID) so the patient can
     be seen immediately. The remaining registration details are completed later
     by editing the record from History. Payment is always left pending and is
     collected afterwards from the Bill Command Center.
@@ -251,14 +291,14 @@ class EmergencyRegistrationForm(forms.Form):
     name = forms.CharField(max_length=200, label="Patient Name")
     age_years = forms.IntegerField(min_value=0, max_value=130, label="Age (Years)")
     gender = forms.ChoiceField(choices=Patient.Gender.choices, label="Sex")
-    mr_number = forms.CharField(max_length=20, label="MR Number", required=False)
+    uhid = forms.CharField(max_length=20, label="UHID", required=False)
 
     def __init__(self, *args, **kwargs):
         next_mr = kwargs.pop("next_mr", None)
         super().__init__(*args, **kwargs)
         self.fields["gender"].choices = [("", "Select Sex…")] + list(Patient.Gender.choices)
         if next_mr and not self.is_bound:
-            self.fields["mr_number"].initial = str(next_mr)
+            self.fields["uhid"].initial = str(next_mr)
 
     def clean_name(self):
         name = self.cleaned_data["name"].strip()
@@ -266,11 +306,11 @@ class EmergencyRegistrationForm(forms.Form):
             raise ValidationError("Enter the patient's name.")
         return name
 
-    def clean_mr_number(self):
-        mr_number = self.cleaned_data["mr_number"].strip()
-        if mr_number and Patient.objects.filter(mr_number=mr_number).exists():
-            raise ValidationError("This MR number is already assigned to another patient.")
-        return mr_number
+    def clean_uhid(self):
+        uhid = self.cleaned_data["uhid"].strip()
+        if uhid and Patient.objects.filter(uhid=uhid).exists():
+            raise ValidationError("This UHID is already assigned to another patient.")
+        return uhid
 
     def clean(self):
         cleaned = super().clean()

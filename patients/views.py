@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import PatientBillForm, PatientForm, PatientRegistrationForm
+from .forms import PatientBillForm, PatientEditForm, PatientForm
 from .models import Patient, PatientBill
 
 
@@ -17,7 +17,7 @@ def patient_list(request):
             Q(first_name__icontains=query)
             | Q(second_name__icontains=query)
             | Q(last_name__icontains=query)
-            | Q(mr_number__icontains=query)
+            | Q(uhid__icontains=query)
             | Q(care_of__icontains=query)
             | Q(phone__icontains=query)
             | Q(aadhar_no__icontains=query)
@@ -68,6 +68,18 @@ def patient_push_bill(request, pk):
         bill.patient = patient
         bill.source = PatientBill.Source.DOCTOR
         bill.created_by = request.user
+        from .models import ConsultationSession
+        bill.consultation = (
+            patient.consultations.filter(
+                status__in=[
+                    ConsultationSession.Status.DRAFT,
+                    ConsultationSession.Status.IN_PROGRESS,
+                    ConsultationSession.Status.COMPLETED,
+                ]
+            )
+            .order_by("-created_at")
+            .first()
+        )
         bill.save()
         messages.success(request, f"Pending bill {bill.bill_number} sent to Bill Command Center.")
     else:
@@ -101,20 +113,23 @@ def patient_create(request):
 def patient_edit(request, pk):
     """Edit a registered patient's full record."""
     patient = get_object_or_404(Patient, pk=pk)
+    saved_name = " ".join(filter(None, (patient.first_name, patient.second_name, patient.last_name)))
+    saved_initials = patient.first_name[:1] + patient.last_name[:1]
     if request.method == "POST":
-        form = PatientRegistrationForm(request.POST, request.FILES, instance=patient)
+        form = PatientEditForm(request.POST, request.FILES, instance=patient)
         if form.is_valid():
             form.save()
             messages.success(request, f"Patient {patient.full_name} updated.")
             return redirect("patient_detail", pk=patient.pk)
     else:
-        form = PatientRegistrationForm(instance=patient)
+        form = PatientEditForm(instance=patient)
     context = {
         "form": form,
-        "title": f"Edit patient — {patient.full_name}",
         "patient": patient,
+        "saved_name": saved_name,
+        "saved_initials": saved_initials,
     }
-    return render(request, "patients/patient_form.html", context)
+    return render(request, "patients/patient_edit.html", context)
 
 
 @login_required(login_url="login")
@@ -136,8 +151,13 @@ def patient_delete(request, pk):
                 "Incorrect password. Deletion cancelled — the patient record is unchanged.",
             )
         else:
-            label = f"{patient.full_name} (MR #{patient.mr_number or patient.id})"
-            patient.delete()
+            label = f"{patient.full_name} (UHID #{patient.uhid or patient.id})"
+            from django.db.models.deletion import ProtectedError
+            try:
+                patient.delete()
+            except ProtectedError:
+                messages.error(request, "This patient has pharmacy issues or service reports that must be retained. The record was not deleted.")
+                return redirect("patient_detail", pk=patient.pk)
             messages.success(request, f"Patient record {label} was permanently deleted.")
             return redirect("history")
 

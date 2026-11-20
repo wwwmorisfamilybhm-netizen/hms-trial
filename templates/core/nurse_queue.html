@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Assessment Queue — OPD Desk{% endblock %}
+
+{% block heading %}
+<div class="np-head">
+  <div>
+    <div class="np-kicker">OPD Desk · Assessment Queue</div>
+    <h1 class="np-title">Assessment Queue</h1>
+    <p class="np-sub">Every visit waiting for or in initial assessment, ordered emergency first, then urgent, then by arrival.</p>
+  </div>
+  <div class="np-head-actions">
+    <a href="{% url 'opd_assistant_dashboard' %}" class="np-btn">← OPD Desk</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="np-kpis">
+  <div class="np-kpi"><div class="np-kpi-label">Open</div><div class="np-kpi-value">{{ counts.open }}</div><div class="np-kpi-note">Waiting / in progress</div></div>
+  <div class="np-kpi"><div class="np-kpi-label">Waiting</div><div class="np-kpi-value">{{ counts.waiting }}</div><div class="np-kpi-note">Not yet claimed</div></div>
+  <div class="np-kpi urgent"><div class="np-kpi-label">Urgent</div><div class="np-kpi-value">{{ counts.emergency }}</div><div class="np-kpi-note">Emergency + urgent</div></div>
+  <div class="np-kpi done"><div class="np-kpi-label">Completed today</div><div class="np-kpi-value">{{ counts.completed_today }}</div><div class="np-kpi-note">Returned to OPD Desk</div></div>
+</div>
+
+<form class="np-filter" method="get">
+  <div class="np-filter-search">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <input type="search" name="q" value="{{ query }}" placeholder="Search name, UHID, phone or ticket…" aria-label="Search triage queue">
+  </div>
+  <select name="status" aria-label="Status filter">
+    <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open visits</option>
+    <option value="waiting" {% if status_filter == 'waiting' %}selected{% endif %}>Waiting</option>
+    <option value="in_assessment" {% if status_filter == 'in_assessment' %}selected{% endif %}>In assessment</option>
+    <option value="recalled" {% if status_filter == 'recalled' %}selected{% endif %}>Recalled</option>
+    <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+    <option value="today" {% if status_filter == 'today' %}selected{% endif %}>All today</option>
+  </select>
+  <select name="priority" aria-label="Priority filter">
+    <option value="">Any priority</option>
+    <option value="emergency" {% if priority_filter == 'emergency' %}selected{% endif %}>Emergency</option>
+    <option value="urgent" {% if priority_filter == 'urgent' %}selected{% endif %}>Urgent</option>
+    <option value="routine" {% if priority_filter == 'routine' %}selected{% endif %}>Routine</option>
+  </select>
+  <button type="submit" class="np-btn sm primary">Apply</button>
+</form>
+
+<section class="np-card">
+  {% if tickets %}
+    <div class="np-queue">
+      {% for ticket in tickets %}
+        <div class="np-qcard {% if ticket.priority == 'emergency' %}is-emergency{% elif ticket.priority == 'urgent' %}is-urgent{% elif ticket.status == 'in_assessment' %}is-active{% endif %} {% if ticket.claimed_by_id == user.pk %}is-mine{% endif %}">
+          <div class="np-qtoken">
+            {{ ticket.ticket_number }}
+            <small>{% if ticket.status == 'waiting' %}{{ ticket.wait_minutes }} min{% else %}{{ ticket.sent_at|date:"H:i" }}{% endif %}</small>
+          </div>
+          <div class="np-qmain">
+            <div class="np-qname">
+              {{ ticket.patient.full_name }}
+              <span class="np-badge {{ ticket.priority }}">{{ ticket.get_priority_display }}</span>
+              <span class="np-badge {% if ticket.status == 'completed' %}routine{% elif ticket.status == 'in_assessment' %}teal{% else %}muted{% endif %}">{{ ticket.get_status_display }}</span>
+            </div>
+            <div class="np-qmeta">
+              <span>{{ ticket.patient.uhid|default:"No UHID" }}</span>
+              <span>{{ ticket.patient.age|default:"—" }} yrs · {{ ticket.patient.get_gender_display|default:"—" }}</span>
+              <span>Sent {{ ticket.sent_at|timesince }} ago</span>
+              {% if ticket.claimed_by %}<span>By: {{ ticket.claimed_by.get_full_name|default:ticket.claimed_by.username }}</span>{% endif %}
+            </div>
+            {% if ticket.visit_note %}<div class="np-qnote">“{{ ticket.visit_note }}”</div>{% endif %}
+            {% if ticket.patient.allergies %}<div class="np-qnote" style="color:#b91c1c;">⚠ Allergies: {{ ticket.patient.allergies }}</div>{% endif %}
+          </div>
+          <div class="np-qactions">
+            {% if ticket.status == 'waiting' or ticket.status == 'recalled' %}
+              <form method="post" action="{% url 'nurse_claim_ticket' ticket.pk %}">
+                {% csrf_token %}<button type="submit" class="np-btn sm primary">Claim</button>
+              </form>
+              <a class="np-btn sm lime" href="{% url 'nurse_triage' %}?ticket={{ ticket.pk }}">Assess →</a>
+            {% elif ticket.status == 'in_assessment' %}
+              <a class="np-btn sm primary" href="{% url 'nurse_triage' %}?ticket={{ ticket.pk }}">Continue</a>
+            {% elif ticket.status == 'completed' %}
+              <a class="np-btn sm" href="{% url 'nurse_triage' %}?ticket={{ ticket.pk }}">Review</a>
+              <form method="post" action="{% url 'nurse_recall_ticket' ticket.pk %}">
+                {% csrf_token %}<button type="submit" class="np-btn sm">Recall</button>
+              </form>
+            {% endif %}
+            {% if ticket.is_open %}
+              <form method="post" action="{% url 'nurse_cancel_ticket' ticket.pk %}" onsubmit="return confirm('Cancel this triage ticket?');">
+                {% csrf_token %}
+                <input type="hidden" name="reason" value="Cancelled from queue">
+                <button type="submit" class="np-btn sm danger">Cancel</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="np-empty">No tickets match this filter.</div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Visit bill {{ consultation.visit_token }} — Cams HMS{% endblock %}
+
+{% block heading %}
+<div class="page-head" style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+  <div>
+    <h1>Visit bill</h1>
+    <p class="page-sub">{{ patient.full_name }} · {{ consultation.visit_token }} · {{ consultation.updated_at|date:"d M Y, h:i A" }}</p>
+  </div>
+  <div style="display:flex; gap:9px; flex-wrap:wrap;">
+    <a href="{% url 'post_consultation_billing' %}" class="btn btn-outline">← Billing queue</a>
+    {% if paid_bills %}<a href="{% url 'visit_billing_slip' consultation.pk %}" class="btn btn-outline">Print payment slip</a>{% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid; grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr); gap:18px; align-items:start;" class="visit-billing-layout">
+  <div style="display:grid; gap:18px; min-width:0;">
+    <section class="card" style="border-radius:22px; padding:22px;">
+      <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+        <div>
+          <p style="margin:0 0 5px; font-size:11px; letter-spacing:1px; font-weight:800; color:var(--muted);">PATIENT & VISIT</p>
+          <h2 style="margin:0; font-size:20px;">{{ patient.full_name }}</h2>
+          <p style="margin:5px 0 0; color:var(--muted); font-size:13px;">UHID #{{ patient.uhid|default:patient.pk }} · {{ patient.age|default:"—" }} yrs · {{ patient.get_gender_display|default:"—" }}</p>
+        </div>
+        <div style="text-align:right; color:var(--muted); font-size:12.5px;">
+          <div>Consultant: <strong style="color:var(--ink);">{% if doctor %}{{ doctor.get_full_name|default:doctor.username }}{% else %}—{% endif %}</strong></div>
+          <div>Appointment: {% if consultation.appointment %}{{ consultation.appointment.date|date:"d M Y" }} · {{ consultation.appointment.start_time|date:"H:i" }}{% else %}—{% endif %}</div>
+        </div>
+      </div>
+
+      <h3 style="font-size:14px; margin:0 0 10px;">Pending charges</h3>
+      {% if pending_bills %}
+      <div style="display:grid; gap:8px;">
+        {% for bill in pending_bills %}
+        <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start; padding:12px 14px; border:1px solid var(--line); border-radius:13px; background:#fffdf5;">
+          <span>
+            <strong>{{ bill.description }}</strong>
+            <small style="display:block; color:var(--muted); margin-top:3px;">{{ bill.get_source_display }} · {{ bill.bill_number }}</small>
+          </span>
+          <strong style="white-space:nowrap;">₹{{ bill.amount_due|floatformat:2 }}</strong>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p style="color:var(--muted); margin:0;">No pending charges. This visit is fully paid.</p>
+      {% endif %}
+
+      {% if service_orders %}
+      <h3 style="font-size:14px; margin:22px 0 10px;">Service orders</h3>
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+          <thead><tr style="text-align:left; color:var(--muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.5px;"><th style="padding:7px 8px;">Service</th><th style="padding:7px 8px;">Department</th><th style="padding:7px 8px;">Status</th><th style="padding:7px 8px; text-align:right;">Price</th></tr></thead>
+          <tbody>
+            {% for order in service_orders %}
+            <tr style="border-top:1px solid var(--line);">
+              <td style="padding:8px;">{{ order.name }}</td>
+              <td style="padding:8px; color:var(--muted);">{{ order.department.name|default:"—" }}</td>
+              <td style="padding:8px;">{% if order.bill and order.bill.status == 'paid' %}Paid · released{% elif order.bill and order.bill.status == 'pending' %}Awaiting payment{% elif order.bill and order.bill.status == 'cancelled' %}Cancelled{% else %}No charge{% endif %}</td>
+              <td style="padding:8px; text-align:right;">₹{{ order.price|default:0|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      {% if pharmacy_issues %}
+      <h3 style="font-size:14px; margin:22px 0 10px;">Pharmacy</h3>
+      {% for issue in pharmacy_issues %}
+      <div style="border:1px solid var(--line); border-radius:13px; padding:12px 14px; margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <strong>Issue #{{ issue.pk }} · {{ issue.get_status_display }}</strong>
+          <span>{% if issue.bill.status == 'paid' %}Paid{% elif issue.bill.status == 'pending' %}Awaiting payment{% else %}{{ issue.bill.get_status_display }}{% endif %} · ₹{{ issue.bill.amount_due|floatformat:2 }}</span>
+        </div>
+        <ul style="margin:8px 0 0; padding-left:18px; color:var(--muted); font-size:12.5px;">
+          {% for line in issue.lines.all %}<li>{{ line.medicine_name }} × {{ line.quantity }} · ₹{{ line.total|floatformat:2 }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if released_prescriptions %}
+      <h3 style="font-size:14px; margin:22px 0 10px;">Prescription awaiting pharmacy pricing</h3>
+      <div style="border:1px solid #fed7aa; background:#fff7ed; border-radius:13px; padding:12px 14px;">
+        <p style="margin:0 0 8px; color:#9a3412; font-size:12.5px; font-weight:650;">Pharmacy has not prepared the priced issue yet. The cashier can collect service charges now and this visit will remain in the billing queue for the pharmacy bill.</p>
+        <ul style="margin:0; padding-left:18px; color:#7c2d12; font-size:12.5px;">
+          {% for rx in released_prescriptions %}
+          <li>{{ rx.medicine_name }}{% if rx.prescribed_quantity %} · {{ rx.prescribed_quantity }} units{% endif %}{% if rx.dose %} · {{ rx.dose }}{% endif %} · {{ rx.frequency }} · {{ rx.duration }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <aside style="display:grid; gap:18px; position:sticky; top:96px;" class="visit-billing-side">
+    <section class="card" style="border-radius:22px; padding:22px; background:#f7f5ff; border-color:#ddd6fe;">
+      <p style="margin:0; font-size:11px; letter-spacing:1px; font-weight:800; color:#6352b5;">AMOUNT TO COLLECT</p>
+      <div style="font-size:34px; font-weight:800; letter-spacing:-1px; margin:6px 0 2px;">₹{{ pending_total|floatformat:2 }}</div>
+      <p style="margin:0; color:var(--muted); font-size:12.5px;">{{ pending_bills|length }} pending bill{{ pending_bills|length|pluralize }}</p>
+
+      {% if pending_bills %}
+      <form method="post" action="{% url 'visit_billing_pay' consultation.pk %}" style="display:grid; gap:11px; margin-top:18px;">
+        {% csrf_token %}
+        <label style="display:grid; gap:5px; font-size:12px; font-weight:700;">Payment method
+          <select name="payment_method" style="padding:10px 12px; border:1px solid #dcdce2; border-radius:10px; font:inherit;">
+            {% for value, label in payment_methods %}<option value="{{ value }}" {% if value == 'cash' %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </label>
+        <label style="display:grid; gap:5px; font-size:12px; font-weight:700;">Reference / receipt no. (optional)
+          <input type="text" name="payment_reference" placeholder="UPI ref, card slip, credit note…" style="padding:10px 12px; border:1px solid #dcdce2; border-radius:10px; font:inherit;">
+        </label>
+        <button type="submit" class="btn" style="background:#16a34a; color:#fff; border:none; font-weight:800; padding:12px 16px;">Collect payment &amp; release work</button>
+        <p style="margin:0; color:var(--muted); font-size:11.5px; line-height:1.5;">Paying releases service orders to the service desks and pharmacy issues to the pharmacy handover queue.</p>
+      </form>
+      {% else %}
+      <p style="margin:16px 0 0; color:#15803d; font-weight:700;">Fully paid. Work has been released to the respective desks.</p>
+      {% endif %}
+    </section>
+
+    {% if paid_bills %}
+    <section class="card" style="border-radius:22px; padding:20px;">
+      <h3 style="font-size:14px; margin:0 0 10px;">Paid on this visit</h3>
+      <div style="display:grid; gap:8px;">
+        {% for bill in paid_bills %}
+        <div style="display:flex; justify-content:space-between; gap:10px; font-size:12.5px; padding-bottom:8px; border-bottom:1px solid var(--line);">
+          <span><strong>{{ bill.description }}</strong><small style="display:block; color:var(--muted);">{{ bill.get_source_display }} · {{ bill.paid_at|date:"d M, H:i" }}{% if bill.paid_by %} · {{ bill.paid_by.get_full_name|default:bill.paid_by.username }}{% endif %}</small></span>
+          <strong>₹{{ bill.amount_due|floatformat:2 }}</strong>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+  </aside>
+</div>
+
+<style>
+  @media (max-width: 900px) {
+    .visit-billing-layout { grid-template-columns: 1fr !important; }
+    .visit-billing-side { position: static !important; }
+  }
+</style>
+{% endblock %}

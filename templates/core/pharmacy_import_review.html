@@ -1,0 +1,34 @@
+{% extends "core/pharmacy_base.html" %}
+{% load static %}
+{% block operations_content %}
+<a class="ph-back" href="{% url 'pharmacy_import' %}">← Imports</a>
+<div class="ph-import-layout">
+<div>
+<section class="ph-panel"><h2>{{ draft.filename }}</h2><p>{{ draft.get_kind_display }} · {{ draft.raw_rows|length }} extracted rows.</p>
+<details {% if not draft.rows %}open{% endif %}><summary>Map file columns and defaults</summary>
+<form method="post">{% csrf_token %}<input type="hidden" name="revision" value="{{ draft.revision }}">
+<p>Choose the column for each field. Defaults fill fields that have no mapped column. Use YYYY-MM-DD for dates. Enter an existing medicine’s exact name and product details to match it.</p>
+<div class="ph-map-fields">{% for field in mapping %}{% include "core/pharmacy_field.html" %}{% endfor %}</div>
+<button class="np-btn" name="action" value="map">Apply mapping &amp; reset review rows</button></form></details></section>
+{% if draft.rows %}
+<section class="ph-panel ph-follow">
+<h2>Review medicine rows</h2><p>Save this page before moving to another page. “Import selected rows” validates and commits selected rows across every page together.</p>
+{% if error_links %}<div class="ops-warning" role="alert">Correct rows {% for item in error_links %}<a href="{% querystring page=item.page %}#row-{{ item.row }}">{{ item.row }}</a>{% if not forloop.last %}, {% endif %}{% endfor %} before importing.</div>{% endif %}
+<form method="post">{% csrf_token %}<input type="hidden" name="revision" value="{{ draft.revision }}">
+{% for number,form,errors in row_forms %}
+<details class="ph-import-row" {% if draft.kind == 'stock' %}data-import-row{% endif %} id="row-{{ number }}" {% if errors or forloop.first %}open{% endif %}><summary>Row {{ number }} · {{ form.initial.name|default:"Medicine details needed" }}</summary>
+{% if errors %}<ul class="errorlist" role="alert">{% for name,items in errors.items %}{% for error in items %}<li>{{ name }} — {{ error.message }}</li>{% endfor %}{% endfor %}</ul>{% endif %}
+<div class="ph-map-fields">{% for field in form %}{% include "core/pharmacy_field.html" %}{% endfor %}</div>
+{% if draft.kind == 'stock' %}<output class="ph-balance" data-conversion aria-live="polite"></output><p class="ph-note">Dispensing units = quantity × pack size for packs, or the entered quantity for units. Prices per pack are divided by pack size and rounded to two decimal places.</p>{% endif %}
+</details>{% endfor %}
+<div class="ops-actions ph-follow"><button class="np-btn" name="action" value="save">Save this page</button><button class="np-btn teal" name="action" value="commit">Import selected rows</button></div></form>
+{% include "core/pharmacy_pagination.html" %}
+</section>{% endif %}
+</div>
+<aside class="ph-panel ph-source"><h2>Source document</h2><p><a target="_blank" rel="noopener" href="{% url 'pharmacy_import_source' draft.pk %}">Download original</a></p>
+{% if preview_type == '.pdf' %}<iframe class="ph-document" title="Original supplier document" sandbox src="{% url 'pharmacy_import_source' draft.pk %}?inline=1"></iframe>{% elif preview_type == '.png' or preview_type == '.jpg' or preview_type == '.jpeg' %}<img class="ph-document" alt="Original invoice" src="{% url 'pharmacy_import_source' draft.pk %}?inline=1">{% endif %}
+<div class="ops-scroll"><table class="ops-table"><caption>First five extracted rows</caption><thead><tr>{% for column in columns %}<th>{{ column }}</th>{% endfor %}</tr></thead><tbody>{% for row in preview %}<tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div></aside>
+</div>
+{% endblock %}
+
+{% block tail_scripts %}<script src="{% static 'js/pharmacy.js' %}"></script>{% endblock %}

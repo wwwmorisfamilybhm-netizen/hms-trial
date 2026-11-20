@@ -2,16 +2,18 @@ from django import forms
 from django.contrib.auth.models import User
 
 from .models import UserProfile
+from patients.models import ServiceDepartment
 
 
 class StaffAccountForm(forms.ModelForm):
-    """Create a staff login account (doctor / nurse / desk / admin) with a photo.
+    """Create a staff login account (doctor / OPD / desk / admin) with a photo.
 
     Used by the admin console to provision new users with an image, name,
     designation, and a login password.
     """
 
     first_name = forms.CharField(max_length=150, label="First name")
+    service_departments = forms.ModelMultipleChoiceField(queryset=ServiceDepartment.objects.all(), required=False, widget=forms.CheckboxSelectMultiple, help_text="Service Staff can access only these departments.")
     last_name = forms.CharField(max_length=150, required=False, label="Last name")
     email = forms.EmailField(required=False, label="Email")
     username = forms.CharField(max_length=150, label="Username")
@@ -54,11 +56,12 @@ class StaffAccountForm(forms.ModelForm):
                 self.fields["designation"].initial = profile.designation
                 self.fields["specialty"].initial = profile.specialty
                 self.fields["photo"].initial = profile.photo
+                self.fields["service_departments"].initial = profile.service_departments.all()
 
         # Order the visible fields sensibly.
         self.order_fields([
             "photo", "first_name", "last_name", "username",
-            "email", "designation", "specialty", "password",
+            "email", "designation", "service_departments", "specialty", "password",
         ])
 
     def clean_username(self):
@@ -101,5 +104,6 @@ class StaffAccountForm(forms.ModelForm):
             if photo:
                 profile.photo = photo
             profile.save()
+            profile.service_departments.set(self.cleaned_data.get("service_departments", []) if profile.designation == UserProfile.Designation.SERVICE_STAFF else [])
             self.save_m2m()
         return user

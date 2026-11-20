@@ -1,0 +1,45 @@
+{% extends "core/pharmacy_base.html" %}
+{% load static %}
+{% block operations_content %}
+<div class="ops-actions ph-back"><a href="{% url 'medicine_catalogue' %}">← Medicine catalogue</a>{% if import_draft %}<a href="{% url 'pharmacy_import_review' import_draft.pk %}">← Imported medicines</a>{% endif %}<a href="{% url 'medicine_edit' medicine.pk %}">Edit medicine details</a></div>
+<section class="ph-panel">
+<h2>{{ medicine.name }}</h2><p>{{ medicine.strength }} · {{ medicine.form }} · {{ medicine.manufacturer|default:"Manufacturer unspecified" }} · {{ medicine.pack_size }} {{ medicine.unit }} per pack{% if medicine.barcode %} · {{ medicine.barcode }}{% endif %}</p>
+{% if error %}<p class="ops-warning" role="alert">{{ error }}</p>{% endif %}
+{% if medicine.photo %}<div class="ph-current-photo">{% include "core/pharmacy_thumbnail.html" %}<div><p>Approved {{ medicine.photo_approved_at|date:"d M Y H:i" }} by {{ medicine.photo_approved_by.get_full_name|default:medicine.photo_approved_by.username }}</p>{% if medicine.photo_source %}<a href="{{ medicine.photo_source }}" target="_blank" rel="noopener noreferrer">Image source</a>{% endif %}
+<form method="post">{% csrf_token %}<button class="np-btn" name="action" value="remove">Remove photo</button></form></div></div>{% endif %}
+<p><a class="np-btn teal" href="{{ search_url }}" target="_blank" rel="noopener noreferrer">Search images ↗</a></p>
+<p class="ph-note">Find the matching pack, then copy its image or paste its product-page link below.</p>
+<div class="ph-photo-inputs">
+  <form method="post" enctype="multipart/form-data" class="ph-panel ph-photo-upload" id="photoUploadForm">{% csrf_token %}
+    <h3>Paste or upload a photo</h3>
+    <div class="ph-paste-zone" id="photoPasteZone" tabindex="0" role="group" aria-label="Paste a copied product image or drop an image here">
+      Click here and paste a copied image, or drag an image here.
+    </div>
+    <label class="ops-field" for="photoFile">Choose a photo (JPEG, PNG or WebP, up to 5 MB)</label>
+    <input type="file" id="photoFile" name="photo" accept="image/jpeg,image/png,image/webp" required>
+    <div id="localPhotoPreview" class="ph-local-preview" hidden><img id="localPhotoImage" alt="Selected product photo preview"></div>
+    <p id="photoInputStatus" class="ph-note" role="status" aria-live="polite"></p>
+    <button class="np-btn" id="photoUploadButton" name="action" value="preview_upload">Preview photo</button>
+  </form>
+  <form method="post" class="ph-panel ph-photo-link">{% csrf_token %}
+    <h3>Paste an image or product link</h3>
+    <label class="ops-field" for="photoLink">Public HTTPS link<input id="photoLink" type="url" name="photo_url" value="{{ photo_url }}" placeholder="https://…" maxlength="2000" required></label>
+    <button class="np-btn" name="action" value="preview_link">Preview link</button>
+    <p class="ph-note">If a website blocks the preview, copy the image itself or upload a photo.</p>
+  </form>
+</div>
+<p class="ph-note">Check brand, strength, manufacturer and pack against your stock before approving a photo.</p>
+</section>
+{% if preview_token %}<section class="ph-panel ph-follow ph-photo-approval" id="photoApproval"><h2>Approve product photo</h2>
+<img src="{{ preview_url }}" alt="Product photo awaiting approval">
+<p>{{ medicine.name }} · {{ medicine.strength }} · {{ medicine.manufacturer|default:"Manufacturer unspecified" }} · {{ medicine.pack_size }} {{ medicine.unit }} per pack</p>
+<form method="post">{% csrf_token %}<input type="hidden" name="preview" value="{{ preview_token }}"><button class="np-btn teal" name="action" value="approve">Use this photo</button></form>
+</section>{% endif %}
+{% if online_suggestions %}<details class="ph-panel ph-follow"><summary>Online suggestions</summary><a class="np-btn" href="{% querystring search='1' %}">Find suggestions</a></details>{% endif %}
+{% if candidates %}<div class="ph-photo-grid ph-follow">{% for candidate in candidates %}<article class="ph-panel">
+<img src="{{ candidate.thumbnail }}" alt="{{ candidate.title }}" referrerpolicy="no-referrer" loading="lazy"><h3>{{ candidate.title }}</h3><p><a href="{{ candidate.source }}" target="_blank" rel="noopener noreferrer">Open source page</a></p>
+<form method="post">{% csrf_token %}<input type="hidden" name="candidate" value="{{ candidate.token }}"><button class="np-btn teal" name="action" value="approve">Use this photo</button></form>
+</article>{% endfor %}</div>{% elif searched and not error %}<p class="ph-panel ph-follow">No product photos found. Check the medicine details or upload a photo.</p>{% endif %}
+{% endblock %}
+
+{% block tail_scripts %}<script src="{% static 'js/pharmacy_photo.js' %}"></script>{% endblock %}

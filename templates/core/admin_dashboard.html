@@ -3,12 +3,15 @@
 {% block title %}Admin Dashboard — Cams HMS{% endblock %}
 
 {% block heading %}
-  <div class="page-head" style="align-items:center; flex-wrap:wrap;">
+  <div class="mb-header">
     <div>
-      <h1>Hospital Overview</h1>
-      <p class="page-sub">Patient activity and department load · {{ today|date:"l, F j, Y" }}</p>
+      <div class="mb-welcome">Administration</div>
+      <h1 class="mb-desk-name">Hospital Overview</h1>
+      <p class="page-sub" style="margin:6px 0 0; color:var(--mb-text-muted); font-size:13px;">Patient activity and department load · {{ today|date:"l, F j, Y" }}</p>
     </div>
-    <span class="badge" style="background:var(--lime); color:var(--ink); padding:8px 16px; font-weight:800;">ADMIN VIEW</span>
+    <div class="mb-header-tools">
+      <span class="mb-status-pill">ADMIN VIEW</span>
+    </div>
   </div>
 {% endblock %}
 
@@ -96,7 +99,7 @@
       {% for patient in recent_patients %}
         <a class="admin-patient-row" href="{% url 'patient_detail' patient.pk %}">
           <span class="admin-patient-avatar" aria-hidden="true">{{ patient.first_name|slice:":1"|upper }}</span>
-          <span class="admin-patient-name">{{ patient.full_name }}<small>MR #{{ patient.mr_number|default:patient.id }}</small></span>
+          <span class="admin-patient-name">{{ patient.full_name }}<small>UHID #{{ patient.uhid|default:patient.id }}</small></span>
           <span class="admin-patient-date">{{ patient.created_at|date:"M j, Y" }}</span>
           <span class="admin-patient-arrow" aria-hidden="true">→</span>
         </a>

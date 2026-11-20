@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }} · Cams HMS{% endblock %}
+
+{% block heading %}
+<div class="np-head">
+  <div>
+    <div class="np-kicker">
+      {% if dashboard_kind == "pharmacy" %}Pharmacy · Dispensing Desk{% else %}Service Departments · Operations Desk{% endif %}
+    </div>
+    <h1 class="np-title">Good day, {{ user.get_full_name|default:user.username }}</h1>
+    <p class="np-sub">
+      {% if dashboard_kind == "pharmacy" %}
+        {{ today|date:"l, j F Y" }} · Prescriptions from consultations land in your dispensing queue.
+        Check stock, confirm payment, and record what was handed to the patient.
+      {% else %}
+        {{ today|date:"l, j F Y" }} · Service orders placed during consultations arrive in department queues.
+        Keep each request moving and record the outcome for the care team.
+      {% endif %}
+    </p>
+  </div>
+  <div class="np-head-actions">
+    {% if dashboard_kind == "pharmacy" %}
+      <a href="{% url 'opd_service_queue' 'pharmacy' %}" class="np-btn">Queue{% if stats.total_open %} · {{ stats.total_open }}{% endif %}</a>
+      <a href="{% url 'pharmacy_stock_report' %}" class="np-btn">Stock report</a>
+      <a href="{% url 'pharmacy_dispense_history' %}" class="np-btn">History</a>
+      <a href="{% url 'opd_service_queue' 'pharmacy' %}?status=ordered" class="np-btn teal">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Start dispensing
+      </a>
+    {% else %}
+      <a href="{% url 'service_completed_today' %}" class="np-btn">Completed today{% if stats.completed_today %} · {{ stats.completed_today }}{% endif %}</a>
+      <a href="{% url 'opd_service_queue' queues.0.slug %}" class="np-btn teal">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Open queues
+      </a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="np-kpis">
+  {% if dashboard_kind == "pharmacy" %}
+    <div class="np-kpi">
+      <div class="np-kpi-label">Awaiting dispense</div>
+      <div class="np-kpi-value">{{ stats.ordered }}</div>
+      <div class="np-kpi-note">Fully ordered, not yet given</div>
+    </div>
+    <div class="np-kpi urgent">
+      <div class="np-kpi-label">Partially dispensed</div>
+      <div class="np-kpi-value">{{ stats.partial }}</div>
+      <div class="np-kpi-note">Need the balance issued</div>
+    </div>
+    <div class="np-kpi emergency">
+      <div class="np-kpi-label">Blocked · payment</div>
+      <div class="np-kpi-value">{{ stats.awaiting_payment }}</div>
+      <div class="np-kpi-note">Patients with pending bills</div>
+    </div>
+    <div class="np-kpi">
+      <div class="np-kpi-label">Low / out of stock</div>
+      <div class="np-kpi-value">{{ stats.low_stock }}</div>
+      <div class="np-kpi-note">Flagged medicine items</div>
+    </div>
+    <div class="np-kpi done">
+      <div class="np-kpi-label">Dispensed today</div>
+      <div class="np-kpi-value">{{ stats.dispensed_today }}</div>
+      <div class="np-kpi-note">{{ stats.dispensed }} all-time records</div>
+    </div>
+    <div class="np-kpi">
+      <div class="np-kpi-label">Unavailable</div>
+      <div class="np-kpi-value">{{ stats.unavailable }}</div>
+      <div class="np-kpi-note">Items marked not in stock</div>
+    </div>
+  {% else %}
+    <div class="np-kpi">
+      <div class="np-kpi-label">Open orders</div>
+      <div class="np-kpi-value">{{ stats.total_open }}</div>
+      <div class="np-kpi-note">Across {{ stats.departments }} departments</div>
+    </div>
+    <div class="np-kpi urgent">
+      <div class="np-kpi-label">In progress</div>
+      <div class="np-kpi-value">{{ stats.in_progress }}</div>
+      <div class="np-kpi-note">Being worked on now</div>
+    </div>
+    <div class="np-kpi emergency">
+      <div class="np-kpi-label">Review required</div>
+      <div class="np-kpi-value">{{ stats.review_required }}</div>
+      <div class="np-kpi-note">Needs a second look</div>
+    </div>
+    <div class="np-kpi done">
+      <div class="np-kpi-label">Completed today</div>
+      <div class="np-kpi-value">{{ stats.completed_today }}</div>
+      <div class="np-kpi-note">Ready for sign-off</div>
+    </div>
+    <div class="np-kpi">
+      <div class="np-kpi-label">Busiest department</div>
+      <div class="np-kpi-value" style="font-size:20px; line-height:1.3;">{{ busiest.title|default:"—" }}</div>
+      <div class="np-kpi-note">{{ busiest.open_count|default:0 }} open orders</div>
+    </div>
+    <div class="np-kpi">
+      <div class="np-kpi-label">Departments live</div>
+      <div class="np-kpi-value">{{ stats.departments }}</div>
+      <div class="np-kpi-note">Laboratory → procedures</div>
+    </div>
+  {% endif %}
+</div>
+
+{% if dashboard_kind == "pharmacy" and stats.awaiting_payment %}
+  <div class="np-strip amber">
+    <span class="np-strip-pulse"></span>
+    {{ stats.awaiting_payment }} patient{{ stats.awaiting_payment|pluralize }} have pending bills — full dispensing is blocked until billing is settled at the Registration Desk.
+  </div>
+{% elif dashboard_kind == "pharmacy" and stats.low_stock %}
+  <div class="np-strip amber">
+    <span class="np-strip-pulse"></span>
+    {{ stats.low_stock }} medicine item{{ stats.low_stock|pluralize }} flagged low or out of stock — check the stock report before promising supply.
+  </div>
+{% elif dashboard_kind != "pharmacy" and stats.review_required %}
+  <div class="np-strip amber">
+    <span class="np-strip-pulse"></span>
+    {{ stats.review_required }} order{{ stats.review_required|pluralize }} marked <strong>Review Required</strong> — resolve these before routine work.
+  </div>
+{% endif %}
+
+<div class="np-bento">
+  <!-- ══════════ LEFT COLUMN ══════════ -->
+  <div class="np-col">
+
+    {% if dashboard_kind == "pharmacy" %}
+      <section class="np-card">
+        <div class="np-card-head">
+          <h2 class="np-card-title"><span class="np-dot"></span>Prescriptions awaiting action</h2>
+          <a href="{% url 'opd_service_queue' 'pharmacy' %}" class="np-card-link">Full queue →</a>
+        </div>
+        {% if work_queue %}
+          <div class="np-queue">
+            {% for item in work_queue %}
+              <div class="np-qcard {% if item.payment_pending %}is-urgent{% endif %}">
+                <div class="np-qtoken">Rx<small>{{ item.created_at|date:"H:i" }}</small></div>
+                <div class="np-qmain">
+                  <div class="np-qname">
+                    {{ item.medicine_name }}
+                    <span class="np-badge teal">{{ item.get_dispense_status_display }}</span>
+                    {% if item.payment_pending %}<span class="np-badge emergency">Payment pending</span>{% endif %}
+                  </div>
+                  <div class="np-qmeta">
+                    <span>{{ item.consultation.patient.full_name }} · {{ item.consultation.patient.uhid|default:"No UHID" }}</span>
+                    <span>{{ item.dose }} · {{ item.frequency }}</span>
+                    <span>Dr {% if item.consultation.doctor %}{{ item.consultation.doctor.get_full_name|default:item.consultation.doctor.username }}{% else %}—{% endif %}</span>
+                  </div>
+                </div>
+                <div class="np-qactions">
+                  <a class="np-btn sm lime" href="{% url 'opd_service_queue' 'pharmacy' %}?prescription={{ item.pk }}">Dispense →</a>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="np-empty">No prescriptions waiting. New orders from the Doctor's Desk will appear here.</div>
+        {% endif %}
+      </section>
+
+      <section class="np-card">
+        <div class="np-card-head">
+          <h2 class="np-card-title"><span class="np-dot" style="background:var(--np-routine)"></span>Recently dispensed</h2>
+          <a href="{% url 'pharmacy_dispense_history' %}" class="np-card-link">History →</a>
+        </div>
+        {% if dispensed_recent %}
+          <div class="np-queue">
+            {% for item in dispensed_recent %}
+              <div class="np-qcard">
+                <div class="np-qtoken" style="background:var(--np-routine-soft); color:var(--np-routine);">✓<small>{{ item.updated_at|date:"H:i" }}</small></div>
+                <div class="np-qmain">
+                  <div class="np-qname">{{ item.medicine_name }} <span class="np-badge routine">Qty {{ item.dispensed_quantity }}</span></div>
+                  <div class="np-qmeta">
+                    <span>{{ item.consultation.patient.full_name }}</span>
+                    <span>By {% if item.dispensed_by %}{{ item.dispensed_by.get_full_name|default:item.dispensed_by.username }}{% else %}—{% endif %}</span>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="np-empty">Nothing dispensed yet today.</div>
+        {% endif %}
+      </section>
+    {% else %}
+      <section class="np-card">
+        <div class="np-card-head">
+          <h2 class="np-card-title"><span class="np-dot"></span>Department workload</h2>
+          <span class="np-card-sub">Open orders right now</span>
+        </div>
+        <div class="np-queue">
+          {% for queue in queues %}
+            <a href="{% url 'opd_service_queue' queue.slug %}" class="np-qcard" style="text-decoration:none;">
+              <div class="np-qtoken">{{ queue.open_count }}<small>open</small></div>
+              <div class="np-qmain">
+                <div class="np-qname">{{ queue.title }}</div>
+                <div class="np-qmeta"><span>Review, schedule, and record outcomes</span></div>
+              </div>
+              <div class="np-qactions">
+                <span class="np-btn sm lime">Open queue →</span>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="np-card">
+        <div class="np-card-head">
+          <h2 class="np-card-title"><span class="np-dot" style="background:var(--np-urgent)"></span>In progress now</h2>
+          <span class="np-card-sub">Latest updates</span>
+        </div>
+        {% if in_progress_orders %}
+          <div class="np-queue">
+            {% for order in in_progress_orders %}
+              <div class="np-qcard is-active">
+                <div class="np-qtoken">◷<small>{{ order.updated_at|date:"H:i" }}</small></div>
+                <div class="np-qmain">
+                  <div class="np-qname">
+                    {{ order.name }} <span class="np-badge teal">In progress</span>
+                    {% if order.result_summary %}<span class="np-badge muted">{{ order.result_summary }}</span>{% endif %}
+                  </div>
+                  <div class="np-qmeta">
+                    <span>{{ order.consultation.patient.full_name }} · {{ order.consultation.patient.uhid|default:"No UHID" }}</span>
+                    <span>{% if order.consultation.doctor %}{{ order.consultation.doctor.get_full_name|default:order.consultation.doctor.username }}{% else %}—{% endif %}</span>
+                  </div>
+                </div>
+                <div class="np-qactions">
+                  <a class="np-btn sm primary" href="{% url 'opd_service_queue' 'procedures' %}?order={{ order.pk }}">Update</a>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="np-empty">No orders are currently in progress.</div>
+        {% endif %}
+      </section>
+    {% endif %}
+  </div>
+
+  <!-- ══════════ RIGHT COLUMN ══════════ -->
+  <div class="np-col">
+
+    {% if dashboard_kind == "pharmacy" %}
+      <section class="np-card dark">
+        <div class="np-card-head">
+          <h2 class="np-card-title"><span class="np-dot" style="background:var(--lime)"></span>Stock watch</h2>
+          <a href="{% url 'pharmacy_stock_report' %}" class="np-card-link" style="color:#ffd9a8;">Report →</a>
+        </div>
+        {% if stock_alerts %}
+          <ul class="np-mini-list">
+            {% for row in stock_alerts %}
+              <li>
+                <span><strong>{{ row.medicine_name }}</strong><br><span style="font-size:11.5px; opacity:.75;">{{ row.items }} item{{ row.items|pluralize }}</span></span>
+                <span style="text-align:right; font-size:11.5px; color:#ffd9a8;">{% if row.unavailable %}Out of stock{% else %}Low stock{% endif %}</span>
+              </li>
+            {% endfor %}
+          </ul>
+          <p class="np-card-sub" style="margin-top:10px;">Open the stock report for the full demand picture and CSV export.</p>
+        {% else %}
+          <p class="np-card-sub" style="margin:0;">All medicine items are marked in stock.</p>
+        {% endif %}
+      </section>
+    {% else %}
+      <section class="np-card dark">
+        <div class="np-card-head">
+          <h2 class="np-card-title"><span class="np-dot" style="background:var(--lime)"></span>Needs review</h2>
+          <span class="np-card-sub">Flagged for a second look</span>
+        </div>
+        {% if review_orders %}
+          <ul class="np-mini-list">
+            {% for order in review_orders %}
+              <li>
+                <span><strong>{{ order.consultation.patient.full_name }}</strong><br><span style="font-size:11.5px; opacity:.75;">{{ order.name }}</span></span>
+                <span style="text-align:right; font-size:11.5px; color:#ffd9a8;">{{ order.result_summary|default:"Review required" }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="np-card-sub" style="margin:0;">No orders are flagged for review.</p>
+        {% endif %}
+      </section>
+    {% endif %}
+
+    {% if dashboard_kind == "pharmacy" %}
+      <section class="np-card">
+        <div class="np-card-head">
+          <h2 class="np-card-title">Pharmacy tools</h2>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <a href="{% url 'pharmacy_stock_report' %}" class="np-btn" style="justify-content:center;">📊 Stock report &amp; CSV export</a>
+          <a href="{% url 'pharmacy_dispense_history' %}" class="np-btn" style="justify-content:center;">⏱ My dispensing history</a>
+          <a href="{% url 'opd_service_queue' 'pharmacy' %}?status=ordered" class="np-btn lime" style="justify-content:center;">＋ Pharmacy Dispensing queue</a>
+        </div>
+      </section>
+    {% else %}
+      <section class="np-card">
+        <div class="np-card-head">
+          <h2 class="np-card-title">Service tools</h2>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <a href="{% url 'service_completed_today' %}" class="np-btn" style="justify-content:center;">✔ Completed today sign-off</a>
+          <a href="{% url 'opd_service_queue' 'laboratory' %}" class="np-btn lime" style="justify-content:center;">◉ Laboratory queue</a>
+          <a href="{% url 'opd_service_queue' 'radiology' %}" class="np-btn" style="justify-content:center;">⌕ Radiology queue</a>
+        </div>
+      </section>
+    {% endif %}
+
+    <section class="np-card">
+      <div class="np-card-head">
+        <h2 class="np-card-title">Recent activity</h2>
+      </div>
+      {% if recent_activity %}
+        <ul class="np-activity">
+          {% for event in recent_activity %}
+            <li>
+              <time>{{ event.occurred_at|date:"H:i" }}</time>
+              <span>{{ event.summary }}{% if event.actor %} <span style="color:var(--muted);">· {{ event.actor.get_full_name|default:event.actor.username }}</span>{% endif %}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="np-empty">No activity logged yet.</div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

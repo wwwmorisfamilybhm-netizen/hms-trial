@@ -21,7 +21,7 @@
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;">
           <h1 style="font-size:26px; font-weight:800; margin:0; letter-spacing:-0.5px;">{{ patient.full_name }}</h1>
           <span class="badge" style="background:var(--lime); color:var(--ink); font-weight:800; font-size:13px; padding:6px 14px; border-radius:99px;">
-            MR #{{ patient.mr_number|default:patient.id }}
+            UHID #{{ patient.uhid|default:patient.id }}
           </span>
           <span class="badge" style="font-size:12px; font-weight:700;">
             {{ patient.patient_category|default:"GENERAL" }}
@@ -87,7 +87,7 @@
         </h3>
         <dl class="details" style="display:grid; grid-template-columns:160px 1fr; row-gap:10px; font-size:14px; margin:0;">
           <dt style="color:var(--muted); font-weight:600;">Medical Record (MR)</dt>
-          <dd style="font-weight:750; color:var(--ink); margin:0;">#{{ patient.mr_number|default:patient.id }}</dd>
+          <dd style="font-weight:750; color:var(--ink); margin:0;">#{{ patient.uhid|default:patient.id }}</dd>
 
           <dt style="color:var(--muted); font-weight:600;">Full Legal Name</dt>
           <dd style="font-weight:700; margin:0;">{{ patient.first_name }} {% if patient.second_name %}{{ patient.second_name }} {% endif %}{{ patient.last_name }}</dd>
@@ -272,7 +272,7 @@
               <td class="cell-strong">{{ appointment.date|date:"M j, Y" }}</td>
               <td class="muted">{{ appointment.start_time|time:"H:i" }}</td>
               <td>
-                <div style="font-weight:600;">{{ appointment.doctor }}</div>
+                <div style="font-weight:600;">{% if appointment.doctor %}{{ appointment.doctor }}{% else %}Unassigned{% endif %}</div>
                 {% if appointment.reason %}
                   <small style="color:var(--muted);">{{ appointment.reason }}</small>
                 {% endif %}

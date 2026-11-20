@@ -12,7 +12,7 @@
       {% if last_registered %}
         <a href="{% url 'patient_print_card' last_registered.pk %}" class="btn btn-outline" style="padding:8px 16px; font-size:13px; font-weight:700; border-radius:12px; display:inline-flex; align-items:center; gap:6px;">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          Print Last Card (#{{ last_registered.mr_number }})
+          Print Last Card (#{{ last_registered.uhid }})
         </a>
       {% endif %}
       <span class="badge" style="background:var(--lime); color:var(--ink); font-weight:800; padding:8px 16px; border-radius:99px; font-size:13px; letter-spacing:0.5px;">
@@ -315,7 +315,7 @@
     <div style="display:flex; gap:16px; align-items:center; padding-top:12px; border-top:1.5px solid var(--line); flex-wrap:wrap;">
       <button type="submit" class="btn" style="background:var(--lime); color:var(--ink); font-weight:800; font-size:1rem; padding:14px 28px; border-radius:14px; border:none; cursor:pointer; box-shadow:0 6px 18px rgba(214,242,95,0.35); display:inline-flex; align-items:center; gap:10px;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        <span>Register Patient & Print Card (MR #{{ next_mr }}) →</span>
+        <span>Register Patient & Print Card (UHID #{{ next_mr }}) →</span>
       </button>
       <a href="{% url 'registration_desk' %}" class="btn btn-outline" style="padding:14px 24px; font-size:1rem; border-radius:14px;">
         Cancel

@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Patient Queue — Doctor Desk{% endblock %}
+
+{% block heading %}
+<div class="cb-app">
+<div class="cb-head">
+  <div>
+    <div class="cb-kicker"><span class="cb-kicker-dot"></span>Doctor Desk · Central Queue</div>
+    <h1 class="cb-title">Patient Queue</h1>
+    <p class="cb-sub">
+      {% if is_doctor %}
+        Your visits for today, end to end — the board shows where everyone is, the pool column is yours to pick from.
+      {% else %}
+        Every assigned visit and the unassigned pool across the central queue.
+      {% endif %}
+    </p>
+  </div>
+  <div class="cb-head-actions">
+    <a href="{% url 'doctor_consultation' %}" class="cb-btn cb-btn-blue">Consultation desk</a>
+    <a href="{% url 'service_queues' %}" class="cb-btn">Service queues</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .cb-app{
+    --cb-blue:#1d4ed8; --cb-blue-dark:#1e40af; --cb-blue-soft:#dbeafe;
+    --cb-red:#dc2626;   --cb-red-soft:#fee2e2;
+    --cb-amber:#d97706; --cb-amber-soft:#fef3c7;
+    --cb-sky:#0284c7;   --cb-sky-soft:#e0f2fe;
+    --cb-cyan:#0891b2;  --cb-cyan-soft:#cffafe;
+    --cb-green:#16a34a; --cb-green-soft:#dcfce7;
+    --cb-ink:#0f172a; --cb-muted:#64748b; --cb-line:#e2e8f0;
+    background:#f8fafc; border-radius:22px; padding:18px 20px 22px;
+  }
+  .cb-head{display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; margin-bottom:14px}
+  .cb-kicker{display:inline-flex; align-items:center; gap:7px; font-size:10.5px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; color:#1e40af; background:#dbeafe; padding:4px 12px; border-radius:999px; margin-bottom:8px}
+  .cb-kicker-dot{width:7px; height:7px; border-radius:50%; background:var(--cb-blue); box-shadow:0 0 0 3px rgba(29,78,216,.15)}
+  .cb-title{margin:0; font-size:24px; font-weight:800; color:var(--cb-ink); letter-spacing:-.5px}
+  .cb-sub{margin:4px 0 0; font-size:13px; color:var(--cb-muted); max-width:640px; line-height:1.5}
+  .cb-head-actions{display:flex; gap:8px; flex-wrap:wrap}
+  .cb-btn{display:inline-flex; align-items:center; gap:6px; padding:9px 16px; border-radius:999px; border:1px solid var(--cb-line); background:#fff; color:#334155; font:inherit; font-size:12.5px; font-weight:750; text-decoration:none; transition:all .15s ease; cursor:pointer}
+  .cb-btn:hover{border-color:#94a3b8; text-decoration:none; transform:translateY(-1px)}
+  .cb-btn-blue{background:var(--cb-blue); border-color:var(--cb-blue); color:#fff}
+  .cb-btn-blue:hover{background:var(--cb-blue-dark); border-color:var(--cb-blue-dark)}
+  .cb-btn.sm{padding:6px 12px; font-size:11.5px}
+  .cb-btn.on{background:var(--cb-blue); border-color:var(--cb-blue); color:#fff}
+
+  /* ── Census bar ── */
+  .cb-census-title{font-size:11px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; color:var(--cb-muted); margin-bottom:6px}
+  .cb-census{display:flex; gap:4px; height:14px; border-radius:999px; overflow:hidden}
+  .cb-seg{min-width:28px; border-radius:0; transition:flex-grow .3s ease}
+  .cb-seg:first-child{border-radius:999px 0 0 999px}
+  .cb-seg:last-child{border-radius:0 999px 999px 0}
+  .cb-seg.red{background:var(--cb-red)} .cb-seg.amber{background:var(--cb-amber)}
+  .cb-seg.blue{background:var(--cb-blue)} .cb-seg.sky{background:var(--cb-sky)}
+  .cb-seg.cyan{background:var(--cb-cyan)} .cb-seg.green{background:var(--cb-green)}
+  .cb-seg.zero{opacity:.25}
+  .cb-census-legend{display:flex; gap:12px; flex-wrap:wrap; margin-top:7px; font-size:11px; color:var(--cb-muted); font-weight:650}
+  .cb-dot{display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:5px; vertical-align:-1px}
+  .cb-dot.red{background:var(--cb-red)} .cb-dot.amber{background:var(--cb-amber)}
+  .cb-dot.blue{background:var(--cb-blue)} .cb-dot.sky{background:var(--cb-sky)}
+  .cb-dot.cyan{background:var(--cb-cyan)} .cb-dot.green{background:var(--cb-green)}
+
+  /* ── Controls ── */
+  .cb-controls{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin:14px 0}
+  .cb-controls-left{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .cb-search{display:flex; align-items:center; gap:0}
+  .cb-search input{padding:9px 14px 9px 34px; border:1.5px solid var(--cb-line); border-radius:999px 0 0 999px; background:#fff; font:inherit; font-size:12.5px; color:var(--cb-ink); outline:none; min-width:240px}
+  .cb-search input:focus{border-color:var(--cb-blue)}
+  .cb-search svg{position:absolute; margin:9px 0 0 12px; color:#94a3b8; pointer-events:none}
+  .cb-search button{padding:9px 16px; border:none; border-radius:0 999px 999px 0; background:var(--cb-blue); color:#fff; font:inherit; font-size:12.5px; font-weight:750; cursor:pointer}
+  .cb-search button:hover{background:var(--cb-blue-dark)}
+  .cb-search{position:relative; display:flex; align-items:center}
+
+  /* ── Board ── */
+  .cb-board{display:grid; grid-template-columns:repeat(6,minmax(214px,1fr)); gap:12px; overflow-x:auto; padding-bottom:6px}
+  .cb-col{background:#eef2f7; border:1px solid var(--cb-line); border-radius:16px; min-height:220px; display:flex; flex-direction:column}
+  .cb-col-head{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px; border-radius:15px 15px 0 0}
+  .cb-col-head.red{background:var(--cb-red-soft); color:var(--cb-red)}
+  .cb-col-head.amber{background:var(--cb-amber-soft); color:#b45309}
+  .cb-col-head.blue{background:var(--cb-blue-soft); color:var(--cb-blue-dark)}
+  .cb-col-head.sky{background:var(--cb-sky-soft); color:#0369a1}
+  .cb-col-head.cyan{background:var(--cb-cyan-soft); color:#0e7490}
+  .cb-col-head.green{background:var(--cb-green-soft); color:#15803d}
+  .cb-col-title{font-size:10.5px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; line-height:1.25}
+  .cb-col-count{font-size:12px; font-weight:800; background:#fff; border-radius:999px; padding:1px 9px; flex-shrink:0}
+  .cb-col-body{display:flex; flex-direction:column; gap:8px; padding:10px; flex:1}
+  .cb-col-empty{flex:1; display:grid; place-items:center; color:#94a3b8; font-weight:700; min-height:80px}
+  .cb-card{position:relative; display:flex; gap:9px; background:#fff; border:1px solid var(--cb-line); border-radius:12px; padding:10px 10px 10px 13px; text-decoration:none; color:inherit; transition:all .15s ease; overflow:hidden}
+  a.cb-card:hover{border-color:var(--cb-blue); transform:translateY(-1px); box-shadow:0 8px 18px rgba(29,78,216,.10); text-decoration:none}
+  .cb-card::before{content:""; position:absolute; left:0; top:8px; bottom:8px; width:3px; border-radius:0 3px 3px 0; background:var(--cb-green)}
+  .cb-card.rail-red::before{background:var(--cb-red)}
+  .cb-card.rail-amber::before{background:var(--cb-amber)}
+  .cb-card.is-emergency{background:#fff7f7; border-color:#fecaca}
+  .cb-avatar{width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,#dbeafe,#bfdbfe); color:#1e40af; font-size:12px; font-weight:800; display:grid; place-items:center; flex-shrink:0}
+  .cb-card.is-emergency .cb-avatar{background:#fee2e2; color:#b91c1c}
+  .cb-card-main{flex:1; min-width:0; display:flex; flex-direction:column; gap:3px}
+  .cb-card-name{font-size:12.5px; font-weight:800; color:var(--cb-ink); display:flex; align-items:center; gap:6px; flex-wrap:wrap; line-height:1.2}
+  .cb-card-meta{font-size:10.5px; color:var(--cb-muted); font-weight:600}
+  .cb-wait{align-self:flex-start; font-size:9.5px; font-weight:800; padding:2px 8px; border-radius:999px}
+  .cb-wait.ok{background:#dcfce7; color:#15803d}
+  .cb-wait.warn{background:#fef3c7; color:#b45309}
+  .cb-wait.late{background:#fee2e2; color:#b91c1c}
+  .cb-tag{font-size:9px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; padding:2px 7px; border-radius:999px; background:#fee2e2; color:#b91c1c; white-space:nowrap}
+  .cb-tag.amber{background:#fef3c7; color:#b45309}
+  .cb-pick-form{margin:0}
+  .cb-pick{width:100%; border:none; border-radius:9px; background:var(--cb-blue); color:#fff; font:inherit; font-size:11.5px; font-weight:800; padding:7px 10px; cursor:pointer; transition:background .15s ease}
+  .cb-pick:hover{background:var(--cb-blue-dark)}
+
+  /* ── List mode ── */
+  .cb-cols{display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start}
+  @media (max-width:1080px){ .cb-cols{grid-template-columns:1fr} }
+  .cb-panel{background:#fff; border:1px solid var(--cb-line); border-radius:16px; padding:14px}
+  .cb-panel-head{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px}
+  .cb-panel-title{font-size:14px; font-weight:800; color:var(--cb-ink); display:flex; align-items:center; gap:8px}
+  .cb-panel-title .cb-dot{width:10px; height:10px}
+  .cb-panel-sub{font-size:11px; color:var(--cb-muted); font-weight:700}
+  .cb-lrow{position:relative; display:flex; gap:12px; align-items:center; background:#fff; border:1px solid var(--cb-line); border-radius:14px; padding:12px 14px 12px 17px; text-decoration:none; color:inherit; transition:all .15s ease; overflow:hidden}
+  a.cb-lrow:hover{border-color:var(--cb-blue); transform:translateY(-1px); box-shadow:0 8px 18px rgba(29,78,216,.10); text-decoration:none}
+  .cb-lrow::before{content:""; position:absolute; left:0; top:10px; bottom:10px; width:3px; border-radius:0 3px 3px 0; background:var(--cb-green)}
+  .cb-lrow.rail-red::before{background:var(--cb-red)}
+  .cb-lrow.rail-amber::before{background:var(--cb-amber)}
+  .cb-lrow.is-emergency{background:#fff7f7}
+  .cb-lrow + .cb-lrow{margin-top:9px}
+  .cb-lrow-main{flex:1; min-width:0; display:flex; flex-direction:column; gap:4px}
+  .cb-lrow-name{font-size:13.5px; font-weight:800; color:var(--cb-ink); display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .cb-lrow-meta{font-size:11.5px; color:var(--cb-muted); font-weight:600}
+  .cb-vitals{display:flex; gap:6px; flex-wrap:wrap}
+  .cb-vital{font-size:10px; font-weight:800; color:#334155; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:7px; padding:2px 7px}
+  .cb-vital b{color:var(--cb-ink); font-variant-numeric:tabular-nums}
+  .cb-status{font-size:10.5px; font-weight:800; padding:3px 10px; border-radius:999px; white-space:nowrap}
+  .cb-status.red{background:var(--cb-red-soft); color:var(--cb-red)}
+  .cb-status.amber{background:var(--cb-amber-soft); color:#b45309}
+  .cb-status.blue{background:var(--cb-blue-soft); color:var(--cb-blue-dark)}
+  .cb-status.sky{background:var(--cb-sky-soft); color:#0369a1}
+  .cb-status.cyan{background:var(--cb-cyan-soft); color:#0e7490}
+  .cb-status.green{background:var(--cb-green-soft); color:#15803d}
+  .cb-status.muted{background:#f1f5f9; color:#64748b}
+  .cb-action{font-size:12px; font-weight:800; color:var(--cb-blue); white-space:nowrap}
+  .cb-empty{padding:26px 14px; text-align:center; color:#94a3b8; font-size:12.5px; font-weight:700; border:1.5px dashed var(--cb-line); border-radius:14px}
+  .cb-list{display:flex; flex-direction:column}
+</style>
+
+<div class="cb-census-title">{% if is_doctor %}My patients{% else %}Assigned patients{% endif %} · today — live census</div>
+<div class="cb-census">
+  {% for seg in census %}
+    <div class="cb-seg {{ seg.tone }} {% if not seg.count %}zero{% endif %}" style="flex-grow:{{ seg.count }};min-width:28px" title="{{ seg.label }} · {{ seg.count }}"></div>
+  {% endfor %}
+</div>
+<div class="cb-census-legend">
+  {% for seg in census %}
+    <span><i class="cb-dot {{ seg.tone }}"></i>{{ seg.label }} · {{ seg.count }}</span>
+  {% endfor %}
+</div>
+
+<div class="cb-controls">
+  <div class="cb-controls-left">
+    <a href="?view=board&q={{ query|urlencode }}" class="cb-btn sm {% if view == 'board' %}on{% endif %}">▦ Board</a>
+    <a href="?view=list&q={{ query|urlencode }}" class="cb-btn sm {% if view == 'list' %}on{% endif %}">☰ List</a>
+    {% if view == "list" and is_doctor %}
+      <span style="width:6px"></span>
+      <a href="?view=list&q={{ query|urlencode }}{% if show_all %}&all=1{% endif %}" class="cb-btn sm {% if sort == 'urgency' or not sort %}on{% endif %}">Urgency</a>
+      <a href="?view=list&sort=arrival&q={{ query|urlencode }}{% if show_all %}&all=1{% endif %}" class="cb-btn sm {% if sort == 'arrival' %}on{% endif %}">Arrival</a>
+      <a href="?view=list&sort=name&q={{ query|urlencode }}{% if show_all %}&all=1{% endif %}" class="cb-btn sm {% if sort == 'name' %}on{% endif %}">Name</a>
+      <span style="width:6px"></span>
+      <a href="?view=list&q={{ query|urlencode }}" class="cb-btn sm {% if not show_all %}on{% endif %}">Today</a>
+      <a href="?view=list&all=1&q={{ query|urlencode }}" class="cb-btn sm {% if show_all %}on{% endif %}">All my patients · {{ my_total }}</a>
+    {% endif %}
+  </div>
+  <form class="cb-search" method="get">
+    {% if view == "list" %}<input type="hidden" name="view" value="list">{% endif %}
+    {% if show_all %}<input type="hidden" name="all" value="1">{% endif %}
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="search" name="q" value="{{ query }}" placeholder="Search name, UHID or phone…" aria-label="Search patients">
+    <button type="submit">Search</button>
+  </form>
+</div>
+
+{% if view == "board" %}
+  <!-- ═══ ED-style tracking board ═══ -->
+  <div class="cb-board">
+    {% for col in board_columns %}
+      <div class="cb-col">
+        <div class="cb-col-head {{ col.tone }}">
+          <span class="cb-col-title">{{ col.title }}</span>
+          <span class="cb-col-count">{{ col.rows|length }}</span>
+        </div>
+        <div class="cb-col-body">
+          {% for row in col.rows %}
+            {% if col.key == "intake" %}
+              <div class="cb-card rail-red {% if row.patient.is_emergency %}is-emergency{% endif %}">
+                <span class="cb-avatar">{{ row.patient.first_name|slice:":1"|upper }}{% if row.patient.last_name %}{{ row.patient.last_name|slice:":1"|upper }}{% endif %}</span>
+                <span class="cb-card-main">
+                  <span class="cb-card-name">{{ row.patient.full_name }}{% if row.patient.is_emergency %}<span class="cb-tag">Emergency</span>{% endif %}{% if row.alert %}<span class="cb-tag amber">{{ row.alert }}</span>{% endif %}</span>
+                  <span class="cb-card-meta">{{ row.patient.uhid|default:"No UHID" }} · {{ row.patient.age|default:"—" }}y · {{ row.patient.get_gender_display|default:"—" }}</span>
+                  <span class="cb-wait {% if row.wait_minutes >= 30 %}late{% elif row.wait_minutes >= 15 %}warn{% else %}ok{% endif %}">⏱ {{ row.wait_minutes }} min</span>
+                </span>
+                {% if is_doctor %}
+                  <form method="post" action="{% url 'assign_doctor' row.patient.pk %}" class="cb-pick-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="doctor_id" value="{{ request.user.pk }}">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="cb-pick">Pick this patient</button>
+                  </form>
+                {% else %}
+                  <span class="cb-status red">Unassigned</span>
+                {% endif %}
+              </div>
+            {% else %}
+              <a class="cb-card {% if row.patient.is_emergency %}rail-red is-emergency{% elif row.priority == 'Urgent' %}rail-amber{% endif %}" href="{% url 'doctor_consultation' %}?patient={{ row.patient.pk }}&q={{ query|urlencode }}&view=board">
+                <span class="cb-avatar">{{ row.patient.first_name|slice:":1"|upper }}{% if row.patient.last_name %}{{ row.patient.last_name|slice:":1"|upper }}{% endif %}</span>
+                <span class="cb-card-main">
+                  <span class="cb-card-name">{{ row.patient.full_name }}{% if row.patient.is_emergency %}<span class="cb-tag">Emergency</span>{% endif %}{% if row.alert %}<span class="cb-tag amber">{{ row.alert }}</span>{% endif %}</span>
+                  <span class="cb-card-meta">{{ row.patient.uhid|default:"No UHID" }} · {{ row.patient.age|default:"—" }}y · {{ row.patient.get_gender_display|default:"—" }}</span>
+                  <span class="cb-wait {% if row.wait_minutes >= 30 %}late{% elif row.wait_minutes >= 15 %}warn{% else %}ok{% endif %}">⏱ {{ row.wait_minutes }} min</span>
+                </span>
+                <span class="cb-status {{ col.tone }}">{{ row.doctor_status }}</span>
+              </a>
+            {% endif %}
+          {% empty %}
+            <div class="cb-col-empty">—</div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <!-- ═══ Dense list mode ═══ -->
+  <div class="cb-cols">
+    <div class="cb-panel">
+      <div class="cb-panel-head">
+        <div class="cb-panel-title"><i class="cb-dot blue"></i>{% if is_doctor %}My patients{% else %}Assigned patients{% endif %}{% if not show_all %} · today{% endif %}</div>
+        <span class="cb-panel-sub">{{ mine_rows|length }} visit{{ mine_rows|length|pluralize }}</span>
+      </div>
+      <div class="cb-list">
+        {% if show_all %}
+          {% for p in mine_rows %}
+            <a class="cb-lrow {% if p.is_emergency %}rail-red is-emergency{% endif %}" href="{% url 'doctor_consultation' %}?patient={{ p.pk }}&q={{ query|urlencode }}&view=list&all=1">
+              <span class="cb-avatar">{{ p.first_name|slice:":1"|upper }}{% if p.last_name %}{{ p.last_name|slice:":1"|upper }}{% endif %}</span>
+              <span class="cb-lrow-main">
+                <span class="cb-lrow-name">{{ p.full_name }}{% if p.is_emergency %}<span class="cb-tag">Emergency</span>{% endif %}{% if p.open_consultation %}<span class="cb-status blue">In consult</span>{% endif %}</span>
+                <span class="cb-lrow-meta">{{ p.uhid|default:"No UHID" }} · {{ p.age|default:"—" }}y · {{ p.get_gender_display|default:"—" }}{% if p.last_visit %} · last visit {{ p.last_visit|date:"j M Y" }}{% else %} · no consultation yet{% endif %}</span>
+              </span>
+              <span class="cb-action">Open →</span>
+            </a>
+          {% empty %}
+            <div class="cb-empty">No patients match{% if query %} “{{ query }}”{% endif %} on your list.</div>
+          {% endfor %}
+        {% else %}
+          {% for row in mine_rows %}
+            <a class="cb-lrow {% if row.patient.is_emergency %}rail-red is-emergency{% elif row.priority == 'Urgent' %}rail-amber{% endif %}" href="{% url 'doctor_consultation' %}?patient={{ row.patient.pk }}&q={{ query|urlencode }}&view=list">
+              <span class="cb-avatar">{{ row.patient.first_name|slice:":1"|upper }}{% if row.patient.last_name %}{{ row.patient.last_name|slice:":1"|upper }}{% endif %}</span>
+              <span class="cb-lrow-main">
+                <span class="cb-lrow-name">
+                  {{ row.patient.full_name }}
+                  {% if row.patient.is_emergency %}<span class="cb-tag">Emergency</span>{% endif %}
+                  {% if row.alert %}<span class="cb-tag amber">{{ row.alert }}</span>{% endif %}
+                </span>
+                <span class="cb-lrow-meta">{{ row.patient.uhid|default:"No UHID" }} · {{ row.patient.age|default:"—" }}y · {{ row.patient.get_gender_display|default:"—" }} · waiting {{ row.wait_minutes }} min</span>
+                {% if row.assessment %}
+                  <span class="cb-vitals">
+                    {% if row.assessment.pulse %}<span class="cb-vital"><b>{{ row.assessment.pulse }}</b> bpm</span>{% endif %}
+                    {% if row.assessment.bp_systolic %}<span class="cb-vital"><b>{{ row.assessment.bp_systolic }}/{{ row.assessment.bp_diastolic }}</b> BP</span>{% endif %}
+                    {% if row.assessment.spo2 %}<span class="cb-vital"><b>{{ row.assessment.spo2 }}%</b> SpO₂</span>{% endif %}
+                    {% if row.assessment.temperature %}<span class="cb-vital"><b>{{ row.assessment.temperature }}</b> °C</span>{% endif %}
+                  </span>
+                {% endif %}
+              </span>
+              <span class="cb-status {% if row.status == 'Doctor Allocation' %}amber{% elif row.status == 'With Doctor' %}blue{% elif row.status == 'Investigations' %}sky{% elif row.status == 'Procedures' or row.status == 'Pharmacy' %}cyan{% elif row.status == 'Completed' %}green{% else %}muted{% endif %}">{{ row.doctor_status }}</span>
+              <span class="cb-action">{% if row.status == "Doctor Allocation" %}Start →{% elif row.status == "With Doctor" %}Resume →{% else %}Open →{% endif %}</span>
+            </a>
+          {% empty %}
+            <div class="cb-empty">No assigned visits{% if query %} match “{{ query }}”{% else %} for today{% endif %}.</div>
+          {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="cb-panel">
+      <div class="cb-panel-head">
+        <div class="cb-panel-title"><i class="cb-dot red"></i>Unassigned — waiting for a doctor</div>
+        <span class="cb-panel-sub">{{ pool_rows|length }} assessed visit{{ pool_rows|length|pluralize }}</span>
+      </div>
+      <div class="cb-list">
+        {% for row in pool_rows %}
+          <div class="cb-lrow rail-red {% if row.patient.is_emergency %}is-emergency{% endif %}">
+            <span class="cb-avatar">{{ row.patient.first_name|slice:":1"|upper }}{% if row.patient.last_name %}{{ row.patient.last_name|slice:":1"|upper }}{% endif %}</span>
+            <span class="cb-lrow-main">
+              <span class="cb-lrow-name">{{ row.patient.full_name }}{% if row.patient.is_emergency %}<span class="cb-tag">Emergency</span>{% endif %}{% if row.alert %}<span class="cb-tag amber">{{ row.alert }}</span>{% endif %}</span>
+              <span class="cb-lrow-meta">{{ row.patient.uhid|default:"No UHID" }} · {{ row.patient.age|default:"—" }}y · assessment ready · waiting {{ row.wait_minutes }} min</span>
+              {% if row.assessment %}
+                <span class="cb-vitals">
+                  {% if row.assessment.pulse %}<span class="cb-vital"><b>{{ row.assessment.pulse }}</b> bpm</span>{% endif %}
+                  {% if row.assessment.bp_systolic %}<span class="cb-vital"><b>{{ row.assessment.bp_systolic }}/{{ row.assessment.bp_diastolic }}</b> BP</span>{% endif %}
+                  {% if row.assessment.spo2 %}<span class="cb-vital"><b>{{ row.assessment.spo2 }}%</b> SpO₂</span>{% endif %}
+                </span>
+              {% endif %}
+            </span>
+            {% if is_doctor %}
+              <form method="post" action="{% url 'assign_doctor' row.patient.pk %}" class="cb-pick-form">
+                {% csrf_token %}
+                <input type="hidden" name="doctor_id" value="{{ request.user.pk }}">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="cb-pick">Pick this patient</button>
+              </form>
+            {% else %}
+              <span class="cb-status red">Unassigned</span>
+            {% endif %}
+          </div>
+        {% empty %}
+          <div class="cb-empty">No assessed visits are waiting for a doctor right now.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endif %}
+</div>
+{% endblock %}

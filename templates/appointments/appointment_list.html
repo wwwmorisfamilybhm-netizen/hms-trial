@@ -4,16 +4,14 @@
 {% block title %}Appointments — Cams HMS{% endblock %}
 
 {% block heading %}
-<div class="rd-page-head">
-  <div class="rd-head-left">
-    <div class="rd-title-row">
-      <h1>Appointments</h1>
-      <span class="rd-counter-badge"><span class="rd-pulse-dot"></span>APPOINTMENT DESK</span>
-    </div>
-    <p class="page-sub">Search, book, and track outpatient appointments from the counter.</p>
+<div class="mb-header">
+  <div>
+    <div class="mb-welcome">Appointment Desk</div>
+    <h1 class="mb-desk-name">Appointments</h1>
+    <p class="page-sub" style="margin:6px 0 0; color:var(--mb-text-muted); font-size:13px;">Search, book, and track outpatient appointments from the counter.</p>
   </div>
-  <div class="rd-head-actions">
-    <a href="{% url 'appointment_create' %}" class="rd-btn-primary">
+  <div class="mb-header-tools">
+    <a href="{% url 'appointment_create' %}" class="mb-btn-action lime">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
       New appointment
     </a>
@@ -149,7 +147,7 @@
               </div>
             </div>
           </td>
-          <td>Dr. {{ appointment.doctor.full_name }}</td>
+          <td>{% if appointment.doctor %}Dr. {{ appointment.doctor.full_name }}{% else %}Unassigned{% endif %}</td>
           <td>{{ appointment.reason }}</td>
           <td><span class="badge badge-{{ appointment.status|lower }}">{{ appointment.get_status_display }}</span></td>
           <td class="rd-actions-cell">

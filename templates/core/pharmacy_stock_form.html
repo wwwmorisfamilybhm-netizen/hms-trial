@@ -1,0 +1,25 @@
+{% extends "core/pharmacy_base.html" %}
+{% load static %}
+{% block operations_content %}
+<a class="ph-back" href="{% url 'pharmacy_stock_report' %}">← Inventory</a>
+<form method="post" class="ph-panel ph-stock-form">
+  {% csrf_token %}{{ form.request_key }}{{ form.request_key.errors }}{{ form.non_field_errors }}
+  {% if form.medicine %}
+    <fieldset><legend>Medicine &amp; quantity</legend>
+      {% include "core/pharmacy_field.html" with field=form.medicine %}{% include "core/pharmacy_field.html" with field=form.packs %}
+      <output class="ph-balance" id="stockPreview" aria-live="polite">Choose a medicine and enter the number of packs.</output></fieldset>
+    <fieldset><legend>Batch details</legend>
+      {% include "core/pharmacy_field.html" with field=form.batch_number %}{% include "core/pharmacy_field.html" with field=form.expiry_date %}
+      {% include "core/pharmacy_field.html" with field=form.supplier %}{% include "core/pharmacy_field.html" with field=form.invoice_reference %}</fieldset>
+    <fieldset><legend>Pricing per dispensing unit</legend>{% include "core/pharmacy_field.html" with field=form.purchase_cost %}{% include "core/pharmacy_field.html" with field=form.selling_price %}</fieldset>
+    {{ pack_sizes|json_script:"packSizes" }}
+  {% else %}
+    <fieldset><legend>Batch correction</legend>{% include "core/pharmacy_field.html" with field=form.batch %}
+      <output class="ph-balance" id="stockPreview" aria-live="polite">Choose a batch to view its balances.</output>
+      {% include "core/pharmacy_field.html" with field=form.quantity %}{% include "core/pharmacy_field.html" with field=form.reason %}</fieldset>
+    {{ balances|json_script:"batchBalances" }}
+  {% endif %}
+  <button class="np-btn teal" type="submit">{{ submit_label }}</button>
+</form>
+{% endblock %}
+{% block tail_scripts %}<script src="{% static 'js/pharmacy.js' %}"></script>{% endblock %}

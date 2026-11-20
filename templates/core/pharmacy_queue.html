@@ -1,0 +1,31 @@
+{% extends "core/pharmacy_base.html" %}
+{% load static %}
+{% block operations_content %}
+<a class="ph-back" href="{% url 'pharmacy_dashboard' %}{% querystring tab=request.GET.tab|default:'prepare' %}">← Back to work queue</a>
+<section class="ph-panel"><div class="ph-patient"><h2>{{ selected.patient.full_name }}</h2><p>{{ selected.patient.uhid }} · {{ selected.visit_token }} · {% firstof selected.doctor.get_full_name selected.doctor.username %}</p></div>
+<form method="post">{% csrf_token %}<input type="hidden" name="request_key" value="{{ request_key }}">
+{% for rx in rows %}
+<article class="ph-rx" data-rx data-remaining="{{ rx.remaining_quantity }}">
+  <header>{% include "core/pharmacy_thumbnail.html" with medicine=rx.medicine %}<h3>{{ rx.medicine_name }}</h3><span class="ph-status">{{ rx.get_dispense_status_display }}</span></header>
+  <p>{{ rx.dose }} · {{ rx.route }} · {{ rx.frequency }} · {{ rx.duration }}{% if rx.instructions %}<br>{{ rx.instructions }}{% endif %}</p>
+  <dl class="ph-quantities"><div><dt>Prescribed</dt><dd>{{ rx.prescribed_quantity|default_if_none:"—" }}</dd></div>
+    <div><dt>Already handed over</dt><dd>{{ rx.dispensed_quantity }}</dd></div><div><dt>Reserved</dt><dd>{{ rx.reserved_quantity }}</dd></div>
+    <div><dt>Available stock</dt><dd data-available>{{ rx.available_stock|default_if_none:"—" }}</dd></div><div><dt>Unreserved balance</dt><dd>{{ rx.remaining_quantity }}</dd></div></dl>
+  {% if rx.dispense_status != 'cancelled' and rx.dispense_status != 'dispensed' %}
+  {% if not rx.prescribed_quantity %}<p class="ops-warning">Doctor clarification needed · Prescribed quantity missing.</p>
+  {% elif rx.remaining_quantity and selected.status != 'cancelled' %}
+  <div class="ph-entry">
+    {% if rx.medicine_id %}<input type="hidden" name="medicine_{{ rx.pk }}" value="{{ rx.medicine_id }}">
+    {% else %}<label class="ops-field">Exact catalogue match<select name="medicine_{{ rx.pk }}" data-match>
+      <option value="">Choose a medicine</option>{% for m in rx.matches %}<option value="{{ m.pk }}" data-stock="{{ m.usable }}" {% if rx.selected_match == m.pk|stringformat:"s" %}selected{% endif %}>{{ m.name }} · {{ m.strength }} · {{ m.form }} · {{ m.get_unit_display }}</option>{% endfor %}
+    </select></label>{% if not rx.matches %}<p class="ops-warning">No exact catalogue match. Review the prescription with the prescriber.</p>{% endif %}{% endif %}
+    <label class="ops-field">Prepare now (units)<input type="number" name="quantity_{{ rx.pk }}" min="0" max="{{ rx.prepare_limit }}" value="{{ rx.entered_quantity }}" data-quantity></label>
+  </div>
+  <p class="ph-note" data-shortage aria-live="polite">{% if rx.available_stock != None and rx.available_stock < rx.remaining_quantity %}Only {{ rx.available_stock }} units available for this balance.{% endif %}</p>
+  {% endif %}{% endif %}
+</article>{% endfor %}
+{% if can_prepare %}<div class="ph-submit"><button class="np-btn teal" type="submit">Prepare issue &amp; send bill to cashier</button></div>{% endif %}</form></section>
+<section class="ph-panel ph-follow"><h2>Issues for this visit</h2>
+{% for issue in issues %}<div class="ph-line"><a href="{% url 'pharmacy_issue' issue.pk %}{% querystring %}">Issue #{{ issue.pk }} · {{ issue.bill.bill_number }}</a><span>₹{{ issue.bill.amount_due }} · {% if issue.ready %}Ready for handover{% else %}{{ issue.get_status_display }}{% endif %}</span></div>{% empty %}<p>No issues prepared yet.</p>{% endfor %}</section>
+{% endblock %}
+{% block tail_scripts %}<script src="{% static 'js/pharmacy.js' %}"></script>{% endblock %}

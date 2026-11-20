@@ -1,0 +1,3 @@
+{% extends "core/operations_base.html" %}
+{% block operations_intro %}{{ intro }}{% endblock %}
+{% block operations_content %}<section class="ops-card" style="max-width:700px"><form method="post">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}{% if field.is_hidden %}{{ field }}{% else %}<label class="ops-field">{{ field.label }}{{ field }}{{ field.errors }}{% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}</label>{% endif %}{% endfor %}<button class="np-btn teal" type="submit">{{ submit_label }}</button></form></section>{% endblock %}

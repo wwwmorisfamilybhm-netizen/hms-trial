@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Visit payment slip {{ consultation.visit_token }} — Cams HMS{% endblock %}
+
+{% block heading %}
+<div class="page-head print-controls" style="display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap;">
+  <div>
+    <h1>Visit payment slip</h1>
+    <p class="page-sub">Consolidated payment for {{ patient.full_name }} · {{ consultation.visit_token }}</p>
+  </div>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <a href="{% url 'visit_billing' consultation.pk %}" class="btn btn-outline">← Back to visit bill</a>
+    <a href="{% url 'post_consultation_billing' %}" class="btn btn-outline">Billing queue</a>
+    <button type="button" class="btn" onclick="window.print()">Print slip</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<article class="visit-slip">
+  <header class="visit-slip-head">
+    <div>
+      <strong class="visit-slip-brand">Cams HMS</strong>
+      <span>Medical Center</span>
+    </div>
+    <div style="text-align:right;">
+      <strong>PAYMENT RECEIPT</strong>
+      <span>{{ consultation.visit_token }}</span>
+      <span>{{ consultation.updated_at|date:"d M Y, h:i A" }}</span>
+    </div>
+  </header>
+
+  <section class="visit-slip-patient">
+    <div><span>Patient</span><strong>{{ patient.full_name }}</strong></div>
+    <div><span>UHID</span><strong>{{ patient.uhid|default:patient.pk }}</strong></div>
+    <div><span>Age / Gender</span><strong>{{ patient.age|default:"—" }} · {{ patient.get_gender_display|default:"—" }}</strong></div>
+    <div><span>Consultant</span><strong>{% if doctor %}{{ doctor.get_full_name|default:doctor.username }}{% else %}—{% endif %}</strong></div>
+  </section>
+
+  <table class="visit-slip-table">
+    <thead><tr><th>#</th><th>Charge</th><th>Source</th><th>Status</th><th style="text-align:right;">Amount</th></tr></thead>
+    <tbody>
+      {% for bill in bills %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>{{ bill.description }}</td>
+        <td>{{ bill.get_source_display }}</td>
+        <td>{% if bill.status == 'paid' %}Paid{% elif bill.status == 'pending' %}Pending{% else %}Cancelled{% endif %}</td>
+        <td style="text-align:right;">₹{{ bill.amount_due|floatformat:2 }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="text-align:center; color:#666;">No charges recorded.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="visit-slip-total"><span>Total paid</span><strong>₹{{ total|floatformat:2 }}</strong></div>
+
+  <section class="visit-slip-meta">
+    <div><span>Collected by</span><strong>{% for bill in bills %}{% if bill.paid_by %}{{ bill.paid_by.get_full_name|default:bill.paid_by.username }}{% endif %}{% endfor %}</strong></div>
+    <div><span>Payment method</span><strong>{% for bill in bills %}{% if bill.payment_method %}{{ bill.get_payment_method_display }}{% endif %}{% endfor %}</strong></div>
+    <div><span>Reference</span><strong>{% for bill in bills %}{% if bill.payment_reference %}{{ bill.payment_reference }}{% endif %}{% endfor %}</strong></div>
+    <div><span>Payment group</span><strong>{% for bill in bills %}{% if bill.payment_group %}{{ bill.payment_group }}{% endif %}{% endfor %}</strong></div>
+  </section>
+
+  <footer class="visit-slip-foot">
+    <span>Thank you for choosing Cams Hospital.</span>
+    <span>Generated from the Cams HMS registration desk.</span>
+  </footer>
+</article>
+
+<style>
+  .visit-slip { max-width: 820px; margin: 0 auto; background: #fff; border: 1px solid var(--line); border-radius: 22px; padding: 34px; box-shadow: 0 12px 40px rgba(25,25,35,.08); color: #202024; }
+  .visit-slip-head { display:flex; justify-content:space-between; gap:18px; border-bottom:2px solid #222; padding-bottom:14px; margin-bottom:18px; }
+  .visit-slip-head strong, .visit-slip-head span { display:block; }
+  .visit-slip-brand { font-size:22px; letter-spacing:-.4px; }
+  .visit-slip-head span { font-size:11px; color:#666; margin-top:3px; }
+  .visit-slip-patient { display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; border:1px solid #ddd; border-radius:10px; padding:12px 14px; margin-bottom:18px; }
+  .visit-slip-patient div { display:flex; gap:8px; font-size:12px; }
+  .visit-slip-patient span { color:#666; min-width:78px; }
+  .visit-slip-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .visit-slip-table th { text-align:left; background:#f4f4f7; border:1px solid #ccc; padding:7px 8px; font-size:10px; text-transform:uppercase; letter-spacing:.4px; }
+  .visit-slip-table td { border:1px solid #ddd; padding:7px 8px; vertical-align:top; }
+  .visit-slip-total { display:flex; justify-content:space-between; gap:12px; margin-top:16px; padding-top:14px; border-top:2px solid #222; font-size:19px; font-weight:800; }
+  .visit-slip-meta { display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; margin-top:20px; border-top:1px dashed #ccc; padding-top:14px; }
+  .visit-slip-meta div { display:flex; gap:8px; font-size:11.5px; }
+  .visit-slip-meta span { color:#666; min-width:100px; }
+  .visit-slip-foot { display:flex; justify-content:space-between; gap:12px; margin-top:24px; padding-top:12px; border-top:1px dashed #ccc; color:#666; font-size:11px; }
+  @media print {
+    .sidebar, .topbar, .print-controls, .messages, .nav-mobile-toggle { display:none !important; }
+    .app, .main { display:block !important; width:100% !important; margin:0 !important; padding:0 !important; }
+    .container { padding:0 !important; max-width:none !important; }
+    body { background:#fff !important; }
+    .visit-slip { max-width:none; border:none; border-radius:0; box-shadow:none; padding:0; }
+  }
+  @page { size: A4; margin: 16mm; }
+  @media (max-width: 700px) {
+    .visit-slip { padding:22px; }
+    .visit-slip-patient, .visit-slip-meta { grid-template-columns:1fr; }
+  }
+</style>
+{% endblock %}

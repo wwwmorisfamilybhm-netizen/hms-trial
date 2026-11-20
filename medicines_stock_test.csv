@@ -1,0 +1,11 @@
+name,generic_name,strength,form,unit,pack_size,manufacturer,barcode,reorder_level,batch_number,expiry_date,supplier,invoice_reference,quantity,quantity_basis,purchase_cost,selling_price,price_basis
+Dolo 650 Tablet,Paracetamol,650mg,Tablet,tablet,15,Micro Labs Ltd,8901148210341,50,DL650-26A,2028-05-31,Apollo Health Supplies,INV-IND-2026-001,100,packs,24.50,33.60,packs
+Pan 40 Tablet,Pantoprazole,40mg,Tablet,tablet,15,Alkem Laboratories Ltd,8901234567890,40,PN40-26C,2028-03-31,Apollo Health Supplies,INV-IND-2026-001,60,packs,115.00,155.00,packs
+Augmentin 625 Duo Tablet,Amoxicillin and Potassium Clavulanate,625mg,Tablet,tablet,10,GlaxoSmithKline Pharmaceuticals Ltd,8901117001234,30,AUG625-26B,2027-11-30,MedPlus Logistics,INV-IND-2026-002,40,packs,160.00,204.00,packs
+Azithral 500 Tablet,Azithromycin,500mg,Tablet,tablet,5,Alembic Pharmaceuticals Ltd,8901345678901,25,AZ500-26F,2028-01-31,MedPlus Logistics,INV-IND-2026-002,50,packs,95.00,120.00,packs
+Glycomet 500 Tablet,Metformin Hydrochloride,500mg,Tablet,tablet,20,USV Ltd,8901456789012,40,GLY500-26D,2028-08-31,Vardhman Pharma Distributors,INV-IND-2026-003,80,packs,32.00,44.00,packs
+Telma 40 Tablet,Telmisartan,40mg,Tablet,tablet,15,Glenmark Pharmaceuticals Ltd,8901567890123,35,TLM40-26H,2028-04-30,Vardhman Pharma Distributors,INV-IND-2026-003,50,packs,145.00,188.00,packs
+Montair LC Tablet,Montelukast and Levocetirizine Hydrochloride,10mg/5mg,Tablet,tablet,15,Cipla Ltd,8901678901234,30,MLC-26E,2027-12-31,Apollo Health Supplies,INV-IND-2026-004,45,packs,190.00,245.00,packs
+Shelcal 500 Tablet,Calcium and Vitamin D3,500mg/250IU,Tablet,tablet,15,Torrent Pharmaceuticals Ltd,8901789012345,40,SHC-26G,2028-02-28,Apollo Health Supplies,INV-IND-2026-004,70,packs,88.00,118.00,packs
+Becosules Capsule,B-Complex Forte with Vitamin C,Standard,Capsule,capsule,20,Pfizer Ltd,8901890123456,50,BEC-26J,2027-10-31,MedPlus Logistics,INV-IND-2026-005,90,packs,42.00,56.00,packs
+Ascoril LS Syrup,"Levosalbutamol, Ambroxol Hydrochloride, and Guaiphenesin",1mg/30mg/50mg per 5ml,Syrup,bottle,1,Glenmark Pharmaceuticals Ltd,8901901234567,20,ASC-26K,2028-06-30,MedPlus Logistics,INV-IND-2026-005,35,units,75.00,108.00,units

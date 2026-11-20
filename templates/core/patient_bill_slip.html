@@ -22,7 +22,8 @@
     <div class="slip-brand"><span class="slip-mark">+</span><div><strong>Cams HMS</strong><small>Medical Center</small></div></div>
     <div class="slip-title"><span>PAYMENT SLIP</span><strong>{{ bill.bill_number }}</strong><small>{{ bill.created_at|date:"d M Y, h:i A" }}</small></div>
   </header>
-  <div class="slip-status {% if bill.status == 'paid' %}paid{% endif %}">{% if bill.status == "paid" %}✓ PAID{% else %}PENDING PAYMENT{% endif %}</div>
+  <div class="slip-status {% if bill.status == 'paid' %}paid{% endif %}">{% if bill.status == "paid" %}✓ PAID{% elif bill.status == "cancelled" %}CANCELLED{% else %}PENDING PAYMENT{% endif %}</div>
+  {% if bill.status != "cancelled" and bill.pharmacy_issue.status != "dispensed" %}
   <div class="slip-actions" style="display:flex; gap:10px; margin:6px 0 0;">
     <form method="post" action="{% url 'bill_set_status' bill.pk %}">
       {% csrf_token %}
@@ -32,6 +33,16 @@
           ↺ Mark as Pending
         </button>
       {% else %}
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:8px;">
+          <label style="display:grid; gap:4px; font-size:11.5px; font-weight:700; color:#555;">Payment method
+            <select name="payment_method" style="padding:7px 9px; border:1px solid #dcdce2; border-radius:9px; font:inherit; font-size:12px;">
+              {% for value, label in payment_methods %}<option value="{{ value }}" {% if value == 'cash' %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+          </label>
+          <label style="display:grid; gap:4px; font-size:11.5px; font-weight:700; color:#555;">Reference (optional)
+            <input type="text" name="payment_reference" placeholder="UPI / card / receipt ref" style="padding:7px 9px; border:1px solid #dcdce2; border-radius:9px; font:inherit; font-size:12px;">
+          </label>
+        </div>
         <button type="submit" class="btn" style="background:#16a34a; color:#fff; font-size:12px; font-weight:800; padding:8px 16px; border-radius:99px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
           <span>Mark as Paid</span>
@@ -39,15 +50,17 @@
       {% endif %}
     </form>
   </div>
+  {% endif %}
   <section class="slip-patient">
     <h2>{{ bill.patient.full_name }}</h2>
-    <div><span>Registration / MR number</span><strong>{{ bill.patient.mr_number|default:bill.patient.pk }}</strong></div>
+    <div><span>Registration / UHID</span><strong>{{ bill.patient.uhid|default:bill.patient.pk }}</strong></div>
     <div><span>Age &amp; gender</span><strong>{% if bill.patient.age %}{{ bill.patient.age }} years{% else %}—{% endif %} · {{ bill.patient.get_gender_display|default:"—" }}</strong></div>
     <div><span>Phone</span><strong>{{ bill.patient.phone|default:"—" }}</strong></div>
   </section>
   <section class="slip-charge">
     <div class="slip-charge-heading"><strong>Payment details</strong><span>{{ bill.get_source_display }}</span></div>
     <div class="slip-description">{{ bill.description }}</div>
+    {% if bill.source == 'pharmacy' %}<div><a href="{% url 'pharmacy_issue' bill.pharmacy_issue.pk %}">Review pharmacy issue</a></div><table style="width:100%;text-align:left;font-size:13px"><thead><tr><th>Medicine</th><th>Units</th><th>Price</th><th>Total</th></tr></thead><tbody>{% for line in bill.pharmacy_issue.lines.all %}<tr><td>{{ line.medicine_name }}</td><td>{{ line.quantity }}</td><td>₹{{ line.unit_price }}</td><td>₹{{ line.total }}</td></tr>{% endfor %}</tbody></table>{% endif %}
     <div class="slip-line"><span>Amount</span><strong>₹{{ bill.amount|floatformat:2 }}</strong></div>
     <div class="slip-line"><span>Discount</span><strong>− ₹{{ bill.discount|floatformat:2 }}</strong></div>
     <div class="slip-total"><span>Amount due</span><strong>₹{{ bill.amount_due|floatformat:2 }}</strong></div>

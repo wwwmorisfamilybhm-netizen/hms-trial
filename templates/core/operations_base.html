@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }} · Cams HMS{% endblock %}
+{% block heading %}
+<div class="np-head"><div><div class="np-kicker">Hospital operations</div><h1 class="np-title">{{ page_title }}</h1><p class="np-sub">{% block operations_intro %}Keep each patient request moving through the care team.{% endblock %}</p></div></div>
+{% endblock %}
+{% block content %}
+{% load static %}<link rel="stylesheet" href="{% static 'css/operations.css' %}?v=20261113">
+{% block operations_nav %}<nav class="ops-nav" aria-label="Operations">
+{% if request.user.profile.designation == 'pharmacy' or request.user.is_superuser or request.user.profile.designation == 'admin' %}
+<a class="np-btn" href="{% url 'pharmacy_dashboard' %}">Pharmacy desk</a><a class="np-btn" href="{% url 'pharmacy_queue' %}">Prescriptions</a><a class="np-btn" href="{% url 'medicine_catalogue' %}">Medicines</a><a class="np-btn" href="{% url 'pharmacy_receive' %}">Receive stock</a><a class="np-btn" href="{% url 'pharmacy_stock_report' %}">Inventory</a><a class="np-btn" href="{% url 'pharmacy_dispense_history' %}">Handovers</a>
+{% endif %}
+{% if request.user.profile.designation == 'registration_desk' or request.user.is_superuser or request.user.profile.designation == 'admin' %}<a class="np-btn" href="{% url 'pharmacy_billing' %}">Pharmacy billing</a>{% endif %}
+{% if request.user.profile.designation == 'service_staff' or request.user.is_superuser or request.user.profile.designation == 'admin' %}<a class="np-btn" href="{% url 'service_staff_dashboard' %}">Service desk</a><a class="np-btn" href="{% url 'service_completed_today' %}">Completed today</a>{% endif %}
+{% if request.user.profile.designation != 'pharmacy' and request.user.profile.designation != 'registration_desk' %}<a class="np-btn" href="{% url 'service_reports' %}">Service reports</a>{% endif %}
+{% if request.user.is_superuser or request.user.profile.designation == 'admin' %}<a class="np-btn" href="{% url 'service_setup' %}">Service catalogue & routing</a><a class="np-btn" href="{% url 'admin_doctors' %}">Staff assignments</a>{% endif %}
+</nav>{% endblock %}
+{% block operations_content %}{% endblock %}
+{% endblock %}

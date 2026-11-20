@@ -65,10 +65,10 @@
         </div>
 
         <div class="field">
-          <label for="id_mr_number">MR Number *</label>
-          {{ form.mr_number }}
-          {% for error in form.mr_number.errors %}<small class="error" style="color:#d32f2f;">{{ error }}</small>{% endfor %}
-          <small style="color:var(--muted); font-size:11px;">Pre-filled with the next available MR number.</small>
+          <label for="id_uhid">UHID *</label>
+          {{ form.uhid }}
+          {% for error in form.uhid.errors %}<small class="error" style="color:#d32f2f;">{{ error }}</small>{% endfor %}
+          <small style="color:var(--muted); font-size:11px;">Pre-filled with the next available UHID.</small>
         </div>
       </div>
 
@@ -110,7 +110,7 @@
     <table>
       <thead>
         <tr>
-          <th>MR Number</th>
+          <th>UHID</th>
           <th>Patient Name</th>
           <th>Age / Sex</th>
           <th>Registered At</th>
@@ -122,7 +122,7 @@
         <tr>
           <td class="cell-strong">
             <span class="badge" style="background:#fee2e2; color:var(--red); font-weight:800;">
-              #{{ patient.mr_number|default:patient.id }}
+              #{{ patient.uhid|default:patient.id }}
             </span>
           </td>
           <td>

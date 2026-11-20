@@ -1,0 +1,364 @@
+.patient-edit {
+  max-width: 1120px;
+  margin-inline: auto;
+  container-type: inline-size;
+}
+
+.patient-edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  padding: clamp(18px, 4cqw, 32px);
+  margin-bottom: 20px;
+  border: 1px solid #e2dcef;
+  border-radius: 20px;
+  background: linear-gradient(110deg, #fff 18%, var(--lav-soft) 100%);
+}
+
+.patient-edit-header h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 4cqw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.16;
+}
+
+.patient-edit-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.patient-edit-identity .badge {
+  background: var(--lime);
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.patient-edit-header .btn {
+  background: #fff;
+}
+
+.patient-edit-header .btn:hover {
+  background: var(--lav-soft);
+}
+
+.patient-edit-form {
+  margin-bottom: 0;
+  padding: clamp(16px, 4cqw, 36px);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(32, 26, 61, 0.05);
+}
+
+.patient-edit-section + .patient-edit-section {
+  margin-top: 30px;
+}
+
+.patient-edit-section h2 {
+  margin: 0 0 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+.patient-edit-grid,
+.patient-edit-birth,
+.patient-edit-age-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 14px 18px;
+}
+
+.patient-edit .field {
+  min-width: 0;
+  margin: 0;
+}
+
+.patient-edit .field label,
+.patient-edit-age legend {
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.patient-edit .field :is(input:not([type="checkbox"]), select, textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+}
+
+.patient-edit .field textarea {
+  resize: vertical;
+}
+
+.patient-edit .field :disabled {
+  background: #f5f4f8;
+  color: var(--muted);
+  opacity: 1;
+}
+
+.patient-edit :is(input, select, textarea, a, button):focus-visible {
+  outline: 2px solid var(--lav-deep);
+  outline-offset: 2px;
+}
+
+.patient-edit :is(input, select, textarea) {
+  scroll-margin-top: 6rem;
+}
+
+.patient-edit-field-wide {
+  grid-column: 1 / -1;
+}
+
+.patient-edit-required {
+  color: var(--red);
+}
+
+.patient-edit-birth {
+  margin-top: 14px;
+}
+
+.patient-edit-age {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.patient-edit-age legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.patient-edit-age-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.patient-edit-age-grid .field label {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.patient-edit .help {
+  font-size: 0.77rem;
+}
+
+.patient-edit-photo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-bottom: 18px;
+  padding: clamp(12px, 2.4cqw, 20px);
+  border-radius: 16px;
+  background: var(--lav-soft);
+}
+
+.patient-edit-portrait {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 84px;
+  height: 84px;
+  overflow: hidden;
+  border: 1px solid #ded6f5;
+  border-radius: 16px;
+  background: #fff;
+  color: var(--lav-deep);
+  font-size: 1.55rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.patient-edit-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.patient-edit-photo .field {
+  flex: 0 1 22rem;
+}
+
+.patient-edit-photo input[type="file"] {
+  padding: 5px 7px;
+  font-size: 0.81rem;
+}
+
+.patient-edit-photo input[type="file"]::file-selector-button {
+  margin-inline-end: 8px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--lav-soft);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.patient-edit .patient-edit-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.patient-edit-photo .patient-edit-checkbox {
+  margin-top: 8px;
+}
+
+.patient-edit-checkbox input {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--lav-deep);
+}
+
+.patient-edit-mlc {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--lav-soft);
+}
+
+.patient-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.patient-edit-actions .btn {
+  padding: 10px 18px;
+}
+
+.patient-edit-actions .patient-edit-save {
+  border-color: var(--lime);
+  background: var(--lime);
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.patient-edit-actions .patient-edit-save:hover {
+  filter: none;
+  border-color: #c6e530;
+  background: #c6e530;
+}
+
+.patient-edit-delete {
+  margin-top: 18px;
+  text-align: end;
+}
+
+.patient-edit-delete a,
+.patient-edit-summary a {
+  color: #9d2424;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.patient-edit-summary h2 {
+  margin-bottom: 5px;
+  font-size: 0.95rem;
+}
+
+.patient-edit-summary ul {
+  margin: 0;
+  padding-inline-start: 1.1rem;
+}
+
+.patient-edit .errorlist {
+  margin: 5px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--red);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+@container (min-width: 600px) {
+  .patient-edit-grid,
+  .patient-edit-birth {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 900px) {
+  .patient-edit-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .patient-edit-birth {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .patient-edit-page .topbar {
+    gap: 8px;
+    padding: 10px 14px;
+  }
+
+  .patient-edit-page .nav-mobile-toggle {
+    flex-shrink: 0;
+    margin-left: 0;
+  }
+
+  .patient-edit-page .topbar .doctor {
+    flex: 1;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .patient-edit-page .topbar .doctor-text {
+    min-width: 0;
+  }
+
+  .patient-edit-page .topbar .doctor-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .patient-edit-page .topbar .reception-avatar {
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .patient-edit-page .topbar :is(.doctor-spec, .user-meta) {
+    display: none;
+  }
+
+  .patient-edit-page .topbar .user-trigger {
+    gap: 5px;
+    padding: 4px 7px 4px 4px;
+  }
+
+  .patient-edit-page .topbar .opd-topbar-tools .mb-date-pill {
+    display: none !important;
+  }
+
+  .patient-edit-page .topbar .opd-topbar-tools .mb-search-box {
+    min-width: 128px !important;
+  }
+}

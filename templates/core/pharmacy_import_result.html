@@ -1,0 +1,6 @@
+{% extends "core/pharmacy_base.html" %}
+{% block operations_content %}
+<section class="ph-panel"><h2>{{ draft.filename }} saved</h2><p>{{ draft.result.created }} medicines created · {{ draft.result.received }} stock receipts recorded.</p>
+<div class="ops-actions"><a class="np-btn" href="{% url 'pharmacy_import' %}">Import another file</a><a class="np-btn" href="{% url 'pharmacy_stock_report' %}">Inventory</a></div>
+<h3 class="ph-follow">Review product photos</h3><ul class="ops-list">{% for medicine in medicines %}<li>{% include "core/pharmacy_thumbnail.html" %}<strong>{{ medicine.name }}</strong> · {{ medicine.strength }} · {{ medicine.manufacturer }} <a class="np-btn" href="{% url 'medicine_photo' medicine.pk %}?import={{ draft.pk }}">Find product photo</a></li>{% endfor %}</ul></section>
+{% endblock %}

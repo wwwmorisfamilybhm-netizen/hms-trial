@@ -608,7 +608,7 @@
       <svg class="rd-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
         <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
       </svg>
-      <input type="search" id="rdSearchInput" name="q" value="{{ query }}" placeholder="Search by name, MR number, phone, C/O, Aadhaar or ABHA…" autocomplete="off">
+      <input type="search" id="rdSearchInput" name="q" value="{{ query }}" placeholder="Search by name, UHID, phone, C/O, Aadhaar or ABHA…" autocomplete="off">
       {% if query %}
         <a href="{% url 'registration_desk' %}{% if date_str %}?date={{ date_str }}{% endif %}" class="rd-clear-search" title="Clear query">✕</a>
       {% endif %}
@@ -701,6 +701,11 @@
                   {% if row.delete_url %}
                     <a href="{{ row.delete_url }}" class="rd-action-btn delete" title="Delete patient record (admin password required)">
                       🗑 Delete
+                    </a>
+                  {% endif %}
+                  {% if row.kind == 'patient' and row.patient_id %}
+                    <a href="{% url 'appointment_create' %}?patient={{ row.patient_id }}" class="rd-action-btn view" title="Book an appointment for this patient">
+                      📅 Book
                     </a>
                   {% endif %}
                   <a href="{{ row.view_url }}" class="rd-action-btn view" title="View full profile">

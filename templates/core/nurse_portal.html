@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Nurse Portal — Triage Desk{% endblock %}
+
+{% block heading %}
+<div class="np-head">
+  <div>
+    <div class="np-kicker">Nurse Portal · Triage &amp; Nursing Desk</div>
+    <h1 class="np-title">Good day, {{ user.get_full_name|default:user.username }}</h1>
+    <p class="np-sub">
+      {{ today|date:"l, j F Y" }} · Visits allocated by the OPD Desk land in your queue.
+      Complete the initial assessment to return them for doctor allocation.
+    </p>
+  </div>
+  <div class="np-head-actions">
+    <a href="{% url 'nurse_queue' %}" class="np-btn">Queue{% if counts.waiting %} · {{ counts.waiting }}{% endif %}</a>
+    <a href="{% url 'nurse_tasks' %}" class="np-btn">Tasks{% if task_counts.pending %} · {{ task_counts.pending }}{% endif %}</a>
+    <a href="{% url 'nurse_handover' %}" class="np-btn">Handover</a>
+    <a href="{% url 'nurse_triage' %}" class="np-btn teal">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      Start triage
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="np-kpis">
+  <div class="np-kpi">
+    <div class="np-kpi-label">In nurse queue</div>
+    <div class="np-kpi-value">{{ counts.waiting }}</div>
+    <div class="np-kpi-note">Waiting for initial assessment</div>
+  </div>
+  <div class="np-kpi urgent">
+    <div class="np-kpi-label">Urgent cases</div>
+    <div class="np-kpi-value">{{ counts.emergency }}</div>
+    <div class="np-kpi-note">Emergency + urgent priority</div>
+  </div>
+  <div class="np-kpi">
+    <div class="np-kpi-label">Longest wait</div>
+    <div class="np-kpi-value">{{ counts.longest_wait }}<small> min</small></div>
+    <div class="np-kpi-note">Since OPD allocation</div>
+  </div>
+  <div class="np-kpi">
+    <div class="np-kpi-label">Being assessed</div>
+    <div class="np-kpi-value">{{ counts.in_assessment }}</div>
+    <div class="np-kpi-note">{{ counts.my_open }} claimed by you</div>
+  </div>
+  <div class="np-kpi done">
+    <div class="np-kpi-label">Sent back today</div>
+    <div class="np-kpi-value">{{ counts.completed_today }}</div>
+    <div class="np-kpi-note">Returned to OPD Desk</div>
+  </div>
+  <div class="np-kpi emergency">
+    <div class="np-kpi-label">Abnormal vitals</div>
+    <div class="np-kpi-value">{{ counts.abnormal_vitals }}</div>
+    <div class="np-kpi-note">Today · out of range readings</div>
+  </div>
+</div>
+
+{% if unsigned_emergencies %}
+  <div class="np-strip emergency">
+    <span class="np-strip-pulse"></span>
+    {{ unsigned_emergencies|length }} emergency registration{{ unsigned_emergencies|length|pluralize }} awaiting triage:
+    {% for p in unsigned_emergencies %}<a href="{% url 'nurse_triage' %}?patient={{ p.pk }}" style="color:inherit; text-decoration:underline; margin-left:4px;">{{ p.full_name }}</a>{% if not forloop.last %},{% endif %}{% endfor %}
+  </div>
+{% elif counts.emergency %}
+  <div class="np-strip amber">
+    <span class="np-strip-pulse"></span>
+    {{ counts.emergency }} urgent visit{{ counts.emergency|pluralize }} in the queue — attend these before routine cases.
+  </div>
+{% endif %}
+
+<div class="np-bento">
+  <!-- ══════════ LEFT COLUMN ══════════ -->
+  <div class="np-col">
+
+    <section class="np-card">
+      <div class="np-card-head">
+        <h2 class="np-card-title"><span class="np-dot"></span>Incoming from OPD Desk</h2>
+        <a href="{% url 'nurse_queue' %}" class="np-card-link">Full queue →</a>
+      </div>
+      {% if waiting_tickets %}
+        <div class="np-queue">
+          {% for ticket in waiting_tickets %}
+            <div class="np-qcard {% if ticket.priority == 'emergency' %}is-emergency{% elif ticket.priority == 'urgent' %}is-urgent{% endif %}">
+              <div class="np-qtoken">{{ ticket.ticket_number }}<small>{{ ticket.wait_minutes }} min</small></div>
+              <div class="np-qmain">
+                <div class="np-qname">
+                  {{ ticket.patient.full_name }}
+                  {% if ticket.patient.is_demo %}<span class="np-badge muted">Demo</span>{% endif %}
+                  <span class="np-badge {{ ticket.priority }}">{{ ticket.get_priority_display }}</span>
+                  {% if ticket.status == 'recalled' %}<span class="np-badge lav">Recall</span>{% endif %}
+                </div>
+                <div class="np-qmeta">
+                  <span>{{ ticket.patient.uhid|default:"No UHID" }}</span>
+                  <span>{{ ticket.patient.age|default:"—" }} yrs · {{ ticket.patient.get_gender_display|default:"—" }}</span>
+                  <span>From {{ ticket.sent_by.get_full_name|default:ticket.sent_by.username|default:"Nurse desk" }}</span>
+                </div>
+                {% if ticket.visit_note %}<div class="np-qnote">“{{ ticket.visit_note }}”</div>{% endif %}
+                {% if ticket.patient.allergies %}<div class="np-qnote" style="color:#b91c1c;">⚠ Allergies: {{ ticket.patient.allergies }}</div>{% endif %}
+              </div>
+              <div class="np-qactions">
+                <form method="post" action="{% url 'nurse_claim_ticket' ticket.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="np-btn sm primary">Claim</button>
+                </form>
+                <a class="np-btn sm lime" href="{% url 'nurse_triage' %}?ticket={{ ticket.pk }}">Assess →</a>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="np-empty">Queue is clear. New OPD Desk allocations will appear here automatically.</div>
+      {% endif %}
+    </section>
+
+    {% if in_assessment_tickets or recalled_tickets %}
+    <section class="np-card">
+      <div class="np-card-head">
+        <h2 class="np-card-title"><span class="np-dot" style="background:var(--np-urgent)"></span>Assessment in progress</h2>
+        <span class="np-card-sub">Open the visit to continue where it was left</span>
+      </div>
+      <div class="np-queue">
+        {% for ticket in in_assessment_tickets %}
+          <div class="np-qcard is-active {% if ticket.claimed_by_id == user.pk %}is-mine{% endif %}">
+            <div class="np-qtoken">{{ ticket.ticket_number }}<small>{{ ticket.wait_minutes }} min</small></div>
+            <div class="np-qmain">
+              <div class="np-qname">{{ ticket.patient.full_name }} <span class="np-badge teal">In assessment</span></div>
+              <div class="np-qmeta">
+                <span>{{ ticket.patient.uhid|default:"No UHID" }}</span>
+                <span>{% if ticket.claimed_by_id == user.pk %}Claimed by you{% else %}Nurse: {{ ticket.claimed_by.get_full_name|default:ticket.claimed_by.username|default:"—" }}{% endif %}</span>
+              </div>
+            </div>
+            <div class="np-qactions">
+              <a class="np-btn sm primary" href="{% url 'nurse_triage' %}?ticket={{ ticket.pk }}">Continue</a>
+            </div>
+          </div>
+        {% endfor %}
+        {% for ticket in recalled_tickets %}
+          <div class="np-qcard is-urgent">
+            <div class="np-qtoken">{{ ticket.ticket_number }}<small>recall</small></div>
+            <div class="np-qmain">
+              <div class="np-qname">{{ ticket.patient.full_name }} <span class="np-badge lav">Re-assessment</span></div>
+              <div class="np-qmeta"><span>{{ ticket.patient.uhid|default:"No UHID" }}</span><span>Previously assessed today</span></div>
+            </div>
+            <div class="np-qactions">
+              <a class="np-btn sm lime" href="{% url 'nurse_triage' %}?ticket={{ ticket.pk }}">Re-assess →</a>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="np-card">
+      <div class="np-card-head">
+        <h2 class="np-card-title"><span class="np-dot" style="background:var(--np-routine)"></span>Assessed today · back at OPD Desk</h2>
+        <a href="{% url 'nurse_handover' %}" class="np-card-link">Handover sheet →</a>
+      </div>
+      {% if completed_today %}
+        <div class="np-queue">
+          {% for ticket in completed_today %}
+            <div class="np-qcard" style="grid-template-columns:auto minmax(0,1fr) auto;">
+              <div class="np-qtoken" style="background:var(--np-routine-soft); color:var(--np-routine);">{{ ticket.ticket_number }}<small style="color:#3f7f57;">{{ ticket.completed_at|date:"H:i" }}</small></div>
+              <div class="np-qmain">
+                <div class="np-qname">🩺 {{ ticket.patient.full_name }}
+                  {% if ticket.escalated %}<span class="np-badge emergency">Escalated</span>{% endif %}
+                  {% if ticket.band.label == 'Emergency' %}<span class="np-badge emergency">Emergency · {{ ticket.band.score }}</span>
+                  {% elif ticket.band.label == 'Semi-urgent' %}<span class="np-badge urgent">Semi-urgent · {{ ticket.band.score }}</span>
+                  {% elif ticket.band %}<span class="np-badge routine">Routine · {{ ticket.band.score }}</span>{% endif %}
+                </div>
+                <div class="np-qmeta">
+                  <span>By {{ ticket.completed_by.get_full_name|default:ticket.completed_by.username|default:"—" }}</span>
+                  <span>Awaits doctor allocation</span>
+                </div>
+              </div>
+              <div class="np-qactions">
+                <form method="post" action="{% url 'nurse_recall_ticket' ticket.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="np-btn sm" title="Bring the patient back for a repeat check">Recall</button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="np-empty">No assessments completed yet today.</div>
+      {% endif %}
+    </section>
+  </div>
+
+  <!-- ══════════ RIGHT COLUMN ══════════ -->
+  <div class="np-col">
+
+    <section class="np-card">
+      <div class="np-card-head">
+        <h2 class="np-card-title">Find a patient</h2>
+        <span class="np-card-sub">Walk-in · Emergency</span>
+      </div>
+      <div class="np-picker" data-nurse-picker>
+        <input type="search" placeholder="Search name, UHID or phone…" aria-label="Search patients for triage" autocomplete="off">
+        <div class="np-picker-results" hidden></div>
+      </div>
+      <p class="np-card-sub" style="margin-top:10px;">Opening a patient here creates a walk-in triage ticket if none is open.</p>
+    </section>
+
+    <section class="np-card">
+      <div class="np-card-head">
+        <h2 class="np-card-title">Nursing tasks</h2>
+        <a href="{% url 'nurse_tasks' %}" class="np-card-link">Board →</a>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+        <span class="np-badge teal">{{ task_counts.pending }} pending</span>
+        <span class="np-badge">{{ task_counts.in_progress }} in progress</span>
+        {% if task_counts.overdue %}<span class="np-badge emergency">{{ task_counts.overdue }} overdue</span>{% endif %}
+        <span class="np-badge routine">{{ task_counts.done_today }} done today</span>
+      </div>
+      {% if flagged_tasks %}
+        {% for task in flagged_tasks %}
+          <div class="np-task {% if task.is_overdue %}overdue{% endif %}">
+            <div class="np-task-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+            </div>
+            <div class="np-task-body">
+              <div class="np-task-title">{{ task.title }}</div>
+              <div class="np-task-meta">{{ task.patient.full_name }}{% if task.due_at %} · due {{ task.due_at|date:"H:i" }}{% endif %}{% if task.is_overdue %} · <strong style="color:#b91c1c;">overdue</strong>{% endif %}</div>
+            </div>
+            <form method="post" action="{% url 'nurse_task_update' task.pk %}" class="np-task-actions">
+              {% csrf_token %}
+              <input type="hidden" name="status" value="done">
+              <input type="hidden" name="next" value="{% url 'nurse_portal' %}">
+              <button type="submit" class="np-btn sm">Done</button>
+            </form>
+          </div>
+        {% endfor %}
+      {% elif task_counts.pending == 0 %}
+        <div class="np-empty">No open nursing tasks.</div>
+      {% else %}
+        <div class="np-empty">{{ task_counts.pending }} routine task{{ task_counts.pending|pluralize }} on the board.</div>
+      {% endif %}
+    </section>
+
+    <section class="np-card dark">
+      <div class="np-card-head">
+        <h2 class="np-card-title"><span class="np-dot" style="background:var(--lime)"></span>Vitals watch</h2>
+        <span class="np-card-sub">Out-of-range today</span>
+      </div>
+      {% if abnormal_today %}
+        <ul class="np-mini-list">
+          {% for item in abnormal_today %}
+            <li>
+              <span><strong>{{ item.assessment.patient.full_name }}</strong><br><span style="font-size:11.5px; opacity:.75;">{{ item.assessment.updated_at|date:"H:i" }}</span></span>
+              <span style="text-align:right; font-size:11.5px; color:#ffd9a8;">{{ item.alerts|join:" · " }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+        <p class="np-card-sub" style="margin-top:10px;">Open the patient record for the full reading set.</p>
+      {% else %}
+        <p class="np-card-sub" style="margin:0;">All recorded vitals are within range today.</p>
+      {% endif %}
+    </section>
+
+    <section class="np-card">
+      <div class="np-card-head">
+        <h2 class="np-card-title">Recent nurse activity</h2>
+      </div>
+      {% if recent_activity %}
+        <ul class="np-activity">
+          {% for event in recent_activity %}
+            <li>
+              <time>{{ event.occurred_at|date:"H:i" }}</time>
+              <span>{{ event.summary }}{% if event.actor %} <span style="color:var(--muted);">· {{ event.actor.get_full_name|default:event.actor.username }}</span>{% endif %}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="np-empty">No nurse activity logged yet.</div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block tail_scripts %}
+<script src="{% static 'js/nurse_portal.js' %}?v=1"></script>
+{% endblock %}

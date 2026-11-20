@@ -1,29 +1,525 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}{{ page_title }} · OPD Management{% endblock %}
-{% block heading %}<div class="opd-page-head"><div><p class="opd-eyebrow">OPD MANAGEMENT</p><h1>{{ page_title }}</h1><p class="page-sub">Route a patient to another specialty and track the referral status.</p></div><a class="opd-action secondary" href="{% url 'opd_patient_queue' %}">Back to patient queue</a></div>{% endblock %}
+
+{% block heading %}
+<style>
+  /* Referral page styles kept inline so the page renders correctly even when
+     a stale static manifest/cache is being served. */
+  :root{--rf-purple:#7053ec;--rf-purple-soft:#ede9fe;--rf-purple-hover:#5d3fe0;--rf-border:rgba(147,128,240,.18);--rf-border-hover:rgba(112,83,236,.4);--rf-card-bg:#fff;--rf-bg-soft:#f8f7fd;--rf-text-main:#191a24;--rf-text-muted:#6b6c7e;--rf-text-dim:#9b9caa}
+  .rf-live-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:750;color:#634be2;background:#ede8fe;padding:3px 10px;border-radius:999px;letter-spacing:.3px;text-transform:uppercase}
+  .rf-pulse-dot{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.2);animation:rfPulse 1.8s infinite}
+  @keyframes rfPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(1.25)}}
+  .rf-panel-card{background:#fff;border-radius:24px;padding:24px;border:1px solid rgba(155,135,248,.14);box-shadow:0 10px 30px rgba(99,75,226,.04)}
+  .rf-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px}
+  .rf-card-header h2{font-size:17px;font-weight:800;color:var(--rf-text-main);margin:0;letter-spacing:-.3px}
+  .rf-count-chip{font-size:11.5px;font-weight:750;color:#553ccb;background:#ede9fe;padding:4px 12px;border-radius:999px;white-space:nowrap}
+  .rf-search-bar{display:flex;gap:10px;align-items:center;margin-bottom:16px}
+  .rf-search-wrap{flex:1;position:relative;display:flex;align-items:center}
+  .rf-search-wrap svg{position:absolute;left:14px;color:#9d9cb0;pointer-events:none}
+  .rf-search-wrap input{width:100%;padding:10px 14px 10px 40px;border-radius:9999px;border:1.5px solid rgba(155,135,248,.2);background:#faf9fe;font-size:13px;font-family:inherit;color:var(--rf-text-main);outline:none;transition:all .18s ease}
+  .rf-search-wrap input:focus{background:#fff;border-color:#7c64f7;box-shadow:0 0 0 4px rgba(124,100,247,.12)}
+  .rf-search-wrap input::placeholder{color:#a2a1b4}
+  .rf-btn-submit{background:var(--mb-lime);color:#1b1c26;border:none;border-radius:9999px;padding:10px 18px;font-size:12.5px;font-weight:750;cursor:pointer;transition:all .15s ease;white-space:nowrap}
+  .rf-btn-submit:hover{background:var(--mb-lime-hover);transform:translateY(-1px);box-shadow:0 4px 12px rgba(212,241,80,.35)}
+  .rf-btn-clear{background:#f1effa;color:#4f418d;border:1px solid rgba(155,135,248,.2);border-radius:9999px;padding:9px 15px;font-size:12.5px;font-weight:700;text-decoration:none;transition:all .15s ease;white-space:nowrap}
+  .rf-btn-clear:hover{background:#e6e2f7;text-decoration:none}
+  /* Patient directory table — emergencies tinted on top, selected row accented. */
+  .rf-emergency-chip{display:inline-flex;align-items:center;gap:5px;background:#fee2e2;color:#b91c1c;font-size:10.5px;font-weight:800;padding:4px 10px;border-radius:999px;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+  .rf-emergency-chip .rf-dot-red{width:5px;height:5px;border-radius:50%;background:#dc2626}
+  .rf-dir-wrap{border:1px solid rgba(155,135,248,.16);border-radius:18px;overflow:hidden;background:#fff}
+  .rf-dir-scroll{max-height:62vh;overflow-y:auto}
+  .rf-dir-scroll::-webkit-scrollbar{width:5px}
+  .rf-dir-scroll::-webkit-scrollbar-thumb{background:rgba(155,135,248,.28);border-radius:999px}
+  table.rf-dir-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px;background:#fff}
+  table.rf-dir-table thead th{position:sticky;top:0;z-index:2;background:#f6f4fd;color:#5f5d78;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;text-align:left;padding:10px 14px;border-bottom:1px solid rgba(155,135,248,.18);white-space:nowrap}
+  table.rf-dir-table tbody td{padding:12px 14px;border-bottom:1px solid #f1eefb;color:var(--rf-text-main);vertical-align:middle}
+  table.rf-dir-table tbody tr{cursor:pointer;transition:background .15s ease}
+  table.rf-dir-table tbody tr:hover{background:#faf8ff}
+  table.rf-dir-table tbody tr:last-child td{border-bottom:none}
+  table.rf-dir-table tbody tr.active{background:linear-gradient(135deg,#f7f5ff 0%,#ebe5fe 100%)}
+  table.rf-dir-table tbody tr.active td:first-child{box-shadow:inset 4px 0 0 #634be2}
+  table.rf-dir-table tbody tr.is-emergency{background:#fff7f7}
+  table.rf-dir-table tbody tr.is-emergency:hover{background:#fff1f1}
+  table.rf-dir-table tbody tr.is-emergency td:first-child{box-shadow:inset 4px 0 0 #dc2626}
+  table.rf-dir-table tbody tr.is-emergency.active{background:linear-gradient(135deg,#fff5f5 0%,#ffe4e6 100%)}
+  .rf-dir-avatar{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,#ede9fe 0%,#ded7fc 100%);border:1px solid rgba(155,135,248,.28);color:#553ccb;font-size:11.5px;font-weight:800;letter-spacing:.3px;display:grid;place-items:center;flex-shrink:0}
+  .rf-dir-avatar.emergency{background:#fee2e2;border-color:#fca5a5;color:#b91c1c}
+  .rf-dir-patient-cell{display:flex;align-items:center;gap:10px;min-width:0}
+  .rf-dir-name{font-weight:750;color:var(--rf-text-main);font-size:13px;text-decoration:none;letter-spacing:-.1px}
+  .rf-dir-name:hover{text-decoration:underline}
+  table.rf-dir-table tr.active .rf-dir-name{color:#4f3bc4}
+  table.rf-dir-table tr.is-emergency .rf-dir-name{color:#991b1b}
+  .rf-dir-uhid{background:#f1effc;color:#634be2;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:6px;letter-spacing:.2px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.rf-dir-table tr.active .rf-dir-uhid{background:#e3dcfd;color:#4f3bc4}
+  table.rf-dir-table tr.is-emergency .rf-dir-uhid{background:#fee2e2;color:#b91c1c}
+  .rf-dir-muted{color:var(--rf-text-muted);font-size:12px;white-space:nowrap}
+  .rf-dir-chip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .rf-dir-chip.allergy{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
+  .rf-dir-chip.referrals{background:#ede9fe;color:#553ccb}
+  .rf-dir-chevron{color:#b9b8c9;display:grid;place-items:center;transition:transform .15s ease,color .15s ease}
+  table.rf-dir-table tr:hover .rf-dir-chevron{transform:translateX(3px);color:#7053ec}
+  .rf-table-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:#faf9fe;border-top:1px solid rgba(155,135,248,.14);flex-wrap:wrap}
+  .rf-page-info{font-size:11.5px;color:var(--rf-text-muted);font-weight:650}
+  .rf-page-btns{display:flex;gap:8px;align-items:center}
+  .rf-page-btn{background:#f1effa;color:#4f418d;border:1px solid rgba(155,135,248,.2);border-radius:9999px;padding:7px 14px;font-size:12px;font-weight:750;text-decoration:none;transition:all .15s ease;white-space:nowrap}
+  .rf-page-btn:hover{background:#e6e2f7;text-decoration:none}
+  .rf-page-btn[aria-disabled="true"]{opacity:.45;pointer-events:none}
+  .rf-chip-uhid{background:#f1effc;color:#634be2;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:6px;letter-spacing:.2px;font-variant-numeric:tabular-nums}
+  .rf-dot-sep{color:#c7c5d8;font-weight:800;font-size:10px}
+  .rf-badge-emergency{display:inline-flex;align-items:center;gap:4px;background:#fee2e2;color:#b91c1c;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:999px;text-transform:uppercase;letter-spacing:.4px}
+  .rf-badge-emergency .rf-dot-red{width:5px;height:5px;border-radius:50%;background:#dc2626}
+  .rf-empty-state{padding:48px 20px;text-align:center;background:#faf9fe;border:1px dashed rgba(155,135,248,.28);border-radius:18px;color:var(--rf-text-muted);font-size:12.5px}
+  .rf-profile-hero{display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,#f7f5ff 0%,#ede9fe 100%);border:1px solid rgba(155,135,248,.22);border-radius:20px;padding:18px;margin-bottom:16px}
+  .rf-profile-avatar-lg{width:56px;height:56px;border-radius:18px;background:#fff;border:1px solid rgba(155,135,248,.28);color:#553ccb;font-size:17px;font-weight:800;display:grid;place-items:center;flex-shrink:0;box-shadow:0 4px 12px rgba(99,75,226,.08)}
+  .rf-profile-avatar-lg.emergency{background:#dc2626;border-color:#dc2626;color:#fff}
+  .rf-profile-title{font-size:21px;font-weight:800;color:var(--rf-text-main);margin:0;letter-spacing:-.5px}
+  .rf-profile-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12px;color:var(--rf-text-muted);margin-top:4px}
+  .rf-allergy-alert{display:flex;align-items:flex-start;gap:9px;background:#fff1f2;border:1px solid #fecdd3;color:#991b1b;border-radius:14px;padding:11px 13px;font-size:12px;line-height:1.45;margin-bottom:16px}
+  .rf-form-grid{display:flex;flex-direction:column;gap:13px}
+  .rf-field-row-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .rf-form-group{display:flex;flex-direction:column;gap:6px}
+  .rf-form-group label{font-size:11.5px;font-weight:750;color:var(--rf-text-muted);text-transform:uppercase;letter-spacing:.4px}
+  .rf-control{width:100%;padding:10px 12px;border-radius:12px;border:1.5px solid rgba(155,135,248,.18);background:#faf9fe;font:inherit;font-size:12.5px;color:var(--rf-text-main);outline:none;transition:all .15s ease;box-sizing:border-box}
+  .rf-control:focus{border-color:#7c64f7;background:#fff;box-shadow:0 0 0 4px rgba(124,100,247,.12)}
+  .rf-control::placeholder{color:#a2a1b4}
+  .rf-file-box{border:1.5px dashed rgba(155,135,248,.3);border-radius:12px;padding:10px;background:#faf9fe;transition:all .15s ease}
+  .rf-file-box:hover{border-color:#8f77f6;background:#f5f2ff}
+  .rf-button-bar{display:flex;gap:10px;margin-top:6px;padding-top:16px;border-top:1px solid rgba(155,135,248,.14)}
+  .rf-btn-draft{flex:1;background:#f1effa;color:#4f418d;border:1px solid rgba(155,135,248,.2);border-radius:9999px;padding:11px 16px;font-size:12.5px;font-weight:750;cursor:pointer;transition:all .15s ease}
+  .rf-btn-draft:hover{background:#e6e2f7}
+  .rf-btn-send{flex:1.35;background:var(--mb-lime);color:#1b1c26;border:none;border-radius:9999px;padding:11px 16px;font-size:12.5px;font-weight:800;cursor:pointer;transition:all .15s ease;box-shadow:0 6px 16px rgba(212,241,80,.3)}
+  .rf-btn-send:hover{background:var(--mb-lime-hover);transform:translateY(-1px);box-shadow:0 8px 20px rgba(212,241,80,.42)}
+  .rf-history-item{background:#faf9fe;border:1px solid rgba(155,135,248,.14);border-radius:14px;padding:12px 14px;transition:all .15s ease}
+  .rf-history-item:hover{border-color:rgba(112,83,236,.3);background:#fff;box-shadow:0 4px 14px rgba(99,75,226,.06)}
+  .rf-hist-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+  .rf-dept-badge{font-size:11.5px;font-weight:750;color:#4f3bc4;background:#ede9fe;padding:3px 9px;border-radius:999px}
+  .rf-hist-reason{font-size:12.5px;color:var(--rf-text-main);line-height:1.45;margin-bottom:4px}
+  .rf-hist-meta{font-size:11.5px;color:#8a88a0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+</style>
+
+<!-- ── Page Header ── -->
+<section class="mb-hero-card" style="margin-bottom:20px;">
+  <div class="mb-hero-top">
+    <div>
+      <span class="mb-hero-badge"><span class="rf-pulse-dot"></span> OPD Desk · Clinical Handover</span>
+      <h2 class="mb-hero-title">{{ page_title }}</h2>
+      <p class="mb-hero-sub">Route patients across specialties, assign doctors, and monitor referral handover statuses in real time.</p>
+    </div>
+    <a href="{% url 'opd_assistant_dashboard' %}" class="mb-btn-action ghost">← Back to dashboard</a>
+  </div>
+
+  <div class="mb-hero-capsules">
+    <div class="mb-capsule">
+      <div class="mb-capsule-head">
+        <span class="mb-capsule-title">Total Referrals</span>
+      </div>
+      <div class="mb-capsule-body">
+        <div>
+          <div class="mb-capsule-num">{{ referral_stats.total|default:"0" }}</div>
+          <div class="mb-capsule-desc">All recorded handovers</div>
+        </div>
+      </div>
+    </div>
+    <div class="mb-capsule">
+      <div class="mb-capsule-head">
+        <span class="mb-capsule-title">Urgent</span>
+      </div>
+      <div class="mb-capsule-body">
+        <div>
+          <div class="mb-capsule-num">{{ referral_stats.urgent|default:"0" }}</div>
+          <div class="mb-capsule-desc">Need priority review</div>
+        </div>
+      </div>
+    </div>
+    <div class="mb-capsule">
+      <div class="mb-capsule-head">
+        <span class="mb-capsule-title">Pending Action</span>
+      </div>
+      <div class="mb-capsule-body">
+        <div>
+          <div class="mb-capsule-num">{{ referral_stats.pending|default:"0" }}</div>
+          <div class="mb-capsule-desc">Draft or sent to department</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
 {% block content %}
-<link rel="stylesheet" href="{% static 'css/opd_dashboard.css' %}">
-<div class="opd-referral-grid">
-  <section class="opd-panel">
-    <h2>New referral</h2>
-    <form method="get" class="opd-queue-search"><label class="opd-search">Find patient<input type="search" name="q" value="{{ query }}" placeholder="Name or UHID"></label><button class="opd-button" type="submit">Search</button></form>
-    {% if not selected_patient %}<div class="opd-queue-list">{% for patient in patients %}<a class="opd-queue-item" href="?patient={{ patient.pk }}"><span class="opd-queue-person"><strong>{{ patient.full_name }}</strong><small>{{ patient.uhid }} · {{ patient.created_at|date:"j M Y" }}</small></span></a>{% empty %}<p class="opd-empty">No patients found.</p>{% endfor %}</div>{% else %}
-    <div class="opd-patient-heading"><span class="opd-queue-avatar large">{{ selected_patient.first_name|slice:":1"|upper }}{{ selected_patient.last_name|slice:":1"|upper }}</span><div><h2>{{ selected_patient.full_name }}</h2><p>{{ selected_patient.uhid }} · {{ selected_patient.age|default:"—" }} / {{ selected_patient.get_gender_display|default:"—" }}</p></div></div>
-    {% if selected_patient.allergies %}<div class="opd-alert-box"><strong>Allergies on file</strong><span>{{ selected_patient.allergies }}</span></div>{% endif %}
-    <form method="post" enctype="multipart/form-data" class="opd-order-form" id="referralForm">{% csrf_token %}<input type="hidden" name="patient_id" value="{{ selected_patient.pk }}">
-      <label>Referral type<select name="referral_type" required>{% for value,label in referral_types %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
-      <label>Department / specialty<input name="department" maxlength="100" required placeholder="e.g. Cardiology"></label>
-      <label>Doctor<select name="doctor_id"><option value="">Select a doctor (optional)</option>{% for doctor in doctors %}<option value="{{ doctor.pk }}">{{ doctor.get_full_name|default:doctor.username }} · {{ doctor.profile.get_specialty_display|default:"General Medicine" }}</option>{% endfor %}</select></label>
-      <label>Reason for referral<input name="reason" maxlength="255" required></label>
-      <label>Urgency<select name="urgency"><option value="routine">Routine</option><option value="urgent">Urgent</option></select></label>
-      <label>Clinical / handover notes<textarea name="notes" rows="4" maxlength="4000"></textarea></label>
-      <label>Attachment<input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg"><small>PDF, PNG, or JPG · maximum 5 MB</small></label>
-      <div class="opd-detail-actions"><button class="opd-button secondary" type="submit" name="action" value="draft">Save draft</button><button class="opd-button" type="submit" name="action" value="send" onclick="return confirm('Send this referral to the destination queue?')">Send referral</button></div>
-    </form>{% endif %}
-  </section>
-  <section class="opd-panel"><div class="opd-panel-head"><div><h2>Referral status</h2><p>Destination queue and visit history</p></div></div>
-    <div class="opd-table-wrap"><table class="opd-flow-table"><thead><tr><th>Patient</th><th>Destination</th><th>Reason</th><th>Priority</th><th>Status</th><th>Sent by / at</th><th>Attachment</th></tr></thead><tbody>{% for referral in referrals %}<tr><td>{{ referral.patient.full_name }}<small>{{ referral.patient.uhid }}</small></td><td>{{ referral.department }}{% if referral.doctor %}<small>{{ referral.doctor.get_full_name|default:referral.doctor.username }}</small>{% endif %}</td><td>{{ referral.reason }}</td><td>{{ referral.get_urgency_display }}</td><td><span class="opd-status status-{{ referral.status }}">{{ referral.get_status_display }}</span></td><td>{% if referral.created_by %}{{ referral.created_by.get_full_name|default:referral.created_by.username }}{% else %}Former user{% endif %}<small>{{ referral.created_at|date:"j M Y, H:i" }}</small></td><td>{% if referral.attachment %}<a href="{{ referral.attachment.url }}">View file</a>{% else %}—{% endif %}</td></tr>{% empty %}<tr><td colspan="7">No referrals for this patient.</td></tr>{% endfor %}</tbody></table></div>
-  </section>
+<div class="mb-bento">
+
+  <!-- ── Left Column: Patient Directory (Professional Healthcare List) ── -->
+  <div class="mb-main-col">
+    <section class="rf-panel-card">
+
+      <!-- Header with Title & Live Patient Counter -->
+      <div class="rf-card-header">
+        <div>
+          <h2>Patient Directory</h2>
+          <span style="font-size:12px; color:var(--rf-text-muted);">Select a patient to initiate or review clinical referrals · {{ patient_total }} in the register</span>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          {% if directory_emergency %}
+            <span class="rf-emergency-chip"><span class="rf-dot-red"></span>{{ directory_emergency }} emergency</span>
+          {% endif %}
+          <span class="rf-count-chip">Showing {{ showing_from }}–{{ showing_to }} of {{ directory_total }}</span>
+        </div>
+      </div>
+
+      <!-- Filter / Search Bar -->
+      <form class="rf-search-bar" method="get">
+        {% if selected_patient %}<input type="hidden" name="patient" value="{{ selected_patient.pk }}">{% endif %}
+        <div class="rf-search-wrap">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="search" name="q" value="{{ query }}" placeholder="Search by patient name, UHID or token..." aria-label="Search patients">
+        </div>
+        <button class="rf-btn-submit" type="submit">Search</button>
+        {% if selected_patient %}
+          <a href="{% url 'opd_referrals' %}?q={{ query|urlencode }}" class="rf-btn-clear" title="Clear patient selection">Clear</a>
+        {% endif %}
+      </form>
+
+      <!-- Patient Directory Table -->
+      {% if page_obj.object_list %}
+        <div class="rf-dir-wrap">
+          <div class="rf-dir-scroll">
+            <table class="rf-dir-table">
+              <thead>
+                <tr>
+                  <th style="width:48px;">#</th>
+                  <th>Patient</th>
+                  <th>UHID</th>
+                  <th>Age / Sex</th>
+                  <th>Phone</th>
+                  <th>Registered</th>
+                  <th>Clinical Context</th>
+                  <th style="width:36px;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for patient in page_obj %}
+                  <tr class="{% if selected_patient.pk == patient.pk %}active{% endif %} {% if patient.is_emergency %}is-emergency{% endif %}"
+                      data-href="?patient={{ patient.pk }}&q={{ query|urlencode }}{% if page_obj.number > 1 %}&page={{ page_obj.number }}{% endif %}">
+                    <td class="rf-dir-muted" style="font-weight:700; color:#c7c5d8;">{{ forloop.counter0|add:page_obj.start_index }}</td>
+                    <td>
+                      <div class="rf-dir-patient-cell">
+                        <div class="rf-dir-avatar {% if patient.is_emergency %}emergency{% endif %}">
+                          {{ patient.first_name|slice:":1" }}{{ patient.last_name|slice:":1" }}
+                        </div>
+                        <div style="min-width:0;">
+                          <a class="rf-dir-name" href="?patient={{ patient.pk }}&q={{ query|urlencode }}{% if page_obj.number > 1 %}&page={{ page_obj.number }}{% endif %}" title="Select {{ patient.full_name }}">{{ patient.full_name }}</a>
+                          {% if patient.is_emergency %}
+                            <div style="margin-top:3px;"><span class="rf-badge-emergency"><span class="rf-dot-red"></span>Emergency</span></div>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="rf-dir-uhid">{{ patient.uhid|default:"No UHID" }}</span></td>
+                    <td class="rf-dir-muted">{{ patient.age|default:"—" }}y{% if patient.gender %} / {{ patient.get_gender_display|slice:":1" }}{% endif %}</td>
+                    <td class="rf-dir-muted">{{ patient.phone|default:"—" }}</td>
+                    <td class="rf-dir-muted">{{ patient.created_at|date:"j M Y" }}</td>
+                    <td>
+                      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        {% if patient.allergies %}
+                          <span class="rf-dir-chip allergy" title="Allergies on file: {{ patient.allergies }}">⚠ {{ patient.allergies|truncatechars:24 }}</span>
+                        {% endif %}
+                        {% if patient.referral_count %}
+                          <span class="rf-dir-chip referrals" title="{{ patient.referral_count }} referral{{ patient.referral_count|pluralize }} recorded">{{ patient.referral_count }} referral{{ patient.referral_count|pluralize }}</span>
+                        {% endif %}
+                      </div>
+                    </td>
+                    <td>
+                      <span class="rf-dir-chevron">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                      </span>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if page_obj.paginator.num_pages > 1 %}
+            <div class="rf-table-foot">
+              <span class="rf-page-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} · {{ directory_total }} matching</span>
+              <div class="rf-page-btns">
+                {% if page_obj.has_previous %}
+                  <a class="rf-page-btn" href="?page={{ page_obj.previous_page_number }}&q={{ query|urlencode }}{% if selected_patient %}&patient={{ selected_patient.pk }}{% endif %}">← Prev</a>
+                {% else %}
+                  <span class="rf-page-btn" aria-disabled="true">← Prev</span>
+                {% endif %}
+                <span class="rf-page-info">Page {{ page_obj.number }}</span>
+                {% if page_obj.has_next %}
+                  <a class="rf-page-btn" href="?page={{ page_obj.next_page_number }}&q={{ query|urlencode }}{% if selected_patient %}&patient={{ selected_patient.pk }}{% endif %}">Next →</a>
+                {% else %}
+                  <span class="rf-page-btn" aria-disabled="true">Next →</span>
+                {% endif %}
+              </div>
+            </div>
+          {% endif %}
+        </div>
+        <script>
+          (function () {
+            document.querySelectorAll("table.rf-dir-table tbody tr[data-href]").forEach(function (row) {
+              row.addEventListener("click", function (e) {
+                if (e.target.closest("a")) return;
+                window.location.href = row.getAttribute("data-href");
+              });
+            });
+          })();
+        </script>
+      {% else %}
+        <div class="rf-empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px; display:block;">
+            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <div style="font-size:15px; font-weight:750; color:var(--rf-text-main); margin-bottom:4px;">No patients match this query</div>
+          <div style="font-size:12.5px;">Try refining your name, UHID or phone search keywords.</div>
+        </div>
+      {% endif %}
+
+    </section>
+  </div>
+
+  <!-- ── Right Column: Referral Form & Destination Panel ── -->
+  <aside class="mb-side-col">
+    <section class="rf-panel-card">
+
+      {% if selected_patient %}
+
+        <!-- Selected Patient Hero Profile Banner -->
+        <div class="rf-profile-hero">
+          <div class="rf-profile-avatar-lg {% if selected_patient.is_emergency %}emergency{% endif %}">
+            {{ selected_patient.first_name|slice:":1" }}{{ selected_patient.last_name|slice:":1" }}
+          </div>
+          <div style="flex:1; min-width:0;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap;">
+              <span class="rf-chip-uhid" style="font-size:12px; padding:3px 9px;">{{ selected_patient.uhid }}</span>
+              {% if selected_patient.is_emergency %}
+                <span class="rf-badge-emergency"><span class="rf-dot-red"></span>Emergency</span>
+              {% endif %}
+            </div>
+            <h2 class="rf-profile-title">{{ selected_patient.full_name }}</h2>
+            <div class="rf-profile-meta">
+              <span>{{ selected_patient.age|default:"—" }} yrs</span>
+              <span class="rf-dot-sep">·</span>
+              <span>{{ selected_patient.get_gender_display|default:"Gender not specified" }}</span>
+              <span class="rf-dot-sep">·</span>
+              <span>Admitted {{ selected_patient.created_at|date:"j M Y, H:i" }}</span>
+            </div>
+          </div>
+        </div>
+
+        {% if selected_patient.allergies %}
+          <div class="rf-allergy-alert">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <div><strong>Allergies on File:</strong> {{ selected_patient.allergies }}</div>
+          </div>
+        {% endif %}
+
+        <!-- Referral Form Heading -->
+        <div style="margin-bottom:16px;">
+          <h3 style="margin:0 0 4px; font-size:16px; font-weight:800; color:var(--rf-text-main); display:flex; align-items:center; gap:8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7053ec" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"></path>
+            </svg>
+            Initiate Clinical Referral
+          </h3>
+          <p style="margin:0; font-size:12.5px; color:var(--rf-text-muted);">Configure destination department, attending specialist, and handover urgency.</p>
+        </div>
+
+        <!-- Referral Submission Form -->
+        <form method="post" enctype="multipart/form-data" class="rf-form-grid" id="referralForm">
+          {% csrf_token %}
+          <input type="hidden" name="patient_id" value="{{ selected_patient.pk }}">
+
+          <div class="rf-field-row-2">
+            <div class="rf-form-group">
+              <label for="id_referral_type">Referral Type</label>
+              <select name="referral_type" id="id_referral_type" class="rf-control" required>
+                {% for value,label in referral_types %}
+                  <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="rf-form-group">
+              <label for="id_urgency">Clinical Urgency</label>
+              <select name="urgency" id="id_urgency" class="rf-control" required>
+                <option value="routine">Routine</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="rf-field-row-2">
+            <div class="rf-form-group">
+              <label for="id_department">Department / Specialty</label>
+              <input name="department" id="id_department" class="rf-control" maxlength="100" required placeholder="e.g. Cardiology, Neurology...">
+            </div>
+            <div class="rf-form-group">
+              <label for="id_doctor">Attending Doctor</label>
+              <select name="doctor_id" id="id_doctor" class="rf-control">
+                <option value="">Select Doctor (Optional)</option>
+                {% for doctor in doctors %}
+                  <option value="{{ doctor.pk }}">{{ doctor.get_full_name|default:doctor.username }} · {{ doctor.profile.get_specialty_display|default:"General Medicine" }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="rf-form-group">
+            <label for="id_reason">Reason for Referral</label>
+            <input name="reason" id="id_reason" class="rf-control" maxlength="255" required placeholder="Primary clinical symptom or specialty evaluation reason...">
+          </div>
+
+          <div class="rf-form-group">
+            <label for="id_notes">Clinical Handover Notes</label>
+            <textarea name="notes" id="id_notes" class="rf-control" rows="3" maxlength="4000" placeholder="Provide background observations, ongoing medications, or specific referral goals..."></textarea>
+          </div>
+
+          <div class="rf-form-group">
+            <label>Clinical Document Attachment</label>
+            <div class="rf-file-box">
+              <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg" style="width:100%; font-size:12.5px; color:#55566c;">
+              <small style="display:block; margin-top:4px; font-size:11px; color:#8a88a0;">Supported formats: PDF, PNG, JPG (maximum 5 MB)</small>
+            </div>
+          </div>
+
+          <div class="rf-button-bar">
+            <button class="rf-btn-draft" type="submit" name="action" value="draft">Save as Draft</button>
+            <button class="rf-btn-send" type="submit" name="action" value="send" onclick="return confirm('Send this referral to the destination department queue?')">
+              Send Referral →
+            </button>
+          </div>
+        </form>
+
+        <!-- Referral History for This Patient -->
+        {% if referrals %}
+          <hr style="border:none; border-top:1px solid rgba(155, 135, 248, 0.16); margin:24px 0 16px;">
+          <h3 style="margin:0 0 12px; font-size:14.5px; font-weight:800; color:var(--rf-text-main); display:flex; align-items:center; gap:8px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#7053ec;">
+              <circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            Referral Records ({{ referrals|length }})
+          </h3>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            {% for referral in referrals %}
+              <div class="rf-history-item">
+                <div class="rf-hist-head">
+                  <span class="rf-dept-badge">
+                    {{ referral.department }}{% if referral.doctor %} · {{ referral.doctor.get_full_name|default:referral.doctor.username }}{% endif %}
+                  </span>
+                  <span class="mb-status-tag {{ referral.status|slugify }}">{{ referral.get_status_display }}</span>
+                </div>
+                <div class="rf-hist-reason">
+                  <strong>Reason:</strong> {{ referral.reason }}
+                </div>
+                <div class="rf-hist-meta">
+                  <span>Priority: <strong>{{ referral.get_urgency_display }}</strong></span>
+                  <span class="rf-dot-sep">·</span>
+                  <span>Sent by {% if referral.created_by %}{{ referral.created_by.get_full_name|default:referral.created_by.username }}{% else %}Staff{% endif %}</span>
+                  <span class="rf-dot-sep">·</span>
+                  <span>{{ referral.created_at|date:"j M Y, H:i" }}</span>
+                </div>
+                {% if referral.attachment %}
+                  <div style="margin-top:2px;">
+                    <a href="{{ referral.attachment.url }}" style="font-size:11.5px; font-weight:750; color:#7053ec; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+                      📎 View Attached Document
+                    </a>
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+      {% else %}
+
+        <!-- Empty State When No Patient is Selected -->
+        <div style="padding:48px 24px; text-align:center;">
+          <div style="width:68px; height:68px; border-radius:22px; background:linear-gradient(135deg, #ede9fe 0%, #ded7fc 100%); border:1px solid rgba(155, 135, 248, 0.28); margin:0 auto 16px; display:grid; place-items:center; color:#553ccb;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"></path>
+            </svg>
+          </div>
+          <h3 style="font-size:17px; font-weight:800; color:var(--rf-text-main); margin:0 0 6px;">Select a Patient from Directory</h3>
+          <p style="font-size:13px; color:var(--rf-text-muted); max-width:320px; margin:0 auto 20px; line-height:1.45;">
+            Choose any registered patient on the left to initiate a specialized handover, track pending status, or attach clinical documentation.
+          </p>
+          <div style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#553ccb; background:#ede9fe; padding:6px 14px; border-radius:999px;">
+            👈 Click any patient row to get started
+          </div>
+        </div>
+
+      {% endif %}
+
+    </section>
+
+    <!-- Recent Global Referrals Table (when no patient selected) -->
+    {% if not selected_patient and referrals %}
+      <section class="rf-panel-card" style="margin-top:20px;">
+        <div class="rf-card-header">
+          <div>
+            <h2>Recent Clinical Referrals</h2>
+            <span style="font-size:12px; color:var(--rf-text-muted);">Active cross-consultations across all departments</span>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="mb-styled-table">
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>Destination</th>
+                <th>Reason</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for referral in referrals %}
+                <tr>
+                  <td>
+                    <a href="?patient={{ referral.patient.pk }}" style="color:#7053ec; font-weight:750; text-decoration:none;">
+                      {{ referral.patient.full_name }}
+                    </a>
+                    <div style="font-size:11px; color:var(--rf-text-muted);">{{ referral.patient.uhid }}</div>
+                  </td>
+                  <td>
+                    <strong>{{ referral.department }}</strong>
+                    {% if referral.doctor %}
+                      <div style="font-size:11px; color:var(--rf-text-muted);">{{ referral.doctor.get_full_name|default:referral.doctor.username }}</div>
+                    {% endif %}
+                  </td>
+                  <td style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ referral.reason }}</td>
+                  <td>
+                    <span style="font-weight:700; font-size:12px; {% if referral.urgency == 'urgent' %}color:#dc2626;{% else %}color:#475569;{% endif %}">
+                      {{ referral.get_urgency_display }}
+                    </span>
+                  </td>
+                  <td><span class="mb-status-tag {{ referral.status|slugify }}">{{ referral.get_status_display }}</span></td>
+                  <td>
+                    <div style="font-size:12px; color:var(--rf-text-main);">{{ referral.created_at|date:"j M Y" }}</div>
+                    <div style="font-size:11px; color:var(--rf-text-muted);">{{ referral.created_at|date:"H:i" }}</div>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="6" style="text-align:center; color:var(--rf-text-muted); padding:24px;">No referrals recorded yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
+
+  </aside>
 </div>
 {% endblock %}

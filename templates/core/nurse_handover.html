@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Shift Handover — OPD Desk{% endblock %}
+
+{% block heading %}
+<div class="np-head">
+  <div>
+    <div class="np-kicker">OPD Desk · Shift Handover</div>
+    <h1 class="np-title">Shift Handover Sheet</h1>
+    <p class="np-sub">{{ today|date:"l, j F Y" }} · everything the incoming shift needs in one printable page.</p>
+  </div>
+  <div class="np-head-actions">
+    <a href="{% url 'opd_assistant_dashboard' %}" class="np-btn">← OPD Desk</a>
+    <button type="button" class="np-btn primary" onclick="window.print()">Print / Save PDF</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="np-kpis">
+  <div class="np-kpi"><div class="np-kpi-label">Received</div><div class="np-kpi-value">{{ stats.received }}</div><div class="np-kpi-note">Visits routed by OPD Desk</div></div>
+  <div class="np-kpi done"><div class="np-kpi-label">Assessed</div><div class="np-kpi-value">{{ stats.assessed }}</div><div class="np-kpi-note">Returned for doctor allocation</div></div>
+  <div class="np-kpi urgent"><div class="np-kpi-label">Still pending</div><div class="np-kpi-value">{{ stats.pending }}</div><div class="np-kpi-note">Open in the assessment queue</div></div>
+  <div class="np-kpi emergency"><div class="np-kpi-label">Emergencies</div><div class="np-kpi-value">{{ stats.emergency }}</div><div class="np-kpi-note">{{ stats.escalated }} escalated</div></div>
+  <div class="np-kpi"><div class="np-kpi-label">Avg. wait</div><div class="np-kpi-value">{{ stats.avg_wait }}<small> min</small></div><div class="np-kpi-note">From allocation to assessment</div></div>
+</div>
+
+{% if pending %}
+  <section class="np-card" style="margin-bottom:18px;">
+    <div class="np-card-head">
+      <h2 class="np-card-title"><span class="np-dot" style="background:var(--np-urgent)"></span>Hand over to the next shift — still pending</h2>
+      <span class="np-card-sub">{{ pending|length }} visit{{ pending|length|pluralize }}</span>
+    </div>
+    <table class="np-table">
+      <thead><tr><th>Ticket</th><th>Patient</th><th>Priority</th><th>Waiting</th><th>OPD note</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for ticket in pending %}
+          <tr>
+            <td><strong>{{ ticket.ticket_number }}</strong></td>
+            <td>{{ ticket.patient.full_name }}<br><span style="font-size:11.5px; color:var(--muted);">{{ ticket.patient.uhid }} · {{ ticket.patient.age|default:"—" }} yrs</span></td>
+            <td><span class="np-badge {{ ticket.priority }}">{{ ticket.get_priority_display }}</span></td>
+            <td>{{ ticket.wait_minutes }} min</td>
+            <td>{{ ticket.visit_note|default:"—" }}</td>
+            <td>{{ ticket.get_status_display }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endif %}
+
+<section class="np-card" style="margin-bottom:18px;">
+  <div class="np-card-head">
+    <h2 class="np-card-title"><span class="np-dot" style="background:var(--np-routine)"></span>Assessed &amp; handed to OPD Desk</h2>
+    <span class="np-card-sub">{{ rows|length }} visit{{ rows|length|pluralize }}</span>
+  </div>
+  {% if rows %}
+    <table class="np-table">
+      <thead>
+        <tr><th>Ticket</th><th>Patient</th><th>Vitals</th><th>Complaint</th><th>Score</th><th>Alerts</th><th>Assessed by</th><th>Time</th></tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <td><strong>{{ row.ticket.ticket_number }}</strong></td>
+            <td>{{ row.patient.full_name }}<br><span style="font-size:11.5px; color:var(--muted);">{{ row.patient.uhid }}</span></td>
+            <td style="font-size:12px;">
+              {% with a=row.ticket.assessment %}
+                {% if a %}
+                  {% if a.temperature %}T {{ a.temperature }}°C<br>{% endif %}
+                  {% if a.bp_systolic %}BP {{ a.bp_systolic }}/{{ a.bp_diastolic|default:"—" }}<br>{% endif %}
+                  {% if a.pulse %}P {{ a.pulse }}/min<br>{% endif %}
+                  {% if a.spo2 %}SpO₂ {{ a.spo2 }}%{% endif %}
+                {% else %}—{% endif %}
+              {% endwith %}
+            </td>
+            <td style="font-size:12px; max-width:220px;">{{ row.ticket.assessment.complaints|default:"—"|truncatechars:90 }}</td>
+            <td><span class="np-badge {% if row.score >= 70 %}emergency{% elif row.score >= 40 %}urgent{% else %}routine{% endif %}">{{ row.score }}</span></td>
+            <td style="font-size:12px; color:#b91c1c;">{{ row.alerts|join:" · "|default:"—" }}</td>
+            <td style="font-size:12px;">{{ row.nurse.get_full_name|default:row.nurse.username|default:"—" }}</td>
+            <td style="font-size:12px;">{{ row.ticket.completed_at|date:"H:i" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="np-empty">No assessments completed yet today.</div>
+  {% endif %}
+</section>
+
+<section class="np-card">
+  <div class="np-card-head">
+    <h2 class="np-card-title">Open nursing tasks</h2>
+    <span class="np-card-sub">{{ open_tasks|length }} task{{ open_tasks|length|pluralize }}</span>
+  </div>
+  {% if open_tasks %}
+    <table class="np-table">
+      <thead><tr><th>Task</th><th>Patient</th><th>Type</th><th>Due</th><th>Assigned</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for task in open_tasks %}
+          <tr>
+            <td><strong>{{ task.title }}</strong>{% if task.is_overdue %} <span class="np-badge emergency">Overdue</span>{% endif %}</td>
+            <td>{{ task.patient.full_name }}</td>
+            <td>{{ task.get_kind_display }}</td>
+            <td>{{ task.due_at|date:"j M, H:i"|default:"—" }}</td>
+            <td>{{ task.assigned_to.get_full_name|default:task.assigned_to.username|default:"Unassigned" }}</td>
+            <td>{{ task.get_status_display }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="np-empty">No open nursing tasks.</div>
+  {% endif %}
+</section>
+
+{% endblock %}

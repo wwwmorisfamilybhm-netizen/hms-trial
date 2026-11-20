@@ -165,6 +165,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="patient",
             name="mr_number",
-            field=models.CharField(max_length=20, blank=True, verbose_name="MR Number"),
+            field=models.CharField(max_length=20, blank=True, verbose_name="UHID"),
         ),
     ]

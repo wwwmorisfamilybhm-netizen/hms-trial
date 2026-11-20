@@ -6,17 +6,17 @@
    ============================================================ */
 
 :root {
-  --opd-border: #e5e5e8;
-  --opd-border-strong: #d4d4d8;
-  --opd-ink: #202024;
-  --opd-ink-soft: #3a3a40;
-  --opd-muted: #74747a;
-  --opd-faint: #9d9da3;
-  --opd-lime: #d7f261;
-  --opd-lav: #c5b9f4;
-  --opd-lav-deep: #a99ae9;
-  --opd-lav-soft: #f0eefb;
-  --opd-shadow: 0 1px 2px rgba(32, 32, 36, 0.04), 0 10px 26px -18px rgba(32, 32, 36, 0.25);
+  --opd-border: #ebebf0;
+  --opd-border-strong: #dcdce2;
+  --opd-ink: #1b1c26;
+  --opd-ink-soft: #2d313a;
+  --opd-muted: #787886;
+  --opd-faint: #a1a1aa;
+  --opd-lime: #d4f150;
+  --opd-lav: #9b87f8;
+  --opd-lav-deep: #6352b5;
+  --opd-lav-soft: #f1effc;
+  --opd-shadow: 0 4px 20px rgba(155, 135, 248, 0.06);
 }
 
 /* ───────────────────── Counter metrics ───────────────────── */

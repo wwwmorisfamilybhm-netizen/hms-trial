@@ -75,7 +75,7 @@ class PatientBillAdmin(admin.ModelAdmin):
     list_display = ["bill_number", "patient", "source", "description", "amount", "discount", "status", "created_at"]
     list_filter = ["source", "status", "created_at"]
     list_editable = ["status"]
-    search_fields = ["patient__first_name", "patient__last_name", "patient__mr_number", "description"]
+    search_fields = ["patient__first_name", "patient__last_name", "patient__uhid", "description"]
     readonly_fields = ["created_at", "paid_at"]
 
     def save_model(self, request, obj, form, change):
@@ -86,7 +86,10 @@ class PatientBillAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
-from .models import InitialAssessment, ConsultationSession, PrescriptionItem, ClinicalOrder, DiagnosticReport
+from .models import (
+    InitialAssessment, ConsultationSession, PrescriptionItem, ClinicalOrder, DiagnosticReport,
+    NurseQueueTicket, NurseTask,
+)
 
 @admin.register(InitialAssessment)
 class InitialAssessmentAdmin(admin.ModelAdmin):
@@ -95,11 +98,13 @@ class InitialAssessmentAdmin(admin.ModelAdmin):
 
 
 class PrescriptionItemInline(admin.TabularInline):
+    readonly_fields = ["dispense_status", "stock_status", "dispensed_quantity", "reserved_quantity", "legacy_dispensed_quantity", "dispensed_by", "released_at", "updated_at"]
     model = PrescriptionItem
     extra = 1
 
 
 class ClinicalOrderInline(admin.TabularInline):
+    readonly_fields = ["status", "result_summary", "operational_details", "assigned_staff", "started_at", "completed_at", "completed_by", "updated_by"]
     model = ClinicalOrder
     extra = 1
 
@@ -118,3 +123,62 @@ class DiagnosticReportAdmin(admin.ModelAdmin):
     list_filter = ["category", "status", "report_date"]
     search_fields = ["title", "patient__first_name", "patient__last_name"]
 
+
+@admin.register(NurseQueueTicket)
+class NurseQueueTicketAdmin(admin.ModelAdmin):
+    list_display = ["ticket_number", "patient", "priority", "status", "sent_by", "claimed_by", "completed_by", "sent_at"]
+    list_filter = ["status", "priority", "source", "sent_at"]
+    search_fields = ["patient__first_name", "patient__last_name", "patient__uhid"]
+    readonly_fields = ["sent_at"]
+
+
+@admin.register(NurseTask)
+class NurseTaskAdmin(admin.ModelAdmin):
+    list_display = ["title", "patient", "kind", "priority", "status", "due_at", "assigned_to"]
+    list_filter = ["kind", "priority", "status"]
+    search_fields = ["title", "patient__first_name", "patient__last_name", "patient__uhid"]
+
+
+
+from .models import Medicine, MedicineBatch, StockMovement, PharmacyIssue, PharmacyIssueLine, BatchAllocation, ServiceDepartment, ServiceDefinition
+
+
+@admin.register(Medicine)
+class MedicineAdmin(admin.ModelAdmin):
+    list_display = ["name", "strength", "form", "unit", "pack_size", "reorder_level", "is_active"]
+    search_fields = ["name", "generic_name"]
+
+    def get_readonly_fields(self, request, obj=None):
+        return ["name", "strength", "form", "unit", "pack_size"] if obj and obj.batches.exists() else []
+
+
+class OperationsReadOnlyAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(MedicineBatch)
+class MedicineBatchAdmin(OperationsReadOnlyAdmin):
+    list_display = ["medicine", "batch_number", "expiry_date", "on_hand", "reserved", "selling_price"]
+    search_fields = ["medicine__name", "batch_number"]
+
+
+@admin.register(StockMovement)
+class StockMovementAdmin(OperationsReadOnlyAdmin):
+    list_display = ["batch", "quantity", "kind", "reason", "actor", "created_at"]
+    list_filter = ["kind", "created_at"]
+
+
+@admin.register(PharmacyIssue)
+class PharmacyIssueAdmin(OperationsReadOnlyAdmin):
+    list_display = ["id", "consultation", "bill", "status", "created_at", "dispensed_at"]
+
+
+admin.site.register(ServiceDepartment)
+admin.site.register(ServiceDefinition)

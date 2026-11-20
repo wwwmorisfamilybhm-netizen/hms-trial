@@ -1,0 +1,29 @@
+{% extends "core/pharmacy_base.html" %}
+{% block operations_content %}
+<div class="ops-grid">
+  <section class="ph-panel">
+    <div class="ph-panel-head"><h2>Medicines</h2><a class="np-btn" href="{% url 'pharmacy_import' %}">Import medicines / stock</a><a href="#medicine-form">Add or edit a medicine</a></div>
+    <form class="ops-search ph-follow" method="get" action="{% url 'medicine_catalogue' %}">
+      <input type="search" aria-label="Search medicine" name="q" value="{{ query }}" placeholder="Name or generic">
+      <button class="np-btn" type="submit">Search</button>
+    </form>
+    <ul class="ops-list">
+      {% for medicine in medicines %}<li class="ph-product">
+        {% include "core/pharmacy_thumbnail.html" with medicine=medicine %}
+        <a href="{% url 'medicine_edit' medicine.pk %}#medicine-form"><strong>{{ medicine.name }}</strong></a>
+        <a href="{% url 'medicine_photo' medicine.pk %}">Product photo</a>
+        <div class="ops-muted">{{ medicine.manufacturer }} · {{ medicine.strength }} · {{ medicine.form }} · {{ medicine.pack_size }} {{ medicine.get_unit_display }} per pack · Reorder at {{ medicine.reorder_level }}{% if not medicine.is_active %} · Inactive{% endif %}</div>
+      </li>{% empty %}<li class="ops-empty">No matching medicines. Add an entry before receiving its first batch.</li>{% endfor %}
+    </ul>
+    {% include 'core/pharmacy_pagination.html' with page=medicines %}
+  </section>
+  <section class="ph-panel" id="medicine-form"><h2>{% if editing %}Edit medicine{% else %}Add a medicine{% endif %}</h2>
+    <form method="post" class="ph-follow">{% csrf_token %}{{ form.non_field_errors }}
+      {% for field in form %}{% include "core/pharmacy_field.html" with field=field %}{% endfor %}
+      <div class="ops-actions"><button type="submit" class="np-btn teal">Save medicine</button>
+        {% if editing %}<a href="{% url 'medicine_catalogue' %}#medicine-form">Add another</a>{% endif %}
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}
