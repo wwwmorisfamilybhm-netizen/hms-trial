@@ -1,3 +1,226 @@
 {% extends "core/pharmacy_base.html" %}
-{% block operations_content %}<section class="ops-card"><h2>Medicine handovers</h2><form method="get" class="ops-search"><label class="ops-field">Patient or UHID<input type="search" name="q" value="{{ query }}"></label><label class="ops-field">Staff<select name="scope"><option value="all">All pharmacy staff</option><option value="mine" {% if mine_only %}selected{% endif %}>My handovers</option></select></label><label class="ops-field">From<input type="date" name="from" value="{{ request.GET.from }}"></label><label class="ops-field">To<input type="date" name="to" value="{{ request.GET.to }}"></label><button class="np-btn" type="submit">Filter</button></form><div class="ops-scroll"><table class="ops-table"><thead><tr><th>When</th><th>Patient / visit</th><th>Issue</th><th>Bill</th><th>Handed over by</th></tr></thead><tbody>{% for issue in issues %}<tr><td>{{ issue.dispensed_at|date:'d M Y H:i' }}</td><td>{{ issue.consultation.patient.full_name }}<div class="ops-muted">{{ issue.consultation.patient.uhid }} · {{ issue.consultation.visit_token }}</div></td><td><a href="{% url 'pharmacy_issue' issue.pk %}{% querystring source="history" %}">Issue #{{ issue.pk }} · Details / print</a></td><td>{{ issue.bill.bill_number }} · ₹{{ issue.bill.amount_due }}</td><td>{% firstof issue.dispensed_by.get_full_name issue.dispensed_by.username '—' %}</td></tr>{% empty %}<tr><td colspan="5" class="ops-empty">No medicine handovers recorded in this period.</td></tr>{% endfor %}</tbody></table></div>{% include 'core/pharmacy_pagination.html' with page=issues %}</section>
-{% if legacy %}<section class="ops-card"><h2>Historical dispensing</h2><p class="ops-muted">These records predate batch inventory. Quantities are preserved without assumed stock deductions.</p><ul class="ops-list">{% for rx in legacy %}<li>{{ rx.consultation.patient.full_name }} · {{ rx.medicine_name }} · {{ rx.legacy_dispensed_quantity }} units · Updated {{ rx.updated_at|date:"d M Y" }}</li>{% endfor %}</ul><div class="ops-page">{% if legacy.has_previous %}<a href="{% querystring legacy_page=legacy.previous_page_number %}">← Earlier records</a>{% endif %}<span>Historical page {{ legacy.number }} of {{ legacy.paginator.num_pages }}</span>{% if legacy.has_next %}<a href="{% querystring legacy_page=legacy.next_page_number %}">More historical records →</a>{% endif %}</div></section>{% endif %}{% endblock %}
+{% block operations_content %}
+{% with today_iso=today|date:"Y-m-d" %}
+<div class="ops-kpis ph-history-kpis">
+  <a class="ops-kpi{% if not query and not mine_only and not request.GET.from and not request.GET.to %} is-current{% endif %}" href="{% url 'pharmacy_dispense_history' %}">
+    Handovers
+    <strong>{{ issues.paginator.count }}</strong>
+    {% if query or mine_only or request.GET.from or request.GET.to %}matching active filters{% else %}completed medicine issues{% endif %}
+  </a>
+  <a class="ops-kpi{% if not mine_only %} is-current{% endif %}" href="{% url 'pharmacy_dispense_history' %}{% querystring scope='all' page=None %}">
+    All pharmacy staff
+    <strong>{% if not mine_only %}{{ issues.paginator.count }}{% else %}All{% endif %}</strong>
+    department-wide handovers
+  </a>
+  <a class="ops-kpi{% if mine_only %} is-current{% endif %}" href="{% url 'pharmacy_dispense_history' %}{% querystring scope='mine' page=None %}">
+    My handovers
+    <strong>{% if mine_only %}{{ issues.paginator.count }}{% else %}Mine{% endif %}</strong>
+    dispensed by {% firstof request.user.get_full_name request.user.username %}
+  </a>
+  <a class="ops-kpi{% if request.GET.from == today_iso and request.GET.to == today_iso %} is-current{% endif %}" href="{% url 'pharmacy_dispense_history' %}{% querystring from=today_iso to=today_iso page=None %}">
+    Today's handovers
+    <strong>{{ today|date:"d M" }}</strong>
+    {% if request.GET.from == today_iso and request.GET.to == today_iso %}{{ issues.paginator.count }} recorded today{% else %}filter to {{ today|date:"d M Y" }}{% endif %}
+  </a>
+  {% if legacy.paginator.count %}
+  <a class="ops-kpi" href="#historical-dispensing">
+    Historical archive
+    <strong>{{ legacy.paginator.count }}</strong>
+    pre-batch prescription records
+  </a>
+  {% endif %}
+</div>
+
+<section class="ph-panel ph-history-panel">
+  <div class="ph-panel-head ph-history-head">
+    <div>
+      <h2>Medicine handovers</h2>
+      <p class="ph-result-count">
+        {{ issues.paginator.count }} handover{{ issues.paginator.count|pluralize }} shown
+        {% if mine_only %} · My handovers{% endif %}
+        {% if request.GET.from or request.GET.to %} · Date range: {{ request.GET.from|default:"Start" }} to {{ request.GET.to|default:"Today" }}{% endif %}
+        {% if query %} · Search: “{{ query }}”{% endif %}
+      </p>
+    </div>
+    <div class="ph-history-presets" aria-label="Quick filters">
+      <a class="ph-chip{% if request.GET.from == today_iso and request.GET.to == today_iso %} is-active{% endif %}" href="{% url 'pharmacy_dispense_history' %}{% querystring from=today_iso to=today_iso page=None %}">Today</a>
+      <a class="ph-chip{% if mine_only %} is-active{% endif %}" href="{% url 'pharmacy_dispense_history' %}{% querystring scope='mine' page=None %}">My handovers</a>
+      <a class="ph-chip{% if not mine_only %} is-active{% endif %}" href="{% url 'pharmacy_dispense_history' %}{% querystring scope='all' page=None %}">All staff</a>
+      {% if query or mine_only or request.GET.from or request.GET.to %}
+      <a class="ph-chip ph-chip-reset" href="{% url 'pharmacy_dispense_history' %}">Clear filters</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <form method="get" class="ops-search ph-history-search">
+    <label class="ops-field ph-field-grow">
+      Patient or UHID
+      <input type="search" name="q" value="{{ query }}" placeholder="Patient name, UHID or visit token">
+    </label>
+    <label class="ops-field">
+      Staff
+      <select name="scope">
+        <option value="all">All pharmacy staff</option>
+        <option value="mine" {% if mine_only %}selected{% endif %}>My handovers</option>
+      </select>
+    </label>
+    <label class="ops-field">
+      From
+      <input type="date" name="from" value="{{ request.GET.from }}">
+    </label>
+    <label class="ops-field">
+      To
+      <input type="date" name="to" value="{{ request.GET.to }}">
+    </label>
+    <div class="ph-history-filter-actions">
+      <button class="np-btn teal" type="submit">Filter</button>
+      {% if query or mine_only or request.GET.from or request.GET.to %}
+      <a class="np-btn" href="{% url 'pharmacy_dispense_history' %}">Reset</a>
+      {% endif %}
+    </div>
+  </form>
+
+  <div class="ops-scroll">
+    <table class="ops-table ops-stack ph-history-table">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Patient / visit</th>
+          <th>Issue &amp; medicines</th>
+          <th>Bill</th>
+          <th>Handed over by</th>
+          <th class="ph-col-action">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for issue in issues %}
+        <tr>
+          <td data-label="When">
+            <strong class="ph-history-date">{{ issue.dispensed_at|date:'d M Y' }}</strong>
+            <div class="ops-muted ph-history-time">{{ issue.dispensed_at|date:'H:i' }}</div>
+          </td>
+          <td data-label="Patient / visit">
+            <strong class="ph-history-patient">{{ issue.consultation.patient.full_name }}</strong>
+            <div class="ops-muted ph-history-meta">
+              <span class="ph-meta-pill">{{ issue.consultation.patient.uhid }}</span>
+              {% if issue.consultation.visit_token %}
+              <span>· {{ issue.consultation.visit_token }}</span>
+              {% endif %}
+            </div>
+          </td>
+          <td data-label="Issue &amp; medicines">
+            <div class="ph-history-issue-line">
+              <span class="ph-status ready">Issue #{{ issue.pk }}</span>
+              {% with line_count=issue.lines.count %}
+              {% if line_count %}
+              <span class="ph-med-badge inactive">{{ line_count }} item{{ line_count|pluralize }}</span>
+              {% endif %}
+              {% endwith %}
+            </div>
+            {% with lines=issue.lines.all %}
+            {% if lines %}
+            <div class="ops-muted ph-history-meds">
+              {% for line in lines %}{% if forloop.counter <= 3 %}{% if not forloop.first %}, {% endif %}{{ line.medicine_name }} ({{ line.quantity }}){% endif %}{% endfor %}{% if lines|length > 3 %} +{{ lines|length|add:"-3" }} more{% endif %}
+            </div>
+            {% endif %}
+            {% endwith %}
+          </td>
+          <td data-label="Bill">
+            <div class="ph-history-bill">
+              <strong>₹{{ issue.bill.amount_due }}</strong>
+              <span class="ph-med-badge ok">Dispensed</span>
+            </div>
+            <div class="ops-muted">{{ issue.bill.bill_number }}</div>
+          </td>
+          <td data-label="Handed over by">
+            <span class="ph-staff-name">{% firstof issue.dispensed_by.get_full_name issue.dispensed_by.username '—' %}</span>
+          </td>
+          <td data-label="Action" class="ph-col-action">
+            <a class="np-btn ph-history-btn" href="{% url 'pharmacy_issue' issue.pk %}{% querystring source="history" %}">Issue #{{ issue.pk }} · Details / print</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="ops-empty ph-empty">
+            <h3>No medicine handovers recorded in this period.</h3>
+            <p>
+              {% if query or mine_only or request.GET.from or request.GET.to %}
+              Try adjusting your patient search, staff scope, or date range, or <a href="{% url 'pharmacy_dispense_history' %}">clear all filters</a>.
+              {% else %}
+              Completed medicine handovers will appear here once issues are paid and dispensed from the pharmacy desk.
+              {% endif %}
+            </p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% include 'core/pharmacy_pagination.html' with page=issues %}
+</section>
+
+{% if legacy %}
+<section class="ph-panel ph-follow ph-legacy-panel" id="historical-dispensing">
+  <details open>
+    <summary class="ph-legacy-summary">
+      <div>
+        <h2>Historical dispensing</h2>
+        <p class="ops-muted">These records predate batch inventory. Quantities are preserved without assumed stock deductions.</p>
+      </div>
+      <span class="ph-med-badge inactive">{{ legacy.paginator.count }} historical record{{ legacy.paginator.count|pluralize }}</span>
+    </summary>
+    <div class="ops-scroll">
+      <table class="ops-table ops-stack ph-history-table ph-legacy-table">
+        <thead>
+          <tr>
+            <th>Patient</th>
+            <th>Medicine</th>
+            <th>Quantity</th>
+            <th>Recorded</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rx in legacy %}
+          <tr>
+            <td data-label="Patient">
+              <strong>{{ rx.consultation.patient.full_name }}</strong>
+              {% if rx.consultation.patient.uhid %}
+              <div class="ops-muted">{{ rx.consultation.patient.uhid }}</div>
+              {% endif %}
+            </td>
+            <td data-label="Medicine">
+              <strong>{{ rx.medicine_name }}</strong>
+              {% if rx.dose or rx.frequency %}
+              <div class="ops-muted">{{ rx.dose }}{% if rx.dose and rx.frequency %} · {% endif %}{{ rx.frequency }}</div>
+              {% endif %}
+            </td>
+            <td data-label="Quantity">
+              <span class="ph-med-badge inactive">{{ rx.legacy_dispensed_quantity }} units</span>
+            </td>
+            <td data-label="Recorded" class="ops-muted">
+              Updated {{ rx.updated_at|date:"d M Y" }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <nav class="ops-page ph-legacy-page" aria-label="Historical pagination">
+      {% if legacy.has_previous %}
+      <a href="{% querystring legacy_page=legacy.previous_page_number %}">← Earlier records</a>
+      {% else %}
+      <span></span>
+      {% endif %}
+      <span>Historical page {{ legacy.number }} of {{ legacy.paginator.num_pages }}</span>
+      {% if legacy.has_next %}
+      <a href="{% querystring legacy_page=legacy.next_page_number %}">More historical records →</a>
+      {% else %}
+      <span></span>
+      {% endif %}
+    </nav>
+  </details>
+</section>
+{% endif %}
+{% endwith %}
+{% endblock %}

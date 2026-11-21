@@ -607,6 +607,12 @@ class ClinicalOrder(models.Model):
     completed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="completed_service_orders")
     status = models.CharField(max_length=30, default="Ordered", verbose_name="Status")
     result_summary = models.CharField(max_length=255, blank=True, default="", verbose_name="Result Summary")
+    sessions_planned = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Planned sessions",
+        help_text="Physiotherapy and counselling: number of sessions expected in this plan.",
+    )
     operational_details = models.JSONField(default=dict, blank=True)
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
@@ -644,6 +650,76 @@ class ClinicalOrder(models.Model):
     @property
     def is_paid(self):
         return not self.bill_id or self.bill.status == PatientBill.Status.PAID
+
+    @property
+    def attended_session_count(self):
+        if not self.pk:
+            return 0
+        return self.sessions.filter(status=ServiceSession.Status.ATTENDED).count()
+
+    @property
+    def session_progress_percent(self):
+        if not self.sessions_planned:
+            return None
+        return min(round(self.attended_session_count * 100 / self.sessions_planned), 100)
+
+    @property
+    def is_session_service(self):
+        return bool(self.department_id and self.department.slug in ("physiotherapy", "counselling"))
+
+
+class ServiceSession(models.Model):
+    """A scheduled appointment in a physiotherapy or counselling plan.
+
+    The order keeps the clinical request and billing link; the sessions record
+    attendance and progress over time. Notes on counselling sessions are
+    restricted to the clinical team by the operations views.
+    """
+
+    class Status(models.TextChoices):
+        SCHEDULED = "scheduled", "Scheduled"
+        ATTENDED = "attended", "Attended"
+        NO_SHOW = "no_show", "No-show"
+        CANCELLED = "cancelled", "Cancelled"
+
+    order = models.ForeignKey(
+        ClinicalOrder, on_delete=models.CASCADE, related_name="sessions"
+    )
+    scheduled_at = models.DateTimeField(null=True, blank=True, verbose_name="Scheduled session")
+    room = models.CharField(max_length=100, blank=True, default="")
+    status = models.CharField(
+        max_length=12, choices=Status.choices, default=Status.SCHEDULED, db_index=True
+    )
+    progress_note = models.TextField(
+        blank=True,
+        default="",
+        help_text="Session progress. Counselling notes are restricted to the clinical team.",
+    )
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="service_sessions_recorded",
+    )
+    recorded_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="service_sessions_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["scheduled_at", "id"]
+        verbose_name = "Service Session"
+        verbose_name_plural = "Service Sessions"
+
+    def __str__(self):
+        when = self.scheduled_at.strftime("%d %b %Y %H:%M") if self.scheduled_at else "unscheduled"
+        return f"{self.order.name} · session #{self.pk or 'new'} · {when}"
 
 
 class OPDAuditEvent(models.Model):
@@ -913,6 +989,23 @@ class NurseTask(models.Model):
     )
     completed_at = models.DateTimeField(null=True, blank=True)
 
+    class Source(models.TextChoices):
+        MANUAL = "manual", "Care board"
+        TRIAGE = "triage", "Triage follow-up"
+        DOCTOR = "doctor_order", "Doctor order"
+        LAB = "lab_collect", "Sample collection"
+
+    source = models.CharField(max_length=20, choices=Source.choices, default=Source.MANUAL)
+    ticket = models.ForeignKey(
+        "NurseQueueTicket", on_delete=models.SET_NULL, null=True, blank=True, related_name="tasks",
+    )
+    consultation = models.ForeignKey(
+        "ConsultationSession", on_delete=models.SET_NULL, null=True, blank=True, related_name="nurse_tasks",
+    )
+    order = models.ForeignKey(
+        "ClinicalOrder", on_delete=models.SET_NULL, null=True, blank=True, related_name="nurse_tasks",
+    )
+
     class Meta:
         ordering = ["status", "due_at", "-created_at"]
         verbose_name = "Nurse Task"
@@ -943,8 +1036,20 @@ class ServiceDepartment(models.Model):
 
 
 class ServiceDefinition(models.Model):
+    class Modality(models.TextChoices):
+        NONE = "", "Not applicable"
+        XRAY = "xray", "X-Ray"
+        USG = "usg", "Ultrasound (USG)"
+
     name = models.CharField(max_length=255, unique=True)
     department = models.ForeignKey(ServiceDepartment, on_delete=models.PROTECT, related_name="services")
+    modality = models.CharField(
+        max_length=10,
+        choices=Modality.choices,
+        blank=True,
+        default=Modality.NONE,
+        help_text="Imaging modality for radiology services. Other departments leave this as not applicable.",
+    )
     price = models.DecimalField(
         max_digits=10,
         decimal_places=2,

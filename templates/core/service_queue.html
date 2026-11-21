@@ -1,10 +1,376 @@
 {% extends "core/operations_base.html" %}
-{% block operations_content %}<section class="ops-card"><form method="get" class="ops-search"><input name="q" value="{{ query }}" placeholder="Patient, UHID, visit or service" aria-label="Search service orders"><select name="status" aria-label="Service status"><option value="">All statuses</option>{% for status in statuses %}<option {% if status == status_filter %}selected{% endif %}>{{ status }}</option>{% endfor %}</select><button class="np-btn" type="submit">Filter</button></form><div class="ops-scroll"><table class="ops-table ops-stack"><thead><tr><th>Patient / visit</th><th>Service</th><th>Priority / waiting</th><th>Staff</th><th>Step</th></tr></thead><tbody>{% for order in orders %}<tr><td data-label="Patient / visit">{{ order.consultation.patient.full_name }}<div class="ops-muted">{{ order.consultation.patient.uhid }} · {{ order.consultation.visit_token }}<br>{% firstof order.consultation.doctor.get_full_name order.consultation.doctor.username '—' %}</div></td><td data-label="Service"><a href="?order={{ order.pk }}&q={{ query|urlencode }}&status={{ status_filter|urlencode }}">{{ order.name }}</a></td><td data-label="Priority / waiting">{{ order.get_priority_display }}<div class="ops-muted">{{ order.created_at|timesince }}</div></td><td data-label="Assigned staff">{% firstof order.assigned_staff.get_full_name order.assigned_staff.username 'Unassigned' %}</td><td data-label="Current step">{{ order.status }}</td></tr>{% empty %}<tr><td colspan="5" class="ops-empty">No requests match this worklist.</td></tr>{% endfor %}</tbody></table></div>{% include 'core/operations_pagination.html' with page=orders %}</section>
-{% if selected %}<div class="ops-grid"><section class="ops-card"><h2>{{ selected.name }}</h2><p class="ops-muted">{{ selected.consultation.patient.full_name }} · {{ selected.consultation.patient.uhid }}<br>Started: {{ selected.started_at|date:'d M H:i'|default:'—' }} · Completed: {{ selected.completed_at|date:'d M H:i'|default:'—' }}</p>{% if can_update %}<form method="post" action="{% url 'opd_order_update' selected.pk %}">{% csrf_token %}<input type="hidden" name="service" value="{{ department.slug }}"><label class="ops-field">Status<select name="status">{% for status in statuses %}<option {% if selected.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label><label class="ops-field">Priority<select name="priority"><option value="routine">Routine</option><option value="urgent" {% if selected.priority == 'urgent' %}selected{% endif %}>Urgent</option></select></label><label class="ops-field">Assigned staff<select name="assigned_staff"><option value="">Unassigned</option>{% for person in staff %}<option value="{{ person.pk }}" {% if selected.assigned_staff_id == person.pk %}selected{% endif %}>{% firstof person.get_full_name person.username '—' %}</option>{% endfor %}</select></label>
-{% if department.slug == 'laboratory' %}<label class="ops-field">Specimen / collection status<select name="specimen_status"><option value="not-collected">Not collected</option><option value="collected" {% if selected.operational_details.specimen_status == 'collected' %}selected{% endif %}>Collected</option><option value="received" {% if selected.operational_details.specimen_status == 'received' %}selected{% endif %}>Received by lab</option></select></label>{% endif %}
-{% if department.slug == 'radiology' %}<label class="ops-field">Body part / study<input name="body_part" value="{{ selected.operational_details.body_part }}"></label><label class="ops-field">Preparation status<select name="preparation_status"><option value="not-required">Not required</option><option value="pending" {% if selected.operational_details.preparation_status == 'pending' %}selected{% endif %}>Pending</option><option value="complete" {% if selected.operational_details.preparation_status == 'complete' %}selected{% endif %}>Complete</option></select></label><label class="ops-field">Preparation notes<input name="preparation_note" value="{{ selected.operational_details.preparation_note }}"></label>{% endif %}
-{% if department.slug == 'cardiology' %}<label class="ops-field">ECG acquisition status<select name="acquisition_status"><option value="pending">Pending</option><option value="acquired" {% if selected.operational_details.acquisition_status == 'acquired' %}selected{% endif %}>Acquired</option></select></label>{% endif %}
-{% if department.slug == 'physiotherapy' or department.slug == 'counselling' or department.slug == 'procedure-room' or department.slug == 'procedures' %}<label class="ops-field">Session date and time<input type="datetime-local" name="session_datetime" value="{{ selected.operational_details.session_datetime }}"></label><label class="ops-field">Room<input name="room" value="{{ selected.operational_details.room }}"></label>{% endif %}
-{% if department.slug == 'procedure-room' %}<label class="ops-field"><input type="checkbox" name="consent_confirmed" {% if selected.operational_details.consent_confirmed %}checked{% endif %}> Consent confirmed</label><label class="ops-field"><input type="checkbox" name="preparation_complete" {% if selected.operational_details.preparation_complete %}checked{% endif %}> Preparation checklist complete</label><label class="ops-field">Post-procedure instructions<textarea name="post_instructions">{{ selected.operational_details.post_instructions }}</textarea></label>{% endif %}
-{% if department.slug != 'counselling' %}<label class="ops-field">Result summary<textarea name="result_summary" maxlength="255">{{ selected.result_summary }}</textarea></label>{% endif %}<button type="submit" class="np-btn teal">Save service update</button></form>{% else %}<p>{{ selected.result_summary }}</p>{% endif %}</section>
-<section class="ops-card"><h2>Reports & doctor review</h2><ul class="ops-list">{% for report in selected_reports %}<li><strong>{{ report.title }}</strong><p class="ops-note">{{ report.summary }}</p><a href="{% url 'report_download' report.pk %}">Download report</a><div class="ops-muted">Published {{ report.published_at|date:'d M H:i' }} · {% if report.reviewed_at %}Reviewed {{ report.reviewed_at|date:'d M H:i' }}{% else %}Awaiting doctor review{% endif %}</div></li>{% empty %}<li class="ops-empty">No report published for this order yet.</li>{% endfor %}</ul>{% if can_publish and selected.status != 'Cancelled' %}<h3>Publish a report</h3><form method="post" enctype="multipart/form-data" action="{% url 'report_publish' selected.pk %}">{% csrf_token %}{% for field in report_form %}<label class="ops-field">{{ field.label }}{{ field }}{% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}</label>{% endfor %}<button class="np-btn teal" type="submit">Publish for doctor review</button></form>{% endif %}</section></div>{% endif %}{% endblock %}
+{% load static %}
+
+{% block title %}{{ page_title }} · Cams HMS{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{% static 'css/service_desk.css' %}?v=20261120">
+{% endblock %}
+
+{% block operations_intro %}
+{% if supports_sessions %}Schedule sessions, record attendance and progress, and publish the outcome for the requesting doctor.{% else %}Review each request, record the operational step and result, and publish a report for the requesting doctor.{% endif %}
+{% endblock %}
+
+{% block operations_content %}
+<div class="svc-layout">
+
+  <section class="ops-card svc-worklist">
+    <div class="svc-worklist-head">
+      <div>
+        <h2>{{ department.name }}</h2>
+        <p class="ops-muted">{{ department_meta.kind|default:"Department worklist" }} · {{ orders.paginator.count }} request{{ orders.paginator.count|pluralize }}</p>
+      </div>
+    </div>
+
+    {% if modality_tabs %}
+      <nav class="svc-tabs" aria-label="Radiology modality">
+        {% for tab in modality_tabs %}
+          <a href="{% querystring modality=tab.key page=None order=None %}"
+             class="svc-tab {% if tab.key == modality_filter %}is-active{% endif %}"
+             {% if tab.key == modality_filter %}aria-current="page"{% endif %}>
+            {{ tab.label }} <b>{{ tab.count }}</b>
+          </a>
+        {% endfor %}
+      </nav>
+    {% endif %}
+
+    <form method="get" class="svc-search">
+      {% if modality_filter %}<input type="hidden" name="modality" value="{{ modality_filter }}">{% endif %}
+      <input name="q" value="{{ query }}" placeholder="Patient, UHID, visit or service" aria-label="Search service orders">
+      <select name="status" aria-label="Service status">
+        <option value="">All statuses</option>
+        {% for option in statuses %}<option {% if option == status_filter %}selected{% endif %}>{{ option }}</option>{% endfor %}
+      </select>
+      <button class="np-btn sm" type="submit">Filter</button>
+      {% if query or status_filter %}<a class="np-btn sm" href="{% querystring q=None status=None page=None %}">Clear</a>{% endif %}
+    </form>
+
+    <div class="svc-orders">
+      {% for order in orders %}
+        <a class="svc-order {% if selected and selected.pk == order.pk %}is-selected{% endif %} {% if order.priority == 'urgent' %}is-urgent{% endif %}"
+           href="{% querystring order=order.pk page=None %}">
+          <span class="svc-order-token">
+            {% if department.slug == 'laboratory' %}LAB{% elif department.slug == 'radiology' %}{% if order.service_definition.modality == 'usg' %}USG{% else %}IMG{% endif %}{% elif department.slug == 'cardiology' %}ECG{% elif department.slug == 'physiotherapy' %}PT{% elif department.slug == 'counselling' %}CNS{% else %}SVC{% endif %}
+            <small>{{ order.created_at|date:"H:i" }}</small>
+          </span>
+          <span class="svc-order-main">
+            <span class="svc-order-name">
+              {{ order.name }}
+              {% if order.priority == 'urgent' %}<span class="np-badge emergency">Urgent</span>{% endif %}
+              {% if order.status == 'Review Required' %}<span class="np-badge urgent">Review</span>{% elif order.status == 'In Progress' %}<span class="np-badge teal">In progress</span>{% elif order.status == 'Completed' %}<span class="np-badge routine">Completed</span>{% elif order.status == 'Cancelled' %}<span class="np-badge muted">Cancelled</span>{% endif %}
+              {% if order.payment_pending %}<span class="np-badge urgent">Payment pending</span>{% endif %}
+            </span>
+            <span class="svc-order-meta">
+              <span>{{ order.consultation.patient.full_name }} · {{ order.consultation.patient.uhid|default:"No UHID" }}</span>
+              <span>Dr {% firstof order.consultation.doctor.get_full_name order.consultation.doctor.username '—' %}</span>
+              <span>Waiting {{ order.created_at|timesince }}</span>
+              {% if order.assigned_staff %}<span>{{ order.assigned_staff.get_full_name|default:order.assigned_staff.username }}</span>{% endif %}
+            </span>
+          </span>
+          <span class="svc-order-arrow" aria-hidden="true">›</span>
+        </a>
+      {% empty %}
+        <div class="np-empty">
+          {% if query or status_filter or modality_filter %}No requests match these filters.{% else %}This queue is clear. New orders from the Doctor's Desk appear here.{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    {% include 'core/operations_pagination.html' with page=orders %}
+  </section>
+
+  <aside class="svc-detail">
+    {% if selected %}
+      <section class="ops-card svc-workstation">
+        <div class="svc-patient-head">
+          <div>
+            <div class="np-kicker">{{ department.name }} · Request #{{ selected.pk }}</div>
+            <h2 class="svc-patient-name">{{ selected.consultation.patient.full_name }}</h2>
+            <p class="ops-muted">
+              {{ selected.consultation.patient.uhid|default:"No UHID" }} · {{ selected.consultation.visit_token }}
+              · Dr {% firstof selected.consultation.doctor.get_full_name selected.consultation.doctor.username '—' %}
+            </p>
+          </div>
+          <div class="svc-head-badges">
+            <span class="np-badge {% if selected.status == 'Completed' %}routine{% elif selected.status == 'Review Required' %}urgent{% elif selected.status == 'Cancelled' %}muted{% else %}teal{% endif %}">{{ selected.status }}</span>
+            {% if selected.priority == 'urgent' %}<span class="np-badge emergency">Urgent</span>{% endif %}
+          </div>
+        </div>
+
+        <div class="svc-steps" aria-label="Service progress">
+          <span class="svc-step {% if selected.status == 'Ordered' %}is-current{% elif selected.status == 'In Progress' or selected.status == 'Review Required' or selected.status == 'Completed' %}is-done{% endif %}">Ordered</span>
+          <span class="svc-step {% if selected.status == 'In Progress' %}is-current{% elif selected.status == 'Review Required' or selected.status == 'Completed' %}is-done{% endif %}">In progress</span>
+          <span class="svc-step {% if selected.status == 'Review Required' %}is-current{% elif selected.status == 'Completed' %}is-done{% endif %}">Review</span>
+          <span class="svc-step {% if selected.status == 'Completed' %}is-current is-done{% endif %}">Completed</span>
+        </div>
+
+        {% if selected.payment_pending %}
+          <div class="np-strip amber"><span class="np-strip-pulse"></span>Payment is pending at the Registration Desk. Processing stays blocked until the bill is settled.</div>
+        {% endif %}
+
+        {% if selected.completed_at %}
+          <p class="ops-muted">Started {{ selected.started_at|date:"d M H:i"|default:"—" }} · Completed {{ selected.completed_at|date:"d M H:i" }} by {% firstof selected.completed_by.get_full_name selected.completed_by.username '—' %}</p>
+        {% endif %}
+
+        {% if can_update %}
+          <form method="post" action="{% url 'opd_order_update' selected.pk %}" class="svc-form">
+            {% csrf_token %}
+            <div class="svc-field-grid">
+              <label class="ops-field">Status
+                <select name="status">
+                  {% for option in statuses %}<option {% if selected.status == option %}selected{% endif %}>{{ option }}</option>{% endfor %}
+                </select>
+              </label>
+              <label class="ops-field">Priority
+                <select name="priority">
+                  <option value="routine">Routine</option>
+                  <option value="urgent" {% if selected.priority == 'urgent' %}selected{% endif %}>Urgent</option>
+                </select>
+              </label>
+              <label class="ops-field">Assigned staff
+                <select name="assigned_staff">
+                  <option value="">Unassigned</option>
+                  {% for person in staff %}<option value="{{ person.pk }}" {% if selected.assigned_staff_id == person.pk %}selected{% endif %}>{% firstof person.get_full_name person.username '—' %}</option>{% endfor %}
+                </select>
+              </label>
+            </div>
+
+            {% if department.slug == 'laboratory' %}
+              <fieldset class="svc-fieldset">
+                <legend>Laboratory processing</legend>
+                <div class="svc-field-grid">
+                  <label class="ops-field">Specimen / collection
+                    <select name="specimen_status">
+                      <option value="not-collected">Not collected</option>
+                      <option value="collected" {% if selected.operational_details.specimen_status == 'collected' %}selected{% endif %}>Collected</option>
+                      <option value="received" {% if selected.operational_details.specimen_status == 'received' %}selected{% endif %}>Received by lab</option>
+                    </select>
+                  </label>
+                  <label class="ops-field">Result status
+                    <select name="result_state" disabled>
+                      <option>Enter the summary below</option>
+                    </select>
+                  </label>
+                </div>
+                {% if selected.operational_details.collected_at %}<p class="ops-muted">Sample collected {{ selected.operational_details.collected_at|slice:":16" }}</p>{% endif %}
+                <label class="svc-check">
+                  <input type="checkbox" name="critical_flag" {% if selected.operational_details.critical_flag %}checked{% endif %}>
+                  <span><strong>Critical result</strong><small>Alert the requesting doctor immediately. This order stays at the top of their reports view.</small></span>
+                </label>
+              </fieldset>
+            {% endif %}
+
+            {% if department.slug == 'radiology' %}
+              <fieldset class="svc-fieldset">
+                <legend>Imaging study</legend>
+                <div class="svc-field-grid">
+                  <label class="ops-field">Modality
+                    <select name="modality">
+                      <option value="" {% if not selected.operational_details.modality and not selected.service_definition.modality %}selected{% endif %}>Unspecified</option>
+                      <option value="xray" {% if selected.operational_details.modality == 'xray' or selected.service_definition.modality == 'xray' %}selected{% endif %}>X-Ray</option>
+                      <option value="usg" {% if selected.operational_details.modality == 'usg' or selected.service_definition.modality == 'usg' %}selected{% endif %}>USG</option>
+                    </select>
+                  </label>
+                  <label class="ops-field">Body part / study
+                    <input name="body_part" value="{{ selected.operational_details.body_part }}">
+                  </label>
+                  <label class="ops-field">View / position
+                    <input name="view_position" value="{{ selected.operational_details.view_position }}" placeholder="PA, lateral, oblique…">
+                  </label>
+                  <label class="ops-field">Preparation status
+                    <select name="preparation_status">
+                      <option value="not-required">Not required</option>
+                      <option value="pending" {% if selected.operational_details.preparation_status == 'pending' %}selected{% endif %}>Pending</option>
+                      <option value="complete" {% if selected.operational_details.preparation_status == 'complete' %}selected{% endif %}>Complete</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="svc-check-row">
+                  <label class="svc-check"><input type="checkbox" name="prep_none" {% if selected.operational_details.prep_none %}checked{% endif %}><span><strong>No prep</strong><small>Walk-in ready</small></span></label>
+                  <label class="svc-check"><input type="checkbox" name="prep_fasting" {% if selected.operational_details.prep_fasting %}checked{% endif %}><span><strong>Fasting</strong><small>Confirm before the study</small></span></label>
+                  <label class="svc-check"><input type="checkbox" name="prep_full_bladder" {% if selected.operational_details.prep_full_bladder %}checked{% endif %}><span><strong>Full bladder</strong><small>For pelvic USG</small></span></label>
+                </div>
+                <label class="ops-field">Preparation notes
+                  <input name="preparation_note" value="{{ selected.operational_details.preparation_note }}">
+                </label>
+              </fieldset>
+            {% endif %}
+
+            {% if department.slug == 'cardiology' %}
+              <fieldset class="svc-fieldset">
+                <legend>ECG acquisition</legend>
+                <label class="ops-field">Acquisition status
+                  <select name="acquisition_status">
+                    <option value="pending" {% if selected.operational_details.acquisition_status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="acquired" {% if selected.operational_details.acquisition_status == 'acquired' %}selected{% endif %}>Acquired</option>
+                  </select>
+                </label>
+                {% if selected.operational_details.acquired_at %}<p class="ops-muted">Trace acquired {{ selected.operational_details.acquired_at|slice:":16" }} — attach the trace when publishing the report.</p>{% endif %}
+              </fieldset>
+            {% endif %}
+
+            {% if supports_sessions %}
+              <fieldset class="svc-fieldset">
+                <legend>Session plan</legend>
+                <div class="svc-field-grid">
+                  <label class="ops-field">Planned sessions
+                    {% if can_manage_plan %}
+                      <input type="number" name="sessions_planned" min="1" max="100" value="{{ selected.sessions_planned|default_if_none:'' }}">
+                    {% else %}
+                      <input type="number" value="{{ selected.sessions_planned|default_if_none:'' }}" disabled>
+                    {% endif %}
+                  </label>
+                  <label class="ops-field">Room
+                    <input name="room" value="{{ selected.operational_details.room|default:'' }}">
+                  </label>
+                </div>
+                {% if selected.sessions_planned %}
+                  <div class="svc-progress">
+                    <div class="svc-progress-bar"><span style="width: {{ selected.session_progress_percent }}%"></span></div>
+                    <p class="ops-muted">{{ selected.attended_session_count }} of {{ selected.sessions_planned }} sessions attended · {{ selected.session_progress_percent }}%</p>
+                  </div>
+                {% endif %}
+              </fieldset>
+            {% endif %}
+
+            {% if department.slug == 'procedure-room' %}
+              <fieldset class="svc-fieldset">
+                <legend>Procedure safety</legend>
+                <label class="svc-check"><input type="checkbox" name="consent_confirmed" {% if selected.operational_details.consent_confirmed %}checked{% endif %}><span><strong>Consent confirmed</strong><small>Signed by the patient or guardian</small></span></label>
+                <label class="svc-check"><input type="checkbox" name="preparation_complete" {% if selected.operational_details.preparation_complete %}checked{% endif %}><span><strong>Preparation checklist complete</strong><small>Site, equipment and safety checks</small></span></label>
+                <label class="ops-field">Post-procedure instructions
+                  <textarea name="post_instructions" rows="3">{{ selected.operational_details.post_instructions }}</textarea>
+                </label>
+              </fieldset>
+            {% endif %}
+
+            {% if department.slug != 'counselling' %}
+              <label class="ops-field">Result summary
+                <textarea name="result_summary" maxlength="255" rows="3" placeholder="Short outcome visible to the requesting doctor and OPD desk">{{ selected.result_summary }}</textarea>
+              </label>
+            {% elif can_publish %}
+              <p class="svc-private-note">Counselling content stays private. Use the confidential session notes below and publish a summary report for the requesting doctor only.</p>
+            {% endif %}
+
+            <button type="submit" class="np-btn teal">Save service update</button>
+          </form>
+        {% else %}
+          <p class="ops-note">{{ selected.result_summary }}</p>
+        {% endif %}
+      </section>
+
+      {% if supports_sessions %}
+        <section class="ops-card svc-sessions">
+          <div class="svc-worklist-head">
+            <div>
+              <h2>Session log</h2>
+              <p class="ops-muted">{% if selected.sessions_planned %}{{ selected.attended_session_count }} of {{ selected.sessions_planned }} attended{% else %}No plan size set yet{% endif %}</p>
+            </div>
+            {% if selected.status == 'Completed' %}<span class="np-badge routine">Plan completed</span>{% endif %}
+          </div>
+
+          {% for session in sessions %}
+            <div class="svc-session {% if session.status == 'attended' %}is-attended{% elif session.status == 'no_show' %}is-missed{% endif %}">
+              <div class="svc-session-head">
+                <strong>Session {{ forloop.counter }}</strong>
+                <span class="np-badge {% if session.status == 'attended' %}routine{% elif session.status == 'no_show' %}urgent{% elif session.status == 'cancelled' %}muted{% else %}teal{% endif %}">{{ session.get_status_display }}</span>
+                {% if session.scheduled_at %}<span class="ops-muted">{{ session.scheduled_at|date:"d M Y · H:i" }}</span>{% endif %}
+                {% if session.room %}<span class="ops-muted">{{ session.room }}</span>{% endif %}
+              </div>
+              {% if session.progress_note %}
+                {% if can_view_session_notes %}
+                  <p class="svc-session-note">{{ session.progress_note }}</p>
+                {% else %}
+                  <p class="svc-session-note is-locked">Clinician-only note · {% firstof session.recorded_by.get_full_name session.recorded_by.username "clinical team" %}</p>
+                {% endif %}
+              {% endif %}
+              {% if can_manage_sessions and selected.status != 'Completed' and selected.status != 'Cancelled' %}
+                <form method="post" action="{% url 'service_session_update' session.pk %}" class="svc-session-form">
+                  {% csrf_token %}
+                  <label class="ops-field">Status
+                    <select name="status">
+                      {% for value, label in session.Status.choices %}<option value="{{ value }}" {% if session.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                  </label>
+                  <label class="ops-field">Scheduled
+                    <input type="datetime-local" name="scheduled_at" value="{{ session.scheduled_at|date:'Y-m-d\TH:i' }}">
+                  </label>
+                  <label class="ops-field">Room
+                    <input name="room" value="{{ session.room }}">
+                  </label>
+                  {% if can_view_session_notes %}
+                    <label class="ops-field svc-full">Progress note
+                      <textarea name="progress_note" rows="2">{{ session.progress_note }}</textarea>
+                    </label>
+                  {% endif %}
+                  <button class="np-btn sm" type="submit">Save session</button>
+                </form>
+              {% endif %}
+            </div>
+          {% empty %}
+            <div class="np-empty">No sessions scheduled yet.</div>
+          {% endfor %}
+
+          {% if can_manage_sessions and selected.status != 'Completed' and selected.status != 'Cancelled' %}
+            <form method="post" action="{% url 'service_session_add' selected.pk %}" class="svc-session-add">
+              {% csrf_token %}
+              <h3>Schedule a session</h3>
+              <div class="svc-field-grid">
+                <label class="ops-field">Date &amp; time
+                  <input type="datetime-local" name="scheduled_at" required>
+                </label>
+                <label class="ops-field">Room
+                  <input name="room" value="{{ selected.operational_details.room|default:'' }}">
+                </label>
+              </div>
+              {% if can_view_session_notes %}
+                <label class="ops-field">Progress note <span class="ops-muted">(optional{% if department.slug == 'counselling' %}; private to the clinical team{% endif %})</span>
+                  <textarea name="progress_note" rows="2"></textarea>
+                </label>
+              {% endif %}
+              <button class="np-btn teal" type="submit">Add session</button>
+            </form>
+          {% endif %}
+        </section>
+      {% endif %}
+
+      <section class="ops-card svc-reports">
+        <h2>Reports &amp; doctor review</h2>
+        <ul class="ops-list">
+          {% for report in selected_reports %}
+            <li>
+              <strong>{{ report.title }}</strong>
+              {% if report.summary %}<p class="ops-note">{{ report.summary }}</p>{% endif %}
+              <a href="{% url 'report_download' report.pk %}">Download report</a>
+              <div class="ops-muted">Published {{ report.published_at|date:'d M H:i' }} · {% if report.reviewed_at %}Reviewed {{ report.reviewed_at|date:'d M H:i' }} by {% firstof report.reviewed_by.get_full_name report.reviewed_by.username '—' %}{% else %}Awaiting doctor review{% endif %}</div>
+            </li>
+          {% empty %}
+            <li class="ops-empty">No report published for this order yet.</li>
+          {% endfor %}
+        </ul>
+        {% if can_publish and selected.status != 'Cancelled' %}
+          <h3>Publish a report</h3>
+          <form method="post" enctype="multipart/form-data" action="{% url 'report_publish' selected.pk %}">
+            {% csrf_token %}
+            {% for field in report_form %}
+              <label class="ops-field">{{ field.label }}{{ field }}{{ field.errors }}
+                {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+              </label>
+            {% endfor %}
+            <button class="np-btn teal" type="submit">Publish for doctor review</button>
+          </form>
+        {% endif %}
+      </section>
+    {% else %}
+      <section class="ops-card svc-empty">
+        <div class="svc-empty-icon" aria-hidden="true">◉</div>
+        <h2>Select a request</h2>
+        <p class="ops-muted">Choose a patient from the worklist to record the operational step, results, sessions and reports.</p>
+        <div class="svc-empty-links">
+          <a class="np-btn sm" href="{% url 'service_completed_today' %}">Completed today</a>
+          <a class="np-btn sm" href="{% url 'service_reports' %}">Service reports</a>
+        </div>
+      </section>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

@@ -12,6 +12,7 @@ from django.utils import timezone
 from patients.models import (
     Patient, PatientBill, ConsultationSession, PrescriptionItem, Medicine, MedicineBatch,
     StockMovement, PharmacyIssue, ClinicalOrder, ServiceDepartment, DiagnosticReport,
+    ServiceDefinition, ServiceSession,
 )
 from .operations import receive_stock, reserve_issue, handover_issue, cancel_issue, adjust_stock, reallocate_issue, set_bill_status
 
@@ -248,6 +249,51 @@ class PharmacyWorkflowTests(TestCase):
         response=self.client.post(reverse('medicine_edit',args=[self.medicine.pk]),{'name':self.medicine.name,'generic_name':'','strength':'','form':'Tablet','unit':'bottle','pack_size':5,'reorder_level':10,'is_active':'on'})
         self.assertContains(response,'Unit and pack size cannot change')
 
+    def test_catalogue_cards_kpis_filters_and_save_flow(self):
+        self.receipt(packs=2)
+        unstocked=Medicine.objects.create(name='Unstocked syrup',form='Syrup',manufacturer='Test maker',barcode='8900000001')
+        retired=Medicine.objects.create(name='Retired item',is_active=False)
+        scarce=Medicine.objects.create(name='Scarce item',reorder_level=15)
+        receive_stock(user=self.pharmacist,medicine=scarce,batch_number='SCARCE-1',expiry_date=timezone.localdate()+timedelta(days=30),supplier='Test supplier',invoice_reference='OPENING-SCARCE',purchase_cost=Decimal('1.00'),selling_price=Decimal('2.00'),packs=1,request_key=uuid4())
+        self.client.force_login(self.pharmacist)
+        url=reverse('medicine_catalogue')
+        page=self.client.get(url)
+        self.assertEqual(page.context['counts'],{'total':4,'active':3,'low':2,'unstocked':2,'expiring':2})
+        self.assertContains(page,'tablets available')
+        self.assertContains(page,'No stock yet')
+        self.assertContains(page,'Expiring ≤ 90 d')
+        self.assertContains(page,'is-inactive')
+        # Search covers barcode and manufacturer, not just the name.
+        self.assertContains(self.client.get(url,{'q':'8900000001'}),'Unstocked syrup')
+        self.assertContains(self.client.get(url,{'q':'Test maker'}),'Unstocked syrup')
+        self.assertNotContains(self.client.get(url,{'q':'8900000001'}),'Scarce item')
+        # Status, stock and sort filters select the matching cards.
+        inactive=self.client.get(url,{'status':'inactive'})
+        self.assertContains(inactive,'Retired item')
+        self.assertNotContains(inactive,'Test medicine 10 mg Tablet')
+        self.assertContains(self.client.get(url,{'stock':'unstocked'}),'Retired item')
+        low=self.client.get(url,{'stock':'low'})
+        self.assertContains(low,'Scarce item')
+        self.assertContains(low,'Unstocked syrup')
+        self.assertEqual(self.client.get(url,{'sort':'recent'}).context['medicines'][0].pk,scarce.pk)
+        # Editing carries the search context, locks identity and saves in place.
+        edit_page=self.client.get(reverse('medicine_edit',args=[scarce.pk]))
+        self.assertContains(edit_page,'identity fields are locked')
+        self.assertContains(edit_page,'readonly')
+        self.assertContains(edit_page,'type="hidden" name="unit"')
+        self.assertContains(self.client.get(url,{'q':'Scarce'}),f'href="/pharmacy/catalogue/{scarce.pk}/?q=Scarce#medicine-form"')
+        response=self.client.post(reverse('medicine_edit',args=[scarce.pk])+'?q=Scarce',
+            {'name':'Scarce item','generic_name':'','strength':'','form':'Tablet','unit':scarce.unit,
+             'pack_size':scarce.pack_size,'reorder_level':20,'is_active':'on','manufacturer':'','barcode':''})
+        self.assertRedirects(response,reverse('medicine_catalogue')+f'?q=Scarce&saved={scarce.pk}')
+        scarce.refresh_from_db()
+        self.assertEqual((scarce.reorder_level,scarce.unit),(20,'tablet'))
+        self.assertContains(self.client.get(url,{'q':'Scarce','saved':scarce.pk}),'is-saved')
+        # Catalogue cards link to a prefilled receiving form.
+        receive_page=self.client.get(reverse('pharmacy_receive'),{'medicine':self.medicine.pk})
+        self.assertEqual(receive_page.context['form'].initial.get('medicine'),self.medicine.pk)
+        self.assertIsNone(self.client.get(reverse('pharmacy_receive'),{'medicine':'absent'}).context['form'].initial.get('medicine'))
+
     def test_released_prescription_and_prepared_bill_snapshots_are_immutable(self):
         self.receipt();issue=self.issue()
         self.rx.dose='different'
@@ -372,6 +418,80 @@ class ServiceOperationsTests(TestCase):
         person=staff('unassigned_staff','service_staff');self.client.force_login(person)
         self.assertContains(self.client.get(reverse('service_staff_dashboard')),'No departments assigned')
         self.assertEqual(self.client.get(reverse('opd_service_queue',args=['laboratory'])).status_code,403)
+
+    def test_radiology_modality_tabs_filter_studies(self):
+        xray=ServiceDefinition.objects.create(name='Chest X-Ray test',department=self.radiology,modality='xray')
+        usg=ServiceDefinition.objects.create(name='USG test',department=self.radiology,modality='usg')
+        ClinicalOrder.objects.create(consultation=self.consultation,name=xray.name,order_type='radiology',service_definition=xray)
+        ClinicalOrder.objects.create(consultation=self.consultation,name=usg.name,order_type='radiology',service_definition=usg)
+        self.client.force_login(self.imaging)
+        usg_page=self.client.get(reverse('opd_service_queue',args=['radiology']),{'modality':'usg'})
+        self.assertContains(usg_page,'USG test')
+        self.assertNotContains(usg_page,'Chest X-Ray test')
+        xray_page=self.client.get(reverse('opd_service_queue',args=['radiology']),{'modality':'xray'})
+        self.assertContains(xray_page,'Chest X-Ray test')
+        self.assertNotContains(xray_page,'USG test')
+        self.assertContains(usg_page,'Unspecified')
+
+    def test_lab_collection_stamp_and_critical_flag(self):
+        self.client.force_login(self.technician)
+        self.client.post(reverse('opd_order_update',args=[self.order.pk]),{
+            'status':'In Progress','specimen_status':'collected','critical_flag':'on',
+        })
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status,'In Progress')
+        self.assertTrue(self.order.operational_details['critical_flag'])
+        self.assertTrue(self.order.operational_details['collected_at'])
+        DiagnosticReport.objects.create(patient=self.patient,order=self.order,title='Critical lab report',summary='Call the doctor',published_at=timezone.now(),author=self.technician)
+        self.client.force_login(self.doctor)
+        self.assertContains(self.client.get(reverse('service_reports')),'Critical result')
+
+    def test_physiotherapy_plan_auto_completes_after_planned_sessions(self):
+        physio=ServiceDepartment.objects.get(slug='physiotherapy')
+        self.technician.profile.service_departments.add(physio)
+        order=ClinicalOrder.objects.create(consultation=self.consultation,department=physio,order_type='other',name='Physiotherapy plan',sessions_planned=2)
+        self.client.force_login(self.technician)
+        self.client.post(reverse('service_session_add',args=[order.pk]),{'scheduled_at':'2026-11-21T10:00','room':'PT-1'})
+        self.assertEqual(order.sessions.count(),1)
+        first=order.sessions.first()
+        self.client.post(reverse('service_session_update',args=[first.pk]),{'status':'attended','progress_note':'Synthetic progress'})
+        order.refresh_from_db();self.assertEqual(order.status,'In Progress')
+        self.assertIsNone(order.completed_at)
+        second=ServiceSession.objects.create(order=order,scheduled_at=timezone.now())
+        self.client.post(reverse('service_session_update',args=[second.pk]),{'status':'attended'})
+        order.refresh_from_db()
+        self.assertEqual(order.status,'Completed')
+        self.assertIsNotNone(order.completed_at)
+        self.assertEqual(order.completed_by,self.technician)
+        self.assertContains(self.client.get(reverse('service_completed_today')),'Physiotherapy plan')
+
+    def test_counselling_notes_are_private_and_not_in_audit(self):
+        counselling=ServiceDepartment.objects.get(slug='counselling')
+        order=ClinicalOrder.objects.create(consultation=self.consultation,department=counselling,order_type='other',name='Counselling plan',sessions_planned=1)
+        opd=staff('service_opd','opd_assistant')
+        self.technician.profile.service_departments.add(counselling)
+        self.client.force_login(self.technician)
+        self.client.post(reverse('service_session_add',args=[order.pk]),{'scheduled_at':'2026-11-22T09:00','progress_note':'SENSITIVE-COUNSELLING-NOTE'})
+        session=order.sessions.get()
+        self.assertEqual(session.progress_note,'SENSITIVE-COUNSELLING-NOTE')
+        for event in order.audit_events.all():
+            self.assertNotIn('SENSITIVE-COUNSELLING-NOTE',event.summary)
+            self.assertNotIn('SENSITIVE-COUNSELLING-NOTE',str(event.details))
+        self.client.force_login(opd)
+        page=self.client.get(reverse('opd_service_queue',args=['counselling']),{'order':order.pk})
+        self.assertContains(page,'Clinician-only note')
+        self.assertNotContains(page,'SENSITIVE-COUNSELLING-NOTE')
+
+    def test_unpaid_session_plan_and_other_department_are_blocked(self):
+        physio=ServiceDepartment.objects.get(slug='physiotherapy')
+        self.technician.profile.service_departments.add(physio)
+        bill=PatientBill.objects.create(patient=self.patient,source='service',description='Physiotherapy',amount=500)
+        order=ClinicalOrder.objects.create(consultation=self.consultation,department=physio,order_type='other',name='Unpaid physiotherapy',sessions_planned=1,bill=bill)
+        self.client.force_login(self.technician)
+        self.client.post(reverse('service_session_add',args=[order.pk]),{'scheduled_at':'2026-11-23T10:00'})
+        self.assertFalse(ServiceSession.objects.filter(order=order).exists())
+        self.client.force_login(self.imaging)
+        self.assertEqual(self.client.post(reverse('service_session_add',args=[order.pk]),{'scheduled_at':'2026-11-23T10:00'}).status_code,404)
 
 
 class PharmacyConcurrencyTests(TransactionTestCase):

@@ -92,25 +92,57 @@
 <section class="np-card">
   <div class="np-card-head">
     <h2 class="np-card-title">Open nursing tasks</h2>
-    <span class="np-card-sub">{{ open_tasks|length }} task{{ open_tasks|length|pluralize }}</span>
+    <span class="np-card-sub">{{ overdue_tasks|length }} overdue · {{ shift_tasks|length }} due this shift · {{ carried_tasks|length }} carried over</span>
   </div>
-  {% if open_tasks %}
-    <table class="np-table">
-      <thead><tr><th>Task</th><th>Patient</th><th>Type</th><th>Due</th><th>Assigned</th><th>Status</th></tr></thead>
+  {% if overdue_tasks %}
+    <table class="np-table" style="margin-bottom:12px;">
+      <thead><tr><th>Task</th><th>Patient</th><th>Type</th><th>Due</th><th>Assigned</th></tr></thead>
       <tbody>
-        {% for task in open_tasks %}
+        {% for task in overdue_tasks %}
+          <tr style="color:#b91c1c;">
+            <td><strong>{{ task.title }}</strong> <span class="np-badge emergency">Overdue</span></td>
+            <td>{{ task.patient.full_name }}</td>
+            <td>{{ task.get_kind_display }}</td>
+            <td>{{ task.due_at|date:"j M, H:i"|default:"—" }}</td>
+            <td>{{ task.assigned_to.get_full_name|default:task.assigned_to.username|default:"Unassigned" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  {% if shift_tasks %}
+    <table class="np-table" style="margin-bottom:12px;">
+      <thead><tr><th>Task</th><th>Patient</th><th>Type</th><th>Due</th><th>Assigned</th></tr></thead>
+      <tbody>
+        {% for task in shift_tasks %}
           <tr>
             <td><strong>{{ task.title }}</strong>{% if task.is_overdue %} <span class="np-badge emergency">Overdue</span>{% endif %}</td>
             <td>{{ task.patient.full_name }}</td>
             <td>{{ task.get_kind_display }}</td>
             <td>{{ task.due_at|date:"j M, H:i"|default:"—" }}</td>
             <td>{{ task.assigned_to.get_full_name|default:task.assigned_to.username|default:"Unassigned" }}</td>
-            <td>{{ task.get_status_display }}</td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
-  {% else %}
+  {% endif %}
+  {% if carried_tasks %}
+    <table class="np-table" style="margin-bottom:12px;">
+      <thead><tr><th>Task</th><th>Patient</th><th>Type</th><th>Due</th><th>Assigned</th></tr></thead>
+      <tbody>
+        {% for task in carried_tasks %}
+          <tr style="color:var(--muted);">
+            <td><strong>{{ task.title }}</strong> <span class="np-badge muted">Carried over</span></td>
+            <td>{{ task.patient.full_name }}</td>
+            <td>{{ task.get_kind_display }}</td>
+            <td>{{ task.due_at|date:"j M, H:i"|default:"—" }}</td>
+            <td>{{ task.assigned_to.get_full_name|default:task.assigned_to.username|default:"Unassigned" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  {% if not overdue_tasks and not shift_tasks and not carried_tasks %}
     <div class="np-empty">No open nursing tasks.</div>
   {% endif %}
 </section>

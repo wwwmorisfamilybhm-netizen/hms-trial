@@ -2,7 +2,7 @@ from datetime import date, timedelta
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
@@ -561,6 +561,8 @@ def admin_dashboard(request):
     for item in department_load:
         item["width"] = round(item["total"] * 100 / max_department_load) if max_department_load else 0
 
+    from patients.models import NurseTask
+    open_tasks_qs = NurseTask.objects.filter(status__in=["pending", "in_progress"])
     return render(request, "core/admin_dashboard.html", {
         "today": today,
         "total_patients": Patient.objects.count(),
@@ -572,6 +574,9 @@ def admin_dashboard(request):
         "daily_load": daily_load,
         "department_load": department_load,
         "recent_patients": Patient.objects.order_by("-created_at")[:6],
+        "nursing_open": open_tasks_qs.count(),
+        "nursing_unassigned": open_tasks_qs.filter(assigned_to__isnull=True).count(),
+        "nursing_overdue": sum(1 for t in open_tasks_qs if t.is_overdue),
         "user": request.user,
     })
 
@@ -1232,6 +1237,13 @@ def service_completed_today(request):
 
 
 @login_required(login_url="login")
+def opd_inpatient_dashboard(request):
+    if _designation_of(request) != UserProfile.Designation.OPD_ASSISTANT:
+        raise PermissionDenied
+    return render(request, "core/opd_inpatient_dashboard.html")
+
+
+@login_required(login_url="login")
 def opd_assistant_dashboard(request):
     """OPD Central Dashboard with live counts and patient-flow filters."""
     import csv
@@ -1439,6 +1451,28 @@ def opd_assistant_dashboard(request):
         else 0
     )
     workflow_active = bool(all_rows)
+    from django.db.models import Case, When, Value, IntegerField, F
+    from patients.models import NurseTask
+    nurse_open = _NQT.objects.filter(status__in=NURSE_OPEN_STATUSES)
+    nurse_waiting = nurse_open.filter(status__in=[_NQT.Status.WAITING, _NQT.Status.RECALLED])
+    open_tasks = NurseTask.objects.filter(status__in=[NurseTask.Status.PENDING, NurseTask.Status.IN_PROGRESS])
+    now = timezone.now()
+    nursing_counts = {
+        "awaiting": nurse_waiting.count(),
+        "assessing": nurse_open.filter(status=_NQT.Status.IN_ASSESSMENT).count(),
+        "urgent": nurse_open.filter(priority__in=[_NQT.Priority.EMERGENCY, _NQT.Priority.URGENT]).count(),
+        "tasks": open_tasks.count(),
+    }
+    assessment_preview = list(nurse_open.select_related("patient", "claimed_by").annotate(
+        priority_order=Case(When(priority=_NQT.Priority.EMERGENCY, then=Value(0)),
+                            When(priority=_NQT.Priority.URGENT, then=Value(1)),
+                            default=Value(2), output_field=IntegerField())
+    ).order_by("priority_order", "sent_at", "pk")[:8])
+    task_preview = list(open_tasks.filter(Q(priority=NurseTask.Priority.URGENT) | Q(due_at__lt=now))
+        .select_related("patient", "assigned_to").annotate(
+            attention_order=Case(When(due_at__lt=now, then=Value(0)),
+                                 default=Value(1), output_field=IntegerField()))
+        .order_by("attention_order", F("due_at").asc(nulls_last=True), "created_at", "pk")[:6])
 
     return render(request, "core/opd_assistant_dashboard.html", {
         "today": today,
@@ -1453,6 +1487,10 @@ def opd_assistant_dashboard(request):
         "department_filter": department_filter,
         "queue_filter": queue_filter,
         "nurse_counts": nurse_counts,
+        "nursing_counts": nursing_counts,
+        "assessment_preview": assessment_preview,
+        "task_preview": task_preview,
+        "dashboard_loaded_at": now,
         "hourly_flow": hourly_flow,
         "peak_display": peak_display,
         "avg_triage_speed": avg_triage_speed,
@@ -4236,6 +4274,11 @@ def doctor_consultation(request):
         "formulary": STANDARD_FORMULARY,
         "service_catalogue": ServiceDefinition.objects.filter(is_active=True).select_related("department"),
         "common_icd": COMMON_ICD10,
+        "open_tasks": list(
+            patient.nurse_tasks.filter(status__in=["pending", "in_progress"])
+            .select_related("assigned_to")
+            .order_by("-priority", "due_at", "created_at")[:6]
+        ) if patient else [],
         "title": "Doctor Consultation (OPD)",
         "user": request.user,
     })
@@ -4394,6 +4437,9 @@ def save_consultation(request):
                         priority="urgent" if ord_item.get("priority") == "urgent" else "routine",
                     )
                     retained_orders.add(created.pk)
+                    # A nursing procedure becomes one task tied to this order.
+                    from core.nursing import ensure_task_for_order
+                    ensure_task_for_order(created, request.user)
         for existing in existing_orders:
             if existing.pk not in retained_orders and existing.status not in ("Completed", "Cancelled"):
                 previous_status = existing.status
@@ -4582,6 +4628,18 @@ def _designation_of(request):
     )
 
 
+def _can_work_nurse_task(request, task):
+    """OPD, doctors and admins work any task. Service staff only their linked order."""
+    if _require_nurse(request) is None:
+        return True
+    if _designation_of(request) != UserProfile.Designation.SERVICE_STAFF or not task.order_id:
+        return False
+    department_id = task.order.department_id
+    if not department_id:
+        return False
+    return request.user.profile.service_departments.filter(pk=department_id).exists()
+
+
 def _require_nurse(request):
     """Return a redirect when the signed-in account may not use the triage desk.
 
@@ -4764,6 +4822,8 @@ def nurse_queue(request):
     today = timezone.localdate()
     if status_filter == "open":
         tickets = list(base.filter(status__in=NURSE_OPEN_STATUSES))
+    elif status_filter == "awaiting":
+        tickets = list(base.filter(status__in=[NurseQueueTicket.Status.WAITING, NurseQueueTicket.Status.RECALLED]))
     elif status_filter == "today":
         tickets = list(base.filter(sent_at__date=today))
     elif status_filter in NurseQueueTicket.Status.values:
@@ -4772,7 +4832,9 @@ def nurse_queue(request):
         tickets = list(base.all()[:200])
     tickets.sort(key=_nurse_priority_token)
 
-    if priority_filter in NurseQueueTicket.Priority.values:
+    if priority_filter == "urgent_all":
+        tickets = [t for t in tickets if t.priority in (NurseQueueTicket.Priority.EMERGENCY, NurseQueueTicket.Priority.URGENT)]
+    elif priority_filter in NurseQueueTicket.Priority.values:
         tickets = [t for t in tickets if t.priority == priority_filter]
     if query:
         needle = query.casefold()
@@ -4865,11 +4927,13 @@ def nurse_triage(request):
 
     claimed_now = False
     if ticket and ticket.is_open and ticket.status == NurseQueueTicket.Status.WAITING:
-        ticket.status = NurseQueueTicket.Status.IN_ASSESSMENT
-        ticket.claimed_by = request.user
-        ticket.claimed_at = timezone.now()
-        ticket.save(update_fields=["status", "claimed_by", "claimed_at"])
-        claimed_now = True
+        claimed_now = bool(NurseQueueTicket.objects.filter(
+            pk=ticket.pk, status=NurseQueueTicket.Status.WAITING
+        ).update(status=NurseQueueTicket.Status.IN_ASSESSMENT, claimed_by=request.user, claimed_at=timezone.now()))
+        ticket.refresh_from_db()
+        if not claimed_now and ticket.claimed_by_id != request.user.pk:
+            messages.warning(request, "This visit was already claimed or is no longer open. Review the queue.")
+            return redirect("nurse_queue")
 
     queue_patients = list(
         NurseQueueTicket.objects.filter(status=NurseQueueTicket.Status.WAITING)
@@ -5079,12 +5143,6 @@ def nurse_send_to_queue(request):
 
     existing = _nurse_ticket_for_patient(patient)
     if existing:
-        existing.priority = priority
-        existing.visit_note = note or existing.visit_note
-        existing.appointment = appointment or existing.appointment
-        if existing.status == NurseQueueTicket.Status.RECALLED:
-            existing.status = NurseQueueTicket.Status.WAITING
-        existing.save(update_fields=["priority", "visit_note", "appointment", "status"])
         ticket = existing
         messages.info(
             request,
@@ -5114,11 +5172,20 @@ def nurse_send_to_queue(request):
     # The assistant who starts the assessment records it: claim the ticket and
     # jump straight into the triage workstation instead of leaving it in the
     # queue for a second handoff.
-    if ticket.status == NurseQueueTicket.Status.WAITING:
-        ticket.status = NurseQueueTicket.Status.IN_ASSESSMENT
-        ticket.claimed_by = request.user
-        ticket.claimed_at = timezone.now()
-        ticket.save(update_fields=["status", "claimed_by", "claimed_at"])
+    claimed = NurseQueueTicket.objects.filter(pk=ticket.pk).filter(
+        Q(status__in=[NurseQueueTicket.Status.WAITING, NurseQueueTicket.Status.RECALLED])
+        | Q(status=NurseQueueTicket.Status.IN_ASSESSMENT, claimed_by__isnull=True)
+    ).update(status=NurseQueueTicket.Status.IN_ASSESSMENT, claimed_by=request.user, claimed_at=timezone.now())
+    if not claimed:
+        ticket.refresh_from_db()
+        if ticket.status != NurseQueueTicket.Status.IN_ASSESSMENT or ticket.claimed_by_id != request.user.pk:
+            messages.warning(request, "This visit was already claimed or is no longer open. Review the queue.")
+            return redirect("nurse_queue")
+    if existing:
+        NurseQueueTicket.objects.filter(
+            pk=ticket.pk, status=NurseQueueTicket.Status.IN_ASSESSMENT, claimed_by=request.user
+        ).update(priority=priority, visit_note=note or existing.visit_note,
+                 appointment=appointment or existing.appointment)
     return redirect(f"{reverse('nurse_triage')}?ticket={ticket.pk}")
 
 
@@ -5132,30 +5199,23 @@ def nurse_claim_ticket(request, ticket_id):
     if denied:
         return denied
     ticket = get_object_or_404(NurseQueueTicket, pk=ticket_id)
-
-    if not ticket.is_open:
-        messages.warning(request, "This visit is no longer open in the nurse queue.")
-    elif ticket.status == NurseQueueTicket.Status.IN_ASSESSMENT and ticket.claimed_by_id != request.user.pk:
-        messages.warning(
-            request,
-            f"{ticket.ticket_number} is already being assessed by "
-            f"{ticket.claimed_by.get_full_name() or ticket.claimed_by.username}.",
-        )
-    else:
-        if ticket.status != NurseQueueTicket.Status.IN_ASSESSMENT:
-            ticket.status = NurseQueueTicket.Status.IN_ASSESSMENT
-        ticket.claimed_by = request.user
-        ticket.claimed_at = ticket.claimed_at or timezone.now()
-        ticket.save(update_fields=["status", "claimed_by", "claimed_at"])
+    claimed = NurseQueueTicket.objects.filter(pk=ticket.pk).filter(
+        Q(status__in=[NurseQueueTicket.Status.WAITING, NurseQueueTicket.Status.RECALLED])
+        | Q(status=NurseQueueTicket.Status.IN_ASSESSMENT, claimed_by__isnull=True)
+    ).update(status=NurseQueueTicket.Status.IN_ASSESSMENT, claimed_by=request.user, claimed_at=timezone.now())
+    if claimed:
         OPDAuditEvent.objects.create(
-            patient=ticket.patient,
-            actor=request.user,
-            action="nurse_claimed",
+            patient=ticket.patient, actor=request.user, action="nurse_claimed",
             summary=f"{ticket.ticket_number} claimed for assessment",
             details={"ticket_id": ticket.pk},
         )
         messages.success(request, f"{ticket.ticket_number} claimed — start the assessment.")
-    return redirect(f"{reverse('nurse_triage')}?ticket={ticket.pk}")
+        return redirect(f"{reverse('nurse_triage')}?ticket={ticket.pk}")
+    ticket.refresh_from_db()
+    if ticket.status == NurseQueueTicket.Status.IN_ASSESSMENT and ticket.claimed_by_id == request.user.pk:
+        return redirect(f"{reverse('nurse_triage')}?ticket={ticket.pk}")
+    messages.warning(request, "This visit was already claimed or is no longer open. Review the queue.")
+    return redirect("nurse_queue")
 
 
 @login_required(login_url="login")
@@ -5451,6 +5511,8 @@ def nurse_save_triage(request):
             priority=(
                 NurseTask.Priority.URGENT if escalated else NurseTask.Priority.ROUTINE
             ),
+            source=NurseTask.Source.TRIAGE,
+            ticket=ticket,
             assigned_to=request.user,
             created_by=request.user,
         )
@@ -5531,12 +5593,23 @@ def nurse_tasks(request):
 
     if request.method == "POST":
         patient = Patient.objects.filter(pk=request.POST.get("patient_id", "")).first()
+        if patient is None:
+            query = request.POST.get("patient_query", "").strip()
+            if query:
+                patient = Patient.objects.filter(
+                    Q(uhid__iexact=query) | Q(phone__iexact=query)
+                ).order_by("-created_at").first()
         title = request.POST.get("title", "").strip()[:255]
         if not patient or not title:
             messages.error(request, "Choose a patient and enter the task.")
         else:
+            from core.nursing import resolve_assignee
+
             kind = request.POST.get("kind", NurseTask.Kind.VITALS)
             priority = request.POST.get("priority", NurseTask.Priority.ROUTINE)
+            assigned_raw = request.POST.get("assigned_to", None)
+            if assigned_raw is None and request.POST.get("assign_me") == "on":
+                assigned_raw = "me"
             due_raw = request.POST.get("due_at", "").strip()
             due_at = None
             if due_raw:
@@ -5554,20 +5627,44 @@ def nurse_tasks(request):
                 notes=request.POST.get("notes", "").strip(),
                 priority=priority if priority in NurseTask.Priority.values else NurseTask.Priority.ROUTINE,
                 due_at=due_at,
-                assigned_to=request.user if request.POST.get("assign_me") == "on" else None,
+                source=NurseTask.Source.MANUAL,
+                assigned_to=resolve_assignee(assigned_raw, request.user),
                 created_by=request.user,
             )
             messages.success(request, f"Nursing task '{task.title}' created for {patient.full_name}.")
         return redirect("nurse_tasks")
 
+    from core.nursing import task_assignees
+    from django.db.models import Q
+
     status_filter = request.GET.get("status", "open")
-    tasks = NurseTask.objects.select_related("patient", "assigned_to", "created_by")
+    scope = request.GET.get("scope", "")
+    tasks = NurseTask.objects.select_related("patient", "assigned_to", "created_by", "order")
     if status_filter == "open":
         tasks = tasks.filter(status__in=[NurseTask.Status.PENDING, NurseTask.Status.IN_PROGRESS])
     elif status_filter in NurseTask.Status.values:
         tasks = tasks.filter(status=status_filter)
-    tasks = list(tasks[:200])
-    tasks.sort(key=lambda t: (0 if t.is_overdue else 1, t.due_at or timezone.now()))
+    if scope == "mine":
+        tasks = tasks.filter(assigned_to=request.user)
+    elif scope == "pool":
+        tasks = tasks.filter(assigned_to__isnull=True)
+    today = timezone.localdate()
+    queue_patients = Patient.objects.filter(
+        Q(created_at__date=today)
+        | Q(appointments__date=today)
+        | Q(nurse_tickets__sent_at__date=today)
+        | Q(nurse_tasks__status__in=[NurseTask.Status.PENDING, NurseTask.Status.IN_PROGRESS])
+    ).distinct().order_by("first_name", "last_name", "pk")[:80]
+    from django.core.paginator import Paginator
+    from django.db.models import Case, When, Value, IntegerField, F
+    tasks = tasks.annotate(
+        overdue_order=Case(
+            When(status__in=[NurseTask.Status.PENDING, NurseTask.Status.IN_PROGRESS],
+                 due_at__lt=timezone.now(), then=Value(0)),
+            default=Value(1), output_field=IntegerField(),
+        )
+    ).order_by("overdue_order", F("due_at").asc(nulls_last=True), "created_at", "pk")
+    tasks = Paginator(tasks, 50).get_page(request.GET.get("page"))
 
     return render(request, "core/nurse_tasks.html", {
         "tasks": tasks,
@@ -5575,7 +5672,9 @@ def nurse_tasks(request):
         "kinds": NurseTask.Kind.choices,
         "priorities": NurseTask.Priority.choices,
         "task_presets": NURSE_TASK_PRESETS,
-        "patients": Patient.objects.order_by("-created_at")[:40],
+        "patients": queue_patients,
+        "assignees": task_assignees(),
+        "scope": scope,
         "counts": {
             "open": NurseTask.objects.filter(
                 status__in=[NurseTask.Status.PENDING, NurseTask.Status.IN_PROGRESS]
@@ -5593,23 +5692,33 @@ def nurse_task_update(request, task_id):
     """Move a nursing task through Pending → In progress → Done."""
     from patients.models import NurseTask, OPDAuditEvent
 
-    denied = _require_nurse(request)
-    if denied:
-        return denied
-    task = get_object_or_404(NurseTask, pk=task_id)
-    next_status = request.POST.get("status", "")
+    task = get_object_or_404(
+        NurseTask.objects.select_related("order__department", "patient"), pk=task_id
+    )
+    if not _can_work_nurse_task(request, task):
+        denied = _require_nurse(request)
+        return denied or redirect("home")
+    next_status = request.POST.get("status", "") or task.status
     if next_status not in NurseTask.Status.values:
         messages.error(request, "Choose a valid task status.")
         return redirect("nurse_tasks")
 
+    from core.nursing import resolve_assignee, sync_order_from_task
+
     task.status = next_status
+    if "assigned_to" in request.POST:
+        task.assigned_to = resolve_assignee(request.POST.get("assigned_to"), request.user)
     if next_status == NurseTask.Status.IN_PROGRESS and not task.assigned_to:
         task.assigned_to = request.user
     if next_status == NurseTask.Status.DONE:
         task.completed_by = request.user
         task.completed_at = timezone.now()
+        if not task.assigned_to_id:
+            task.assigned_to = request.user
     task.outcome = request.POST.get("outcome", "").strip()[:255] or task.outcome
     task.save()
+    if next_status == NurseTask.Status.DONE:
+        sync_order_from_task(task, request.user)
     OPDAuditEvent.objects.create(
         patient=task.patient,
         actor=request.user,
@@ -5659,6 +5768,16 @@ def nurse_handover(request):
         status__in=[NurseTask.Status.PENDING, NurseTask.Status.IN_PROGRESS]
     ).select_related("patient", "assigned_to"))
     open_tasks.sort(key=lambda t: (0 if t.is_overdue else 1, t.due_at or timezone.now()))
+    overdue_tasks = [task for task in open_tasks if task.is_overdue]
+    carried_tasks = [
+        task for task in open_tasks
+        if not task.is_overdue and task.created_at.date() < today
+        and (task.due_at is None or timezone.localtime(task.due_at).date() < today)
+    ]
+    shift_tasks = [
+        task for task in open_tasks
+        if task not in overdue_tasks and task not in carried_tasks
+    ]
 
     stats = {
         "received": len(tickets),
@@ -5679,6 +5798,9 @@ def nurse_handover(request):
         "rows": rows,
         "pending": pending,
         "open_tasks": open_tasks,
+        "overdue_tasks": overdue_tasks,
+        "shift_tasks": shift_tasks,
+        "carried_tasks": carried_tasks,
         "stats": stats,
         "assessments_today": InitialAssessment.objects.filter(
             completed_at__date=today

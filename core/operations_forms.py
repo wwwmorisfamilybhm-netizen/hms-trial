@@ -45,7 +45,13 @@ class AdjustmentForm(forms.Form):
 class ServiceDefinitionForm(forms.ModelForm):
     class Meta:
         model = ServiceDefinition
-        fields = ["name", "department", "price", "is_active"]
+        fields = ["name", "department", "modality", "price", "is_active"]
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("modality") and cleaned.get("department") and cleaned["department"].slug != "radiology":
+            self.add_error("modality", "Modality only applies to radiology services.")
+        return cleaned
 
     def clean_price(self):
         value = self.cleaned_data.get("price") or 0
@@ -56,7 +62,7 @@ class ServiceDefinitionForm(forms.ModelForm):
 
 class ReportForm(forms.Form):
     title = forms.CharField(max_length=255)
-    summary = forms.CharField(widget=forms.Textarea, max_length=10000)
+    summary = forms.CharField(widget=forms.Textarea(attrs={"rows": 4}), max_length=10000)
     attachment = forms.FileField(help_text="PDF, JPEG or PNG, up to 10 MB.")
 
     def clean_attachment(self):

@@ -174,6 +174,35 @@ class OpdAssistantAccessTests(TestCase):
         response = self.client.get(reverse("opd_assistant_dashboard"))
         self.assertRedirects(response, reverse("dashboard"))
 
+    def test_opd_assistant_can_switch_workspaces(self):
+        opd_url = reverse("opd_assistant_dashboard")
+        inpatient_url = reverse("opd_inpatient_dashboard")
+        login = self.client.post(reverse("login"), {
+            "username": "opd_staff",
+            "password": "password123",
+            "designation": UserProfile.Designation.OPD_ASSISTANT,
+        })
+        self.assertRedirects(login, opd_url)
+
+        response = self.client.get(opd_url)
+        self.assertContains(response, f'<a href="{opd_url}" aria-current="true">OPD</a>', html=True)
+        self.assertContains(response, f'<a href="{inpatient_url}">Inpatient</a>', html=True)
+        self.assertContains(response, "Assessment Queue")
+
+        response = self.client.get(inpatient_url)
+        self.assertContains(response, f'<a href="{opd_url}">OPD</a>', html=True)
+        self.assertContains(response, f'<a href="{inpatient_url}" aria-current="true">Inpatient</a>', html=True)
+        self.assertContains(response, "<h1>Inpatient Desk</h1>", html=True)
+        self.assertContains(response, 'id="receptionNavToggle"')
+        self.assertNotContains(response, "Assessment Queue")
+        self.assertNotContains(response, "Search patient register")
+
+    def test_inpatient_requires_opd_assistant_access(self):
+        url = reverse("opd_inpatient_dashboard")
+        self.assertRedirects(self.client.get(url), f"{reverse('login')}?next={url}")
+        self.client.force_login(self.doctor_user)
+        self.assertEqual(self.client.get(url).status_code, 403)
+
     def test_patient_and_service_queue_workflow(self):
         self.client.login(username="opd_staff", password="password123")
         patient = Patient.objects.create(first_name="Mira", last_name="Das", uhid="MR-1001")
@@ -504,6 +533,55 @@ class OPDTriageTests(TestCase):
         self.assertRedirects(self.client.get(reverse("dashboard")), reverse("opd_assistant_dashboard"))
         self.assertRedirects(self.client.get(reverse("reception_dashboard")), reverse("opd_assistant_dashboard"))
         self.assertRedirects(self.client.get(reverse("doctor_consultation")), reverse("opd_assistant_dashboard"))
+
+    def test_nursing_dashboard_counts_match_queue_and_tasks(self):
+        from patients.models import NurseQueueTicket, NurseTask
+        from django.utils import timezone
+        self._login_opd()
+        urgent = NurseQueueTicket.objects.create(patient=self.patient, priority="urgent", status="recalled")
+        other = Patient.objects.create(first_name="Another", last_name="Patient")
+        routine = NurseQueueTicket.objects.create(patient=other, priority="routine", status="in_assessment", claimed_by=self.opd)
+        NurseTask.objects.create(patient=self.patient, title="Repeat vitals", priority="urgent", status="pending", due_at=timezone.now())
+        response = self.client.get(reverse("opd_assistant_dashboard"), {"q": "Ravi"})
+        self.assertEqual(response.context["nursing_counts"], {"awaiting": 1, "assessing": 1, "urgent": 1, "tasks": 1})
+        self.assertEqual(list(response.context["assessment_preview"]), [urgent, routine])
+        self.assertEqual(len(response.context["task_preview"]), 1)
+        self.assertEqual(response.context["task_preview"][0].title, "Repeat vitals")
+        self.assertEqual(list(self.client.get(reverse("nurse_queue"), {"status": "awaiting"}).context["tickets"]), [urgent])
+        self.assertEqual(list(self.client.get(reverse("nurse_queue"), {"status": "open", "priority": "urgent_all"}).context["tickets"]), [urgent])
+        self.assertEqual(self.client.get(reverse("nurse_tasks"), {"status": "open"}).context["counts"]["open"], 1)
+
+    def test_open_task_count_can_be_browsed_across_pages(self):
+        from patients.models import NurseTask
+        self._login_opd()
+        NurseTask.objects.bulk_create([
+            NurseTask(patient=self.patient, title=f"Task {number}", status="pending")
+            for number in range(51)
+        ])
+        response = self.client.get(reverse("nurse_tasks"), {"status": "open"})
+        self.assertEqual(response.context["counts"]["open"], 51)
+        self.assertEqual(len(response.context["tasks"]), 50)
+        self.assertTrue(response.context["tasks"].has_next())
+        second = self.client.get(reverse("nurse_tasks"), {"status": "open", "page": 2})
+        self.assertEqual(len(second.context["tasks"]), 1)
+
+    def test_second_claim_cannot_replace_existing_owner(self):
+        from patients.models import NurseQueueTicket
+        self._login_opd()
+        ticket = NurseQueueTicket.objects.create(patient=self.patient, status="waiting")
+        self.client.post(reverse("nurse_claim_ticket", args=[ticket.pk]))
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.claimed_by, self.opd)
+        self.client.force_login(self.legacy_nurse)
+        response = self.client.post(reverse("nurse_claim_ticket", args=[ticket.pk]))
+        self.assertRedirects(response, reverse("nurse_queue"))
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.claimed_by, self.opd)
+        response = self.client.post(reverse("opd_send_to_nurse"), {"patient_id": self.patient.pk})
+        self.assertRedirects(response, reverse("nurse_queue"))
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.claimed_by, self.opd)
+        self.assertEqual(ticket.status, NurseQueueTicket.Status.IN_ASSESSMENT)
 
     def test_opd_assistant_opens_the_triage_tabs(self):
         self._login_opd()

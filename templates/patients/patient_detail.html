@@ -294,6 +294,30 @@
       {% endif %}
     </section>
 
+    {% if open_tasks %}
+    <section class="card" style="border-radius:24px; padding:24px 28px; background:var(--lav-soft); border:1px solid var(--line);">
+      <h3 style="font-size:13px; font-weight:750; margin:0 0 10px 0; text-transform:uppercase; letter-spacing:0.5px; color:#b45309;">Nursing tasks in treatment</h3>
+      <table style="width:100%; font-size:13px;">
+        <thead>
+          <tr style="text-align:left;">
+            <th style="padding-bottom:6px; color:var(--muted);">Task</th>
+            <th style="padding-bottom:6px; color:var(--muted);">Type</th>
+            <th style="padding-bottom:6px; color:var(--muted);">Assigned</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for task in open_tasks %}
+          <tr style="border-bottom:1px solid var(--line);">
+            <td style="padding:7px 0; font-weight:600;">{{ task.title }}</td>
+            <td style="padding:7px 0; color:var(--muted);">{{ task.get_kind_display }}</td>
+            <td style="padding:7px 0; color:var(--muted);">{{ task.assigned_to.get_full_name|default:task.assigned_to.username|default:"Unassigned" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+
     <!-- Quick Counter Card -->
     <div class="card" style="border-radius:24px; padding:24px 28px; background:var(--lav-soft); border:1px solid var(--line);">
       <h3 style="font-size:14px; font-weight:750; margin:0 0 8px 0;">Registration Desk Reference</h3>

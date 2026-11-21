@@ -86,7 +86,7 @@ without creating duplicate demo encounters. Never enter real patient information
 
 ### Service Staff and Pharmacy access
 
-Assign **Service Staff** or **Pharmacy** to a staff account from the Admin Console. Service Staff can process the laboratory, imaging, ECG, physiotherapy, counselling, and procedure queues. Pharmacy staff use the separate prescription dispensing queue; OPD Assistants and Service Staff do not have pharmacy queue or dispensing access. Apply the database migrations after deploying the designation changes.
+Assign **Service Staff** or **Pharmacy** to a staff account from the Admin Console. Service Staff can process the laboratory, imaging, ECG, physiotherapy, counselling, and procedure queues. Radiology uses X-Ray/USG modality tabs; physiotherapy and counselling use multi-session plans with attendance and progress notes. Pharmacy staff use the separate prescription dispensing queue; OPD Assistants and Service Staff do not have pharmacy queue or dispensing access. Apply the database migrations after deploying the designation changes.
 
 ## Project structure
 

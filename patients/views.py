@@ -40,12 +40,19 @@ def patient_detail(request, pk):
     )
     can_push_bill = designation == "doctor"
     appointments = patient.appointments.select_related("doctor").order_by("-date", "-start_time")
+    from patients.models import NurseTask
+    open_tasks = list(
+        NurseTask.objects.filter(patient=patient, status__in=["pending", "in_progress"])
+        .select_related("assigned_to")
+        .order_by("-priority", "due_at", "created_at")[:8]
+    )
     context = {
         "patient": patient,
         "appointments": appointments,
         "can_view_appointments": True,
         "can_push_bill": can_push_bill,
         "bill_form": PatientBillForm(),
+        "open_tasks": open_tasks,
     }
     return render(request, "patients/patient_detail.html", context)
 

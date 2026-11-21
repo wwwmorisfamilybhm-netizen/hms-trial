@@ -10,8 +10,30 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20261102d">
   <link rel="stylesheet" href="{% static 'css/mindbloom.css' %}?v=20261102d">
-  <link rel="stylesheet" href="{% static 'css/nurse_portal.css' %}?v=20261113">
+  <link rel="stylesheet" href="{% static 'css/nurse_portal.css' %}?v=nursing-desk-2">
   <style>
+    .workspace-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin: 0 2px 14px;
+      padding: 4px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .workspace-switch a {
+      display: grid;
+      place-items: center;
+      min-height: 36px;
+      border-radius: 8px;
+      color: #e9e9ec;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .workspace-switch a:hover { background: rgba(255, 255, 255, 0.12); text-decoration: none; }
+    .workspace-switch a[aria-current="true"] { background: #d6f25f; color: #202024; }
+    .workspace-switch a:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+
     /* OPD Single-Line Topbar Guard */
     .topbar { flex-wrap: nowrap !important; }
     .opd-topbar-tools {
@@ -125,6 +147,10 @@
       height: 38px !important;
       box-sizing: border-box !important;
     }
+    @media (max-width: 640px) {
+      body[data-role="opd_assistant"] .topbar .opd-topbar-tools .mb-date-pill,
+      body[data-role="nurse"] .topbar .opd-topbar-tools .mb-date-pill { display: none !important; }
+    }
   </style>
   {% block page_styles %}{% endblock %}
 </head>
@@ -133,7 +159,7 @@
 
   <!-- ============ SIDEBAR ============ -->
   <aside class="sidebar" id="appSidebar">
-    <a class="brand" href="{% if request.session.designation == 'service_staff' %}{% url 'service_staff_dashboard' %}{% elif request.session.designation == 'pharmacy' %}{% url 'pharmacy_dashboard' %}{% elif request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}{% url 'reception_dashboard' %}{% elif request.session.designation == 'opd_assistant' or request.resolver_match.url_name == 'opd_assistant_dashboard' %}{% url 'opd_assistant_dashboard' %}{% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}{% url 'admin_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
+    <a class="brand" href="{% if request.resolver_match.url_name == 'opd_inpatient_dashboard' %}{% url 'opd_inpatient_dashboard' %}{% elif request.session.designation == 'service_staff' %}{% url 'service_staff_dashboard' %}{% elif request.session.designation == 'pharmacy' %}{% url 'pharmacy_dashboard' %}{% elif request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}{% url 'reception_dashboard' %}{% elif request.session.designation == 'opd_assistant' or request.resolver_match.url_name == 'opd_assistant_dashboard' %}{% url 'opd_assistant_dashboard' %}{% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}{% url 'admin_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
       <span class="brand-mark">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M3 10l9-7 5 4-4 4z" fill="#d6f25f"/>
@@ -146,10 +172,19 @@
       </span>
     </a>
 
+    {% if request.user.profile.designation == 'opd_assistant' or request.user.profile.designation == 'nurse' %}
+      <nav class="workspace-switch" aria-label="Workspace">
+        <a href="{% url 'opd_assistant_dashboard' %}"{% if request.resolver_match.url_name != 'opd_inpatient_dashboard' %} aria-current="true"{% endif %}>OPD</a>
+        <a href="{% url 'opd_inpatient_dashboard' %}"{% if request.resolver_match.url_name == 'opd_inpatient_dashboard' %} aria-current="true"{% endif %}>Inpatient</a>
+      </nav>
+    {% endif %}
+
     {% block sidebar_controls %}{% endblock %}
 
     <nav class="side-nav">
-      {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}
+      {% if request.resolver_match.url_name == 'opd_inpatient_dashboard' %}
+        <a href="{% url 'opd_inpatient_dashboard' %}" class="nav-item active" aria-current="page"><span class="nav-label">Dashboard</span></a>
+      {% elif request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}
         <!-- Registration Desk branch -->
         <!-- Registration Desk Hero Emergency Capsule -->
         <a href="{% url 'emergency_registration' %}" class="rd-emergency-card {% if request.resolver_match.url_name == 'emergency_registration' %}active{% endif %}" title="Priority Emergency Registration & Immediate MR Number issuance">
@@ -330,12 +365,6 @@
           <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.3"/><circle cx="3.5" cy="12" r="1.3"/><circle cx="3.5" cy="18" r="1.3"/></svg></span>
           <span class="nav-label">Assessment Queue</span>
           <span class="nav-subtag">Triage</span>
-        </a>
-
-        <a href="{% url 'nurse_triage' %}" class="nav-item {% if request.resolver_match.url_name == 'nurse_triage' %}active{% endif %}">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/><path d="M12 1v4"/></svg></span>
-          <span class="nav-label">Start Assessment</span>
-          <span class="nav-subtag">Walk-in</span>
         </a>
 
         <a href="{% url 'nurse_tasks' %}" class="nav-item {% if request.resolver_match.url_name == 'nurse_tasks' %}active{% endif %}">
@@ -528,7 +557,7 @@
   <!-- ============ MAIN ============ -->
   <div class="main">
     <header class="topbar">
-      {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' or request.session.designation == 'pharmacy' %}<button type="button" class="nav-mobile-toggle" id="receptionNavToggle" aria-label="Open navigation" aria-expanded="false" aria-controls="appSidebar"><span></span><span></span><span></span></button>{% endif %}
+      {% if request.resolver_match.url_name == 'opd_inpatient_dashboard' or request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' or request.session.designation == 'pharmacy' or request.session.designation == 'opd_assistant' %}<button type="button" class="nav-mobile-toggle" id="receptionNavToggle" aria-label="Open navigation" aria-expanded="false" aria-controls="appSidebar"><span></span><span></span><span></span></button>{% endif %}
       <div class="doctor">
         <div class="avatar lav reception-avatar">
           {% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' %}
@@ -573,7 +602,7 @@
             <span class="doctor-spec">Pharmacy Portal</span>
           {% elif request.session.designation == 'opd_assistant' or 'opd' in request.resolver_match.url_name or 'nurse' in request.resolver_match.url_name %}
             <span class="doctor-name">OPD Assistant</span>
-            <span class="doctor-spec">OPD Desk Portal</span>
+            <span class="doctor-spec">{% if request.resolver_match.url_name == 'opd_inpatient_dashboard' %}Inpatient Desk Portal{% else %}OPD Desk Portal{% endif %}</span>
           {% elif request.session.designation == 'admin' or request.resolver_match.url_name == 'admin_dashboard' or request.resolver_match.url_name == 'admin_settings' or request.resolver_match.url_name == 'admin_backup_import' or request.resolver_match.url_name == 'admin_backup_export' %}
             <span class="doctor-name">Hospital Admin</span>
             <span class="doctor-spec">Administration Portal</span>
@@ -675,7 +704,7 @@
 </div>
 
 <script src="{% static 'js/refresh-logout.js' %}"></script>
-{% if request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' or request.session.designation == 'pharmacy' %}<script>
+{% if request.resolver_match.url_name == 'opd_inpatient_dashboard' or request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' or request.session.designation == 'pharmacy' or request.session.designation == 'opd_assistant' %}<script>
   (function () {
     var toggle = document.getElementById("receptionNavToggle");
     var sidebar = document.getElementById("appSidebar");
@@ -684,7 +713,7 @@
       document.body.classList.toggle("reception-nav-open", open);
       toggle.setAttribute("aria-expanded", String(open));
       toggle.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
-      if (open && document.body.dataset.role === "pharmacy") {
+      if (open && ["pharmacy", "opd_assistant", "nurse"].includes(document.body.dataset.role)) {
         (sidebar.querySelector(".nav-item.active") || sidebar.querySelector(".brand")).focus();
       }
     }

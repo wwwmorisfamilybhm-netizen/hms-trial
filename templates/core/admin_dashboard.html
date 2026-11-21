@@ -41,6 +41,17 @@
     </span>
     <div><div class="admin-metric-value">{{ department_count }}</div><div class="admin-metric-label">Departments active today</div></div>
   </article>
+
+  <article class="card admin-metric admin-metric-amber" style="grid-column:1 / -1;">
+    <span class="metric-icon metric-icon-amber" aria-hidden="true">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="16" cy="8" r="7"/><path d="M8.21 13.82 7 23h-5l3-6.22M16 15.5l3-3.72L16 7.5"/></svg>
+    </span>
+    <div>
+      <div class="admin-metric-value" style="color:#b45309;">{{ nursing_open }}</div>
+      <div class="admin-metric-label">Open nursing tasks · {{ nursing_unassigned }} unassigned · {{ nursing_overdue }} overdue</div>
+      <a href="{% url 'nurse_tasks' %}?status=open" class="np-btn sm" style="font-size:12px; margin-top:6px; display:inline-block;">Care board →</a>
+    </div>
+  </article>
 </section>
 
 <div class="admin-charts">
@@ -122,6 +133,7 @@
   .admin-metric-label { margin-top:4px; color:var(--muted); font-size:12px; line-height:1.3; }
   .admin-metric-dark { background:var(--ink); color:#fff; }
   .admin-metric-dark .admin-metric-label { color:#c7c7cc; }
+  .metric-icon-amber { background:#fef3c7; color:#b45309; }
   .admin-charts { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:18px; align-items:stretch; }
   .admin-chart-card { min-width:0; padding:24px; border-radius:22px; }
   .admin-chart-card .card-header, .admin-recent-card .card-header { align-items:flex-start; margin-bottom:20px; }

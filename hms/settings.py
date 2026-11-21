@@ -65,6 +65,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'core.middleware.DirectNavigationLogoutMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     # 'core.middleware.AutoLogoutMiddleware',  # disabled
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -183,6 +184,7 @@ MAILERS = {
 }
 
 # Auth redirects
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 CSRF_FAILURE_VIEW = 'core.views.csrf_failure'

@@ -1,0 +1,38 @@
+<section class="nd-desk" aria-labelledby="nd-title">
+  <div class="nd-heading">
+    <div><p class="nd-kicker">OPD desk</p><h1 id="nd-title">Assessment &amp; nursing desk</h1><p>Loaded {{ dashboard_loaded_at|date:"j M Y, H:i" }}</p></div>
+    <div class="nd-actions">
+      <a class="np-btn" href="{% querystring updated=dashboard_loaded_at|date:'Uu' %}">Update dashboard</a>
+      <a class="np-btn" href="{% url 'nurse_handover' %}">Shift handover</a>
+      <a class="np-btn teal" href="{% url 'nurse_triage' %}">Start assessment</a>
+    </div>
+  </div>
+  <div class="nd-counts">
+    <a href="{% url 'nurse_queue' %}?status=awaiting"><span>Awaiting assessment</span><strong>{{ nursing_counts.awaiting }}</strong><small>Waiting or recalled</small></a>
+    <a href="{% url 'nurse_queue' %}?status=in_assessment"><span>In assessment</span><strong>{{ nursing_counts.assessing }}</strong><small>Currently open</small></a>
+    <a class="nd-urgent" href="{% url 'nurse_queue' %}?status=open&amp;priority=urgent_all"><span>Urgent visits</span><strong>{{ nursing_counts.urgent }}</strong><small>Emergency and urgent</small></a>
+    <a href="{% url 'nurse_tasks' %}?status=open"><span>Open nursing tasks</span><strong>{{ nursing_counts.tasks }}</strong><small>Pending or in progress</small></a>
+  </div>
+  <div class="nd-work">
+    <section class="nd-card" aria-labelledby="nd-assessments">
+      <header><h2 id="nd-assessments">Assessment worklist</h2><a href="{% url 'nurse_queue' %}">Full queue →</a></header>
+      {% for ticket in assessment_preview %}
+      <article class="nd-row">
+        <div class="nd-person"><strong>{{ ticket.patient.full_name }}</strong><span>{{ ticket.patient.uhid|default:"No UHID" }} · {{ ticket.ticket_number }} · {{ ticket.wait_minutes }} min wait</span></div>
+        <div><span class="nd-badge nd-{{ ticket.priority }}">{{ ticket.get_priority_display }}</span><small>{{ ticket.get_status_display }}{% if ticket.claimed_by %} · {% if ticket.claimed_by_id == user.pk %}You{% else %}{{ ticket.claimed_by.get_full_name|default:ticket.claimed_by.username }}{% endif %}{% endif %}</small></div>
+        <div class="nd-row-action">
+          {% if ticket.status == 'waiting' or ticket.status == 'recalled' or not ticket.claimed_by_id %}<form method="post" action="{% url 'nurse_claim_ticket' ticket.pk %}">{% csrf_token %}<button class="np-btn sm primary">Claim &amp; assess</button></form>
+          {% elif ticket.claimed_by_id == user.pk %}<a class="np-btn sm primary" href="{% url 'nurse_triage' %}?ticket={{ ticket.pk }}">Continue</a>
+          {% else %}<a class="np-btn sm" href="{% url 'nurse_queue' %}">View queue</a>{% endif %}
+        </div>
+      </article>
+      {% empty %}<p class="nd-empty">No open assessments. New visits appear in the assessment queue.</p>{% endfor %}
+    </section>
+    <section class="nd-card" aria-labelledby="nd-tasks">
+      <header><h2 id="nd-tasks">Tasks needing attention</h2><a href="{% url 'nurse_tasks' %}?status=open">Task board →</a></header>
+      {% for task in task_preview %}
+      <article class="nd-task"><div><strong>{{ task.title }}</strong><span>{{ task.patient.full_name }}{% if task.patient.uhid %} · {{ task.patient.uhid }}{% endif %}</span><small>{% if task.due_at %}Due {{ task.due_at|date:"j M, H:i" }}{% else %}No due time{% endif %} · {% if task.assigned_to %}{{ task.assigned_to.get_full_name|default:task.assigned_to.username }}{% else %}Unassigned{% endif %}</small></div><span class="nd-badge {% if task.is_overdue %}nd-emergency{% else %}nd-urgent{% endif %}">{% if task.is_overdue %}Overdue{% else %}Urgent{% endif %}</span></article>
+      {% empty %}<p class="nd-empty">No urgent or overdue tasks. Open the task board for all nursing tasks.</p>{% endfor %}
+    </section>
+  </div>
+</section>

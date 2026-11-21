@@ -1,2 +1,72 @@
 {% extends "core/operations_base.html" %}
-{% block operations_content %}<section class="ops-card"><h2>Completed on {{ today|date:'d M Y' }}</h2><div class="ops-scroll"><table class="ops-table"><thead><tr><th>Patient</th><th>Department / service</th><th>Summary</th><th>Completed by</th><th>Completed at</th></tr></thead><tbody>{% for order in orders %}<tr><td>{{ order.consultation.patient.full_name }}<div class="ops-muted">{{ order.consultation.patient.uhid }}</div></td><td><a href="{% url 'opd_service_queue' order.department.slug %}?order={{ order.pk }}">{{ order.name }}</a><div class="ops-muted">{{ order.department.name }}</div></td><td>{{ order.result_summary|default:'—' }}</td><td>{% firstof order.completed_by.get_full_name order.completed_by.username '—' %}</td><td>{{ order.completed_at|date:'H:i' }}</td></tr>{% empty %}<tr><td colspan="5" class="ops-empty">No service completions recorded today.</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}
+{% load static %}
+
+{% block title %}Completed today · Cams HMS{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{% static 'css/service_desk.css' %}?v=20261120">
+{% endblock %}
+
+{% block operations_intro %}
+{{ today|date:"l, j F Y" }} · Sign-off for orders completed and sessions attended today.
+{% endblock %}
+
+{% block content %}
+<div class="np-kpis">
+  <div class="np-kpi done">
+    <div class="np-kpi-label">Orders completed</div>
+    <div class="np-kpi-value">{{ orders|length }}</div>
+    <div class="np-kpi-note">Finished today</div>
+  </div>
+  <div class="np-kpi">
+    <div class="np-kpi-label">Sessions attended</div>
+    <div class="np-kpi-value">{{ session_count }}</div>
+    <div class="np-kpi-note">Physiotherapy &amp; counselling</div>
+  </div>
+</div>
+
+<section class="ops-card">
+  <h2>Completed orders</h2>
+  <div class="ops-scroll">
+    <table class="ops-table">
+      <thead><tr><th>Patient</th><th>Department / service</th><th>Summary</th><th>Completed by</th><th>Completed at</th></tr></thead>
+      <tbody>
+        {% for order in orders %}
+          <tr>
+            <td>{{ order.consultation.patient.full_name }}<div class="ops-muted">{{ order.consultation.patient.uhid }}</div></td>
+            <td><a href="{% url 'opd_service_queue' order.department.slug %}?order={{ order.pk }}">{{ order.name }}</a><div class="ops-muted">{{ order.department.name }}</div></td>
+            <td>{{ order.result_summary|default:'—' }}</td>
+            <td>{% firstof order.completed_by.get_full_name order.completed_by.username '—' %}</td>
+            <td>{{ order.completed_at|date:'H:i' }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="ops-empty">No service completions recorded today.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'core/operations_pagination.html' with page=orders %}
+</section>
+
+<section class="ops-card">
+  <h2>Sessions attended</h2>
+  <div class="ops-scroll">
+    <table class="ops-table">
+      <thead><tr><th>Patient</th><th>Plan</th><th>Department</th><th>Recorded by</th><th>Time</th></tr></thead>
+      <tbody>
+        {% for session in sessions %}
+          <tr>
+            <td>{{ session.order.consultation.patient.full_name }}<div class="ops-muted">{{ session.order.consultation.patient.uhid }}</div></td>
+            <td><a href="{% url 'opd_service_queue' session.order.department.slug %}?order={{ session.order.pk }}">{{ session.order.name }}</a><div class="ops-muted">Session #{{ session.pk }}{% if session.room %} · {{ session.room }}{% endif %}</div></td>
+            <td>{{ session.order.department.name }}</td>
+            <td>{% firstof session.recorded_by.get_full_name session.recorded_by.username '—' %}</td>
+            <td>{{ session.recorded_at|date:'H:i' }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="ops-empty">No sessions attended today.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

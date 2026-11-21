@@ -1,0 +1,604 @@
+/* ============================================================
+   Cams HMS — Service desk (lab, imaging, ECG, physio, counselling)
+   Reuses the np-* Riverside components; these rules add the
+   master–detail worklist and department-specific workstations.
+   ============================================================ */
+
+.svc-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.svc-worklist,
+.svc-workstation,
+.svc-sessions,
+.svc-reports {
+  margin-bottom: 0;
+}
+
+.svc-worklist-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.svc-worklist-head h2 {
+  margin: 0 0 4px;
+}
+
+.svc-worklist-head p {
+  margin: 0;
+}
+
+/* ── Department tiles (dashboard) ───────────────────────────── */
+.svc-dept-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.svc-dept {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line, #ebe7f7);
+  border-radius: 16px;
+  background: #fff;
+  text-decoration: none;
+  color: var(--ink, #1b1c26);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.svc-dept::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--svc-tone, #0f766e);
+}
+
+.svc-dept:hover {
+  transform: translateY(-1px);
+  border-color: var(--svc-tone, #0f766e);
+  box-shadow: 0 10px 24px -18px rgba(32, 32, 36, 0.45);
+}
+
+.svc-dept-count {
+  min-width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--svc-tone, #0f766e);
+  background: var(--svc-tone-soft, #d9f3ef);
+  flex-shrink: 0;
+}
+
+.svc-dept-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.svc-dept-main strong {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.svc-dept-main small {
+  font-size: 11.5px;
+  color: var(--muted, #787886);
+  line-height: 1.3;
+}
+
+.svc-dept-arrow {
+  margin-left: auto;
+  color: var(--svc-tone, #0f766e);
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.svc-tone-teal { --svc-tone: #0f766e; --svc-tone-soft: #d9f3ef; }
+.svc-tone-lav { --svc-tone: #6d5bd0; --svc-tone-soft: #ece8fd; }
+.svc-tone-rose { --svc-tone: #be3b5e; --svc-tone-soft: #fbe4ea; }
+.svc-tone-amber { --svc-tone: #b45309; --svc-tone-soft: #fdf0d5; }
+.svc-tone-violet { --svc-tone: #7c3aed; --svc-tone-soft: #f1e9fe; }
+.svc-tone-slate { --svc-tone: #475569; --svc-tone-soft: #e9edf3; }
+.svc-tone-emerald { --svc-tone: #15803d; --svc-tone-soft: #dcfce7; }
+
+.svc-busiest {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #f8f6ff;
+  border: 1px solid #ece7fb;
+  text-decoration: none;
+  color: var(--ink, #1b1c26);
+}
+
+.svc-busiest strong { font-size: 16px; }
+.svc-busiest span { font-size: 12px; color: var(--muted, #787886); }
+.svc-busiest-cta { color: #634be2 !important; font-weight: 700; margin-top: 6px; }
+
+.svc-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Modality tabs & search ─────────────────────────────────── */
+.svc-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 4px;
+  background: #f6f3fe;
+  border-radius: 999px;
+}
+
+.svc-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5f5a71;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.svc-tab b {
+  font-size: 11px;
+  font-weight: 800;
+  background: #e8e3fa;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.svc-tab.is-active {
+  background: #fff;
+  color: #3f2fa6;
+  box-shadow: 0 4px 12px -8px rgba(63, 47, 166, 0.5);
+}
+
+.svc-tab.is-active b {
+  background: #ded6fb;
+}
+
+.svc-search {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.svc-search input,
+.svc-search select {
+  flex: 1 1 140px;
+  min-width: 0;
+  border: 1px solid #e1ddef;
+  border-radius: 10px;
+  background: #fbfaff;
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 12.5px;
+  color: #252330;
+}
+
+.svc-search input:focus,
+.svc-search select:focus {
+  outline: 2px solid #9b87f8;
+  outline-offset: 1px;
+}
+
+.svc-search .np-btn { flex: 0 0 auto; }
+
+/* ── Worklist order cards ───────────────────────────────────── */
+.svc-orders {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.svc-order {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 11px;
+  border-radius: 14px;
+  border: 1px solid #efecf8;
+  background: #fdfcff;
+  text-decoration: none;
+  color: var(--ink, #1b1c26);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.svc-order:hover {
+  border-color: #cdc3f1;
+  background: #fff;
+}
+
+.svc-order.is-selected {
+  border-color: #9b87f8;
+  background: #fff;
+  box-shadow: 0 8px 22px -20px rgba(76, 55, 170, 0.55);
+}
+
+.svc-order.is-urgent {
+  border-left: 3px solid var(--np-emergency, #dc2626);
+}
+
+.svc-order-token {
+  flex: 0 0 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: #f1edfc;
+  color: #5b47c9;
+}
+
+.svc-order-token small {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #8d85aa;
+  letter-spacing: 0;
+}
+
+.svc-order-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.svc-order-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.svc-order-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+  font-size: 11.5px;
+  color: var(--muted, #787886);
+}
+
+.svc-order-arrow {
+  margin-left: auto;
+  font-size: 20px;
+  line-height: 1;
+  color: #b7aed6;
+  flex-shrink: 0;
+}
+
+/* ── Workstation ────────────────────────────────────────────── */
+.svc-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  position: sticky;
+  top: 16px;
+}
+
+.svc-patient-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.svc-patient-name {
+  font-size: 21px;
+  margin: 2px 0 3px;
+  letter-spacing: -0.3px;
+}
+
+/* The global .np-kicker is white for the gradient hero; inside a white card
+   it needs the desk accent instead. */
+.svc-workstation .np-kicker {
+  color: #6d5bd0;
+}
+
+.svc-patient-head p {
+  margin: 0;
+}
+
+.svc-head-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.svc-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 16px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.svc-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8a849b;
+  background: #f6f3fe;
+  white-space: nowrap;
+}
+
+.svc-step::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d6cfee;
+}
+
+.svc-step.is-done {
+  color: #0f766e;
+  background: #e3f6f2;
+}
+
+.svc-step.is-done::before {
+  background: #0f766e;
+}
+
+.svc-step.is-current {
+  color: #4c37b8;
+  background: #ece7fd;
+  box-shadow: inset 0 0 0 1px #c9bcf6;
+}
+
+.svc-step.is-current::before {
+  background: #6d5bd0;
+}
+
+.svc-form .svc-field-grid,
+.svc-session-form,
+.svc-session-add .svc-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 10px 12px;
+}
+
+.svc-field-grid .ops-field,
+.svc-session-form .ops-field {
+  margin-bottom: 0;
+}
+
+.svc-fieldset {
+  border: 1px solid #efecf8;
+  border-radius: 14px;
+  padding: 12px 13px 13px;
+  margin: 0 0 14px;
+  background: #fdfcff;
+}
+
+.svc-fieldset legend {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b6385;
+  padding: 0 5px;
+}
+
+.svc-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 8px 0;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.svc-check input {
+  width: auto;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  accent-color: #0f766e;
+}
+
+.svc-check span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.svc-check small {
+  color: var(--muted, #787886);
+  font-size: 11px;
+}
+
+.svc-check-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 4px 12px;
+  margin: 4px 0;
+}
+
+.svc-private-note {
+  border-radius: 12px;
+  background: #f6f1fe;
+  border: 1px solid #e5d9fb;
+  padding: 11px 13px;
+  font-size: 12px;
+  color: #5b4a86;
+  margin: 0 0 14px;
+}
+
+.svc-progress {
+  margin-top: 10px;
+}
+
+.svc-progress-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: #eee9fb;
+  overflow: hidden;
+}
+
+.svc-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0f766e, #4fd1c5);
+}
+
+.svc-progress p {
+  margin: 6px 0 0;
+}
+
+/* ── Session log ────────────────────────────────────────────── */
+.svc-sessions h2,
+.svc-reports h2 {
+  margin-top: 0;
+}
+
+.svc-session {
+  border: 1px solid #efecf8;
+  border-radius: 14px;
+  padding: 12px 13px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.svc-session.is-attended {
+  border-color: #c8ebdf;
+  background: #f7fdfa;
+}
+
+.svc-session.is-missed {
+  border-color: #f3d8b7;
+  background: #fffaf2;
+}
+
+.svc-session-head {
+  display: flex;
+  align-items: center;
+  gap: 7px 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+}
+
+.svc-session-note {
+  margin: 0 0 9px;
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #444052;
+}
+
+.svc-session-note.is-locked {
+  color: #8a849b;
+  font-style: italic;
+}
+
+.svc-session-form {
+  gap: 8px 10px;
+  align-items: end;
+}
+
+.svc-session-form .svc-full {
+  grid-column: 1 / -1;
+}
+
+.svc-session-form .np-btn {
+  justify-self: start;
+}
+
+.svc-session-add {
+  border-top: 1px dashed #e5e0f3;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.svc-session-add h3 {
+  margin: 0 0 10px;
+  font-size: 13.5px;
+}
+
+/* ── Empty state ────────────────────────────────────────────── */
+.svc-empty {
+  text-align: center;
+  padding: 42px 24px;
+}
+
+.svc-empty-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 10px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  color: #6d5bd0;
+  background: #f1edfc;
+}
+
+.svc-empty h2 {
+  margin: 0 0 5px;
+}
+
+.svc-empty p {
+  max-width: 360px;
+  margin: 0 auto 14px;
+}
+
+.svc-empty-links {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 1180px) {
+  .svc-layout { grid-template-columns: 1fr; }
+  .svc-detail { position: static; }
+}
+
+@media (max-width: 720px) {
+  .svc-dept-grid { grid-template-columns: 1fr; }
+  .svc-order-token { flex-basis: 40px; height: 40px; font-size: 9.5px; }
+  .svc-order-name { font-size: 12.5px; }
+  .svc-tabs { border-radius: 16px; }
+  .svc-session-form { grid-template-columns: 1fr; }
+}

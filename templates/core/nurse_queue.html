@@ -31,6 +31,7 @@
   </div>
   <select name="status" aria-label="Status filter">
     <option value="open" {% if status_filter == 'open' %}selected{% endif %}>Open visits</option>
+    <option value="awaiting" {% if status_filter == 'awaiting' %}selected{% endif %}>Waiting or recalled</option>
     <option value="waiting" {% if status_filter == 'waiting' %}selected{% endif %}>Waiting</option>
     <option value="in_assessment" {% if status_filter == 'in_assessment' %}selected{% endif %}>In assessment</option>
     <option value="recalled" {% if status_filter == 'recalled' %}selected{% endif %}>Recalled</option>
@@ -39,6 +40,7 @@
   </select>
   <select name="priority" aria-label="Priority filter">
     <option value="">Any priority</option>
+    <option value="urgent_all" {% if priority_filter == 'urgent_all' %}selected{% endif %}>Emergency and urgent</option>
     <option value="emergency" {% if priority_filter == 'emergency' %}selected{% endif %}>Emergency</option>
     <option value="urgent" {% if priority_filter == 'urgent' %}selected{% endif %}>Urgent</option>
     <option value="routine" {% if priority_filter == 'routine' %}selected{% endif %}>Routine</option>

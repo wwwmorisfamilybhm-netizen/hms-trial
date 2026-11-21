@@ -21,34 +21,39 @@
 <style>
   /* ── Visit Journey Card (selected-patient panel) ── */
   .jc-card{display:flex;flex-direction:column;gap:14px}
-  .jc-id{display:flex;gap:12px;align-items:flex-start}
-  .jc-avatar{width:48px;height:48px;border-radius:15px;background:#e6e1fb;color:#554a8f;font-size:16px;font-weight:800;display:grid;place-items:center;flex-shrink:0;border:1px solid rgba(155,135,248,.3)}
-  .jc-avatar.is-emergency{background:#fee2e2;border-color:#fca5a5;color:#b91c1c}
+  .jc-id{display:flex;gap:12px;align-items:center}
+  .jc-avatar{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,#ede9fe 0%,#ddd6fe 100%);color:#5b21b6;font-size:16px;font-weight:800;display:grid;place-items:center;flex-shrink:0;box-shadow:0 4px 12px rgba(139,92,246,0.15)}
+  .jc-avatar.is-emergency{background:linear-gradient(135deg,#fee2e2,#fecaca);color:#b91c1c;box-shadow:0 4px 12px rgba(220,38,38,0.15)}
   .jc-name-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .jc-name{margin:0;font-size:18px;font-weight:800;color:var(--mb-text-dark);letter-spacing:-.3px}
+  .jc-name{margin:0;font-size:18px;font-weight:800;color:var(--mb-text-dark);letter-spacing:-.3px;text-transform:capitalize}
   .jc-badge{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;padding:2px 8px;border-radius:999px;white-space:nowrap}
   .jc-badge.red{background:#fee2e2;color:#b91c1c}
   .jc-badge.amber{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
-  .jc-id-meta{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text-muted);margin-top:3px;flex-wrap:wrap}
-  .jc-uhid{border:none;background:#f1effc;color:#634be2;font:inherit;font-weight:800;cursor:pointer;padding:2px 8px;border-radius:6px;font-variant-numeric:tabular-nums}
-  .jc-uhid:hover{background:#e3dcfd}
+  .jc-id-meta{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mb-text-muted);margin-top:4px;flex-wrap:wrap}
+  .jc-uhid{display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(155,135,248,.25);background:#fbfaff;color:#634be2;font:inherit;font-size:11.5px;font-weight:750;cursor:pointer;padding:2px 8px;border-radius:6px;font-variant-numeric:tabular-nums;transition:all .15s ease}
+  .jc-uhid:hover{background:#f0eefb;border-color:#9b87f8}
+  .jc-uhid svg{width:11px;height:11px;opacity:0.75}
   .jc-dot{color:#c7c5d8;font-weight:800}
-  .jc-appt{font-size:11px;color:var(--mb-text-muted)}
-  .jc-wait-pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#71717a;background:#f4f3fb;border-radius:999px;padding:3px 10px;margin-top:7px}
-  .jc-pulse-dot{width:6px;height:6px;border-radius:50%;background:#f59e0b;animation:jcPulse 1.8s infinite}
+  .jc-token{font-size:11.5px;font-weight:600;color:var(--mb-text-muted)}
+  .jc-demog{font-size:12px;color:var(--mb-text-muted)}
+  .jc-appt{font-size:11px;color:var(--mb-text-muted);margin-top:2px}
+  .jc-wait-pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:650;color:#4b5563;background:#f4f3fb;border:1px solid #ebe8f7;border-radius:8px;padding:4px 9px;margin-top:6px}
+  .jc-pulse-dot{width:6px;height:6px;border-radius:50%;background:#f59e0b;animation:jcPulse 1.8s infinite;flex-shrink:0}
   @keyframes jcPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.35)}}
-  .jc-rail{display:flex;padding:12px 4px 6px;border-top:1px solid #f1eefb;border-bottom:1px solid #f1eefb}
+  .jc-rail{display:flex;padding:14px 2px 8px;border-top:1px solid #f0eff8;border-bottom:1px solid #f0eff8;position:relative}
   .jc-rail.is-cancelled{opacity:.45;filter:grayscale(1)}
-  .jc-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;min-width:0}
-  .jc-step:not(:last-child)::before{content:"";position:absolute;top:5.5px;left:calc(50% + 11px);right:calc(-50% + 11px);height:2px;background:#e6e2f7}
+  .jc-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;position:relative;min-width:0}
+  .jc-step:not(:last-child)::before{content:"";position:absolute;top:8px;left:50%;width:100%;height:2px;background:#e5e5ea;z-index:1}
   .jc-step.done:not(:last-child)::before{background:#9b87f8}
-  .jc-node{width:13px;height:13px;border-radius:50%;background:#fff;border:2.5px solid #dcdce2;position:relative;z-index:1}
-  .jc-step.done .jc-node{background:#7660ea;border-color:#7660ea}
-  .jc-step.current .jc-node{border-color:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.18);animation:jcPulse 1.8s infinite}
-  .jc-step-label{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.35px;color:#9d9da8;text-align:center;line-height:1.2}
-  .jc-step.current .jc-step-label{color:#b45309}
-  .jc-step.done .jc-step-label{color:#554a8f}
-  .jc-step-time{font-size:8.5px;color:#a1a1aa;font-variant-numeric:tabular-nums}
+  .jc-node-wrap{position:relative;z-index:2;display:flex;align-items:center;justify-content:center}
+  .jc-node{width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #d4d4d8;display:flex;align-items:center;justify-content:center;transition:all .2s ease;box-sizing:border-box}
+  .jc-step.done .jc-node{background:#7660ea;border-color:#7660ea;color:#fff}
+  .jc-check-icon{width:9px;height:9px}
+  .jc-step.current .jc-node{background:#fff;border-color:#f59e0b;box-shadow:0 0 0 3.5px rgba(245,158,11,.2);animation:jcPulse 1.8s infinite}
+  .jc-step-label{font-size:10.5px;font-weight:650;color:#8e8e99;text-align:center;line-height:1.2;white-space:nowrap}
+  .jc-step.current .jc-step-label{color:#b45309;font-weight:750}
+  .jc-step.done .jc-step-label{color:#4b4b5a}
+  .jc-step-time{font-size:9px;font-weight:600;color:#9ca3af;font-variant-numeric:tabular-nums}
   .jc-step-note{font-size:8.5px;color:#554a8f;font-weight:750;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .jc-now{border:1px solid rgba(155,135,248,.22);border-radius:16px;background:#faf9fe;padding:14px;display:flex;flex-direction:column;gap:10px}
   .jc-now-kicker{font-size:9.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#634be2;background:#ede9fe;padding:2px 9px;border-radius:999px}
@@ -176,19 +181,25 @@
                 {% if selected.patient.allergies %}<span class="jc-badge amber" title="Allergies: {{ selected.patient.allergies }}">⚠ Allergy</span>{% endif %}
               </div>
               <div class="jc-id-meta">
-                <button type="button" class="jc-uhid" data-copy="{{ selected.patient.uhid }}" title="Copy UHID to clipboard">{{ selected.patient.uhid|default:"No UHID" }} ⧉</button>
+                <button type="button" class="jc-uhid" data-copy="{{ selected.patient.uhid }}" title="Copy UHID to clipboard">
+                  <span>{{ selected.patient.uhid|default:"No UHID" }}</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                </button>
                 <span class="jc-dot">·</span>
-                <span>{{ selected.visit_number }}</span>
+                <span class="jc-token">{{ selected.visit_number }}</span>
                 <span class="jc-dot">·</span>
-                <span>{{ selected.patient.age|default:"—" }}/{{ selected.patient.get_gender_display|default:"—" }}</span>
+                <span class="jc-demog">{{ selected.patient.age|default:"—" }}y / {{ selected.patient.get_gender_display|default:"—" }}</span>
               </div>
               {% if selected.appointment %}
                 <div class="jc-appt">Appointment {{ selected.appointment.date|date:"j M" }} · {{ selected.appointment.start_time|date:"H:i" }}{% if selected.appointment.doctor %} · Dr. {{ selected.appointment.doctor.full_name }}{% else %} · doctor to be assigned{% endif %}</div>
               {% endif %}
               <div class="jc-wait-pill">
                 <span class="jc-pulse-dot"></span>
-                Waiting {{ selected.patient.created_at|timesince }}
-                {% if selected.assessment and selected.assessment.completed_at %} · assessed {{ selected.assessment.completed_at|timesince }} ago{% endif %}
+                <span>Waiting {{ selected.patient.created_at|timesince }}</span>
+                {% if selected.assessment and selected.assessment.completed_at %}
+                  <span class="jc-dot">·</span>
+                  <span>assessed {{ selected.assessment.completed_at|timesince }} ago</span>
+                {% endif %}
               </div>
             </div>
           </div>
@@ -197,8 +208,22 @@
           <div class="jc-rail {% if selected.status == 'Cancelled' %}is-cancelled{% endif %}">
             {% for step in selected.journey %}
               <div class="jc-step {{ step.state }}">
-                <span class="jc-node"></span>
-                <span class="jc-step-label">{{ step.label }}</span>
+                <div class="jc-node-wrap">
+                  <span class="jc-node">
+                    {% if step.state == "done" %}
+                      <svg class="jc-check-icon" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="2.5 6 4.8 8.5 9.5 3.5"/>
+                      </svg>
+                    {% endif %}
+                  </span>
+                </div>
+                <span class="jc-step-label">
+                  {% if step.label == "Registered" %}Reg
+                  {% elif step.label == "Assessment" %}Triage
+                  {% elif step.label == "Consultation" %}Consult
+                  {% elif step.label == "Completed" %}Done
+                  {% else %}{{ step.label }}{% endif %}
+                </span>
                 {% if step.state == "done" and step.time %}<span class="jc-step-time">{{ step.time|date:"H:i" }}</span>{% endif %}
                 {% if step.note %}<span class="jc-step-note" title="{{ step.note }}">{{ step.note }}</span>{% endif %}
               </div>

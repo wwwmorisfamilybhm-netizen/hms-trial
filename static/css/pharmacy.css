@@ -97,3 +97,98 @@
 .ph-local-preview img, .ph-photo-approval > img { width: 100%; max-width: 420px; height: 260px; object-fit: contain; background: white; border: 1px solid #e4e1eb; border-radius: 12px; }
 .ph-photo-approval h2 { margin-bottom: 16px; }
 @media (max-width: 760px) { .ph-photo-inputs { grid-template-columns: 1fr; } }
+
+/* Medicine catalogue — KPI strip, filter bar and product card grid */
+.pharmacy-page .ops-kpi.is-current { border-color: var(--ph-teal); color: var(--ph-teal); }
+.pharmacy-page .ops-search.ph-catalogue-search select { width: auto; flex: 0 1 auto; }
+.ph-result-count { margin: 10px 0 0; font-size: .78rem; color: var(--ph-muted); }
+.ph-med-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 18px; margin-block: 14px 0; align-items: start; }
+.ph-med-grid > .ops-empty { grid-column: 1 / -1; margin: 0; }
+.ph-med-card { min-width: 0; display: grid; gap: 9px; padding: 14px; background: #fff; border: 1px solid var(--ph-line); border-radius: 16px; box-shadow: 0 4px 18px #30204706; }
+.ph-med-card.is-inactive { background: #fafaf7; }
+.ph-med-card.is-inactive .ph-med-name a { color: #7c7690; }
+.ph-med-card.is-saved { border-color: #7fcdc3; animation: ph-saved-flash 2.5s ease-out 1; }
+@keyframes ph-saved-flash { 0% { box-shadow: 0 0 0 5px rgba(16, 107, 100, .35); } 100% { box-shadow: 0 4px 18px #30204706; } }
+.ph-med-photo { display: grid; place-items: center; height: 148px; border: 1px solid var(--ph-line); border-radius: 12px; background: #fff; overflow: hidden; }
+.ph-med-photo a { display: grid; place-items: center; width: 100%; height: 100%; }
+.ph-med-photo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.ph-med-monogram { display: grid; place-items: center; width: 100%; height: 100%; font-size: 1.7rem; font-weight: 800; color: #a9c9c3; background: #f4faf8; text-decoration: none; }
+.ph-med-name { margin: 0; font-size: 1rem; line-height: 1.3; overflow-wrap: anywhere; }
+.ph-med-name a { color: inherit; text-decoration: none; }
+.ph-med-name a:hover { text-decoration: underline; }
+.ph-med-sub, .ph-med-generic { margin: 0; font-size: .78rem; color: var(--ph-muted); overflow-wrap: anywhere; }
+.ph-med-stock { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: .82rem; color: var(--ph-muted); }
+.ph-med-stock strong { color: #282231; font-variant-numeric: tabular-nums; }
+.ph-med-badge { display: inline-block; padding: 3px 8px; border-radius: 7px; font-weight: 650; font-size: .72rem; }
+.ph-med-badge.ok { color: #146355; background: #e5f5ed; }
+.ph-med-badge.low { color: #79510f; background: #fff2d5; }
+.ph-med-badge.out, .ph-med-badge.nostock { color: #8a3142; background: #fceef1; }
+.ph-med-badge.expiring { color: #8a5a14; background: #ffedd6; }
+.ph-med-badge.inactive { color: #6b6678; background: #efedf4; }
+.ph-med-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.ph-form-sections { display: grid; gap: 4px; margin-top: 14px; }
+.ph-form-sections fieldset { margin: 0; padding: 12px 0 0; border: 0; border-top: 1px solid var(--ph-line); display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 12px; }
+.ph-form-sections legend { padding-inline-end: 8px; font-weight: 700; font-size: .78rem; color: var(--ph-teal); letter-spacing: .04em; text-transform: uppercase; }
+.ph-form-sections .ops-field { margin: 0; }
+.pharmacy-page .ops-field input[readonly], .pharmacy-page .ops-field select:disabled { background: #f2f0f7; color: #7c7690; cursor: not-allowed; }
+.pharmacy-page .ops-page .ops-pages { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; }
+.pharmacy-page .ops-pages b { padding: 3px 9px; border-radius: 7px; background: var(--ph-teal); color: #fff; font-weight: 700; }
+.pharmacy-page .ops-pages a { padding: 3px 9px; border-radius: 7px; background: #f1eff8; color: #575364; text-decoration: none; }
+.pharmacy-page .ops-pages a:hover { background: #e7e2f3; }
+@media (max-width: 640px) {
+  .ph-med-grid { grid-template-columns: 1fr; }
+  .ph-form-sections fieldset { grid-template-columns: 1fr; }
+}
+@media print {
+  .ph-catalogue-search, .ph-med-actions, .ph-result-count { display: none; }
+  .ph-med-photo img { max-height: 84px; }
+  .ph-med-photo { height: auto; }
+}
+
+/* Dispensing history — KPI strip, quick filter chips, structured table & legacy archive */
+.ph-history-kpis { margin-bottom: 18px; }
+.ph-history-head { padding-bottom: 14px; border-bottom: 1px solid var(--ph-line); margin-bottom: 16px; }
+.ph-history-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ph-chip { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--ph-line); background: #f8f7fc; color: #575364; font-size: .76rem; font-weight: 650; text-decoration: none; transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.ph-chip:hover { background: #efecf7; border-color: #d3cde2; }
+.ph-chip.is-active { background: var(--ph-teal); border-color: var(--ph-teal); color: #fff; }
+.ph-chip.ph-chip-reset { background: #fff5f5; border-color: #f3d2d7; color: #8a3142; }
+.ph-chip.ph-chip-reset:hover { background: #fce8ec; }
+
+.ph-history-search { display: grid; grid-template-columns: minmax(220px, 1.8fr) minmax(160px, 1fr) minmax(140px, .85fr) minmax(140px, .85fr) auto; gap: 12px; align-items: end; padding: 14px 16px; margin-bottom: 18px; background: #faf9fd; border: 1px solid var(--ph-line); border-radius: 14px; }
+.ph-history-search .ops-field { margin: 0; }
+.ph-history-search .ops-field input, .ph-history-search .ops-field select { max-width: none; background: #fff; }
+.ph-history-filter-actions { display: flex; align-items: center; gap: 8px; }
+
+.ph-history-table th { text-transform: uppercase; font-weight: 700; letter-spacing: .04em; font-size: .72rem; color: var(--ph-muted); padding-bottom: 12px; }
+.ph-history-table td { vertical-align: middle; padding-block: 14px; }
+.ph-history-table tbody tr:hover { background: #fbfafe; }
+.ph-history-date, .ph-history-patient { display: block; color: #252330; font-size: .9rem; }
+.ph-history-time { font-variant-numeric: tabular-nums; margin-top: 2px; }
+.ph-history-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 4px; }
+.ph-meta-pill { display: inline-block; padding: 2px 7px; border-radius: 6px; background: #f2f0f8; color: #544e63; font-weight: 600; font-size: .72rem; font-variant-numeric: tabular-nums; }
+.ph-history-issue-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ph-history-meds { margin-top: 5px; max-width: 340px; line-height: 1.35; }
+.ph-history-bill { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.ph-history-bill strong { font-size: .92rem; color: #252330; }
+.ph-staff-name { font-weight: 550; color: #2f2c3a; }
+.ph-col-action { text-align: right; white-space: nowrap; }
+.ph-history-btn { font-size: .78rem; padding: 7px 12px; }
+
+.ph-legacy-panel summary.ph-legacy-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; list-style: none; padding: 0 0 12px; border-bottom: 1px solid var(--ph-line); margin-bottom: 10px; }
+.ph-legacy-panel summary.ph-legacy-summary::-webkit-details-marker { display: none; }
+.ph-legacy-panel summary.ph-legacy-summary p { margin: 4px 0 0; }
+.ph-legacy-page { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ph-line); font-size: .82rem; color: var(--ph-muted); }
+
+@media (max-width: 960px) {
+  .ph-history-search { grid-template-columns: 1fr 1fr; }
+  .ph-history-search .ph-field-grow { grid-column: 1 / -1; }
+  .ph-history-filter-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+@media (max-width: 640px) {
+  .ph-history-search { grid-template-columns: 1fr; }
+  .ph-col-action { text-align: left; }
+}
+@media print {
+  .ph-history-kpis, .ph-history-presets, .ph-history-search, .ph-col-action, .ops-page { display: none; }
+}

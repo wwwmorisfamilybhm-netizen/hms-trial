@@ -29,6 +29,11 @@
         <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
         <option value="" {% if status_filter == '' %}selected{% endif %}>All</option>
       </select>
+      <select name="scope" aria-label="Scope" style="margin-left:8px;">
+        <option value="" {% if scope == '' %}selected{% endif %}>All tasks</option>
+        <option value="mine" {% if scope == 'mine' %}selected{% endif %}>Mine</option>
+        <option value="pool" {% if scope == 'pool' %}selected{% endif %}>Unassigned pool</option>
+      </select>
       <button type="submit" class="np-btn sm primary">Apply</button>
       <span style="margin-left:auto; font-size:12px; color:var(--muted);">{{ counts.open }} open · {{ counts.done_today }} done today</span>
     </form>
@@ -59,8 +64,10 @@
               <div class="np-task-meta">
                 {{ task.patient.full_name }} · {{ task.get_kind_display }}
                 {% if task.due_at %} · due {{ task.due_at|date:"j M, H:i" }}{% endif %}
+                {% if task.order %} · order {{ task.order.name }}{% elif task.ticket %} · {{ task.ticket.ticket_number }}{% endif %}
                 {% if task.notes %} · {{ task.notes|truncatechars:80 }}{% endif %}
                 {% if task.created_by %} · by {{ task.created_by.get_full_name|default:task.created_by.username }}{% endif %}
+                {% if task.assigned_to %} · {{ task.assigned_to.get_full_name|default:task.assigned_to.username }}{% else %} · unassigned{% endif %}
               </div>
             </div>
             <div class="np-task-actions">
@@ -72,12 +79,20 @@
                 </form>
               {% endif %}
               {% if task.status != 'done' %}
-                <form method="post" action="{% url 'nurse_task_update' task.pk %}" style="display:flex; gap:6px;">
+                <form method="post" action="{% url 'nurse_task_update' task.pk %}" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                   {% csrf_token %}
                   <input type="hidden" name="status" value="done">
-                  <input type="text" name="outcome" placeholder="Outcome (optional)" style="width:130px; padding:6px 9px; border-radius:9px; border:1px solid var(--line); font:inherit; font-size:12px;">
+                  <input type="text" name="outcome" placeholder="Outcome" style="width:120px; padding:6px 8px; border-radius:9px; border:1px solid var(--line); font:inherit; font-size:12px;">
                   <button type="submit" class="np-btn sm primary">Done</button>
                 </form>
+                {% if not task.assigned_to %}
+                  <form method="post" action="{% url 'nurse_task_update' task.pk %}" style="display:flex; gap:6px; align-items:center; margin-top:6px;">
+                    {% csrf_token %}
+                    <input type="hidden" name="status" value="{{ task.status }}">
+                    <input type="hidden" name="assigned_to" value="me">
+                    <button type="submit" class="np-btn sm">Assign to me</button>
+                  </form>
+                {% endif %}
               {% elif task.outcome %}
                 <span style="font-size:12px; color:var(--muted); align-self:center;">{{ task.outcome }}</span>
               {% endif %}
@@ -87,6 +102,11 @@
       {% else %}
         <div class="np-empty">No tasks in this view.</div>
       {% endif %}
+      {% if tasks.has_other_pages %}<nav class="nd-pagination" aria-label="Task pages">
+        {% if tasks.has_previous %}<a href="{% querystring page=tasks.previous_page_number %}">← Previous</a>{% endif %}
+        <span>Page {{ tasks.number }} of {{ tasks.paginator.num_pages }}</span>
+        {% if tasks.has_next %}<a href="{% querystring page=tasks.next_page_number %}">Next →</a>{% endif %}
+      </nav>{% endif %}
     </section>
   </div>
 
@@ -97,12 +117,13 @@
         {% csrf_token %}
         <div class="np-field">
           <label for="taskPatient">Patient</label>
-          <select id="taskPatient" name="patient_id" required>
-            <option value="">Select patient…</option>
+          <input id="taskPatient" list="patientList" name="patient_query" placeholder="Name, UHID or phone…" required style="width:100%; padding:6px 9px; border-radius:9px; border:1px solid var(--line); font:inherit;">
+          <input id="taskPatientId" name="patient_id" type="hidden">
+          <datalist id="patientList">
             {% for p in patients %}
               <option value="{{ p.pk }}">{{ p.full_name }}{% if p.uhid %} · {{ p.uhid }}{% endif %}</option>
             {% endfor %}
-          </select>
+          </datalist>
         </div>
         <div class="np-field">
           <label>Quick start</label>
@@ -138,9 +159,16 @@
           <label for="taskNotes">Notes</label>
           <textarea id="taskNotes" name="notes" placeholder="Instructions, site, dose…"></textarea>
         </div>
-        <label class="np-check" style="margin-bottom:12px;">
-          <input type="checkbox" name="assign_me" checked> Assign this task to me
-        </label>
+        <div class="np-field">
+          <label for="taskAssignee">Assign to</label>
+          <select id="taskAssignee" name="assigned_to">
+            <option value="me" selected>Assign to me</option>
+            <option value="pool">Leave unassigned (pool)</option>
+            {% for a in assignees %}
+              <option value="{{ a.pk }}">{{ a.get_full_name|default:a.username }}</option>
+            {% endfor %}
+          </select>
+        </div>
         <button type="submit" class="np-btn teal" style="width:100%; justify-content:center;">Create task</button>
       </form>
     </section>
@@ -157,6 +185,17 @@
       chip.classList.add("is-on");
     });
   });
+
+  var input = document.getElementById("taskPatient");
+  var hidden = document.getElementById("taskPatientId");
+  if (input && hidden) {
+    input.addEventListener("change", function () {
+      var list = document.getElementById("patientList");
+      var match = Array.from(list.options).find(function (o) { return o.value === input.value; });
+      hidden.value = match ? match.value : "";
+    });
+    input.addEventListener("input", function () { hidden.value = ""; });
+  }
 })();
 </script>
 {% endblock %}

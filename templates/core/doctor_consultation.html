@@ -740,6 +740,35 @@
     </div>
   </section>
 
+  {% if open_tasks %}
+  <section class="np-card" style="margin-top:12px; border-left:4px solid #b45309;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h3 style="font-size:13px; font-weight:750; margin:0; color:#b45309;">Nursing tasks in treatment</h3>
+      <a href="{% url 'nurse_tasks' %}?status=open" class="np-btn sm" style="font-size:12px;">Open care board →</a>
+    </div>
+    <table style="width:100%; font-size:12.5px; border-collapse:collapse;">
+      <thead><tr style="text-align:left;">
+        <th style="padding-bottom:6px; color:var(--muted); font-weight:600;">Task</th>
+        <th style="padding-bottom:6px; color:var(--muted); font-weight:600;">Type</th>
+        <th style="padding-bottom:6px; color:var(--muted); font-weight:600;">Priority</th>
+        <th style="padding-bottom:6px; color:var(--muted); font-weight:600;">Assigned</th>
+        <th style="padding-bottom:6px; color:var(--muted); font-weight:600;">Due</th>
+      </tr></thead>
+      <tbody>
+        {% for task in open_tasks %}
+        <tr style="border-bottom:1px solid var(--line);">
+          <td style="padding:6px 0; font-weight:600;">{{ task.title }}</td>
+          <td style="padding:6px 0; color:var(--muted);">{{ task.get_kind_display }}</td>
+          <td style="padding:6px 0; color:var(--muted);">{{ task.get_priority_display }}</td>
+          <td style="padding:6px 0; color:var(--muted);">{{ task.assigned_to.get_full_name|default:task.assigned_to.username|default:"Unassigned" }}</td>
+          <td style="padding:6px 0; color:var(--muted);">{{ task.due_at|date:"j M, H:i"|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
   <div class="np-work dc-work">
     <div class="dc-main">
 
@@ -1136,6 +1165,7 @@
                 <header class="dc-report-head">
                   <div>
                     <h4>{{ report.title }}</h4>
+                    {% if report.order.operational_details.critical_flag %}<span class="dc-pill dc-pill-critical">Critical result</span>{% endif %}
                     {% if report.attachment and report.published_at %}
                     <a href="{% url 'report_download' report.pk %}">Download report</a>
                     <p>{{ report.summary }}</p>

@@ -1473,7 +1473,7 @@
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
       <a href="?" class="mb-btn-action ghost" style="padding:7px 14px; font-size:12px;">Clear Filters</a>
-      <a href="{% url 'opd_assistant_dashboard' %}" class="mb-btn-action ghost" style="padding:7px 14px; font-size:12px;">↻ Refresh</a>
+      <a href="{% querystring updated=dashboard_loaded_at|date:'Uu' %}" class="mb-btn-action ghost" style="padding:7px 14px; font-size:12px;">↻ Refresh</a>
     </div>
   </div>
 

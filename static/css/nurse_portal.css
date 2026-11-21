@@ -2246,3 +2246,56 @@ body[data-role="service_staff"] .container {
   background: #f4f3fb;
   min-height: 100vh;
 }
+
+/* Shared OPD dashboard nursing worklists */
+.nd-desk { margin: 0 0 28px; color: #20232a; }
+.nd-heading, .nd-actions, .nd-card > header { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.nd-heading { align-items: end; margin-bottom: 18px; }
+.nd-heading h1 { font-size: clamp(25px, 3vw, 36px); letter-spacing: -.04em; margin: 2px 0; }
+.nd-heading p { margin: 0; color: #666275; font-size: 13px; }
+.nd-heading .nd-kicker { color: #0f766e; font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: .09em; }
+.nd-actions { justify-content: flex-start; }
+.nd-counts { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
+.nd-counts a, .nd-card { background: #fff; border: 1px solid #e8e5ef; border-radius: 18px; box-shadow: 0 5px 20px #20232a08; }
+.nd-counts a { padding: 17px; text-decoration: none; color: #23212c; border-bottom: 3px solid #0f766e; }
+.nd-counts a.nd-urgent { border-bottom-color: #dc6a39; }
+.nd-counts span, .nd-counts strong, .nd-counts small { display: block; }
+.nd-counts span { font-size: 13px; font-weight: 700; }
+.nd-counts strong { font-size: 29px; line-height: 1.2; margin: 6px 0; }
+.nd-counts small, .nd-row small, .nd-person span, .nd-task span:not(.nd-badge), .nd-task small { color: #666275; font-size: 12px; }
+.nd-work { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(260px,1fr); gap: 16px; align-items: start; }
+.nd-card { padding: 20px; min-width: 0; }
+.nd-card header h2 { margin: 0; font-size: 17px; }
+.nd-card header a { font-weight: 700; font-size: 12px; }
+.nd-row { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr) auto; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid #eeeaf4; }
+.nd-row:last-child, .nd-task:last-child { border-bottom: 0; }
+.nd-person strong, .nd-person span, .nd-row small, .nd-task strong, .nd-task span:not(.nd-badge), .nd-task small { display: block; overflow-wrap: anywhere; }
+.nd-person strong, .nd-task strong { font-size: 13px; }
+.nd-person span, .nd-row small, .nd-task small, .nd-task span:not(.nd-badge) { margin-top: 4px; }
+.nd-badge { display: inline-block; border-radius: 7px; padding: 4px 8px; background: #eef5f1; color: #236347; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.nd-badge.nd-emergency { background: #fff0ef; color: #a42e26; }
+.nd-badge.nd-urgent { background: #fff3e1; color: #8d5400; }
+.nd-task { display: flex; justify-content: space-between; gap: 10px; padding: 14px 0; border-bottom: 1px solid #eeeaf4; align-items: start; }
+.nd-empty { color: #666275; font-size: 13px; padding: 16px 0 0; }
+.nd-desk :is(a,button):focus-visible { outline: 3px solid #7964b0; outline-offset: 3px; }
+@media (max-width: 1100px) { .nd-work { grid-template-columns: 1fr; } }
+@media (max-width: 700px) {
+  .nd-counts { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .nd-row { grid-template-columns: 1fr 1fr; }
+  .nd-row-action { grid-column: 1 / -1; }
+  .nd-card { padding: 16px; }
+}
+
+.nd-pagination { display:flex; justify-content:space-between; gap:12px; align-items:center; padding-top:16px; font-size:13px; }
+
+@media (max-width: 640px) {
+  body[data-role="opd_assistant"] .topbar, body[data-role="nurse"] .topbar { gap: 8px; padding-inline: 12px; }
+  body[data-role="opd_assistant"] .topbar .doctor-text, body[data-role="nurse"] .topbar .doctor-text,
+  body[data-role="opd_assistant"] .mb-date-pill, body[data-role="nurse"] .mb-date-pill,
+  body[data-role="opd_assistant"] .user-meta, body[data-role="nurse"] .user-meta { display: none !important; }
+  body[data-role="opd_assistant"] .topbar .doctor, body[data-role="nurse"] .topbar .doctor { flex: none; }
+  body[data-role="opd_assistant"] .opd-topbar-tools, body[data-role="nurse"] .opd-topbar-tools { flex: 1 1 auto !important; min-width: 0 !important; }
+  body[data-role="opd_assistant"] .opd-topbar-tools .mb-search-box, body[data-role="nurse"] .opd-topbar-tools .mb-search-box { min-width: 0 !important; width: 100% !important; }
+  body[data-role="opd_assistant"] .topbar-right, body[data-role="nurse"] .topbar-right { margin-left: 0; flex: none; }
+  body[data-role="opd_assistant"] .user-trigger, body[data-role="nurse"] .user-trigger { padding: 6px; }
+}
