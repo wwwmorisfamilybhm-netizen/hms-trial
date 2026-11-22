@@ -760,7 +760,7 @@
           <td style="padding:6px 0; font-weight:600;">{{ task.title }}</td>
           <td style="padding:6px 0; color:var(--muted);">{{ task.get_kind_display }}</td>
           <td style="padding:6px 0; color:var(--muted);">{{ task.get_priority_display }}</td>
-          <td style="padding:6px 0; color:var(--muted);">{{ task.assigned_to.get_full_name|default:task.assigned_to.username|default:"Unassigned" }}</td>
+          <td style="padding:6px 0; color:var(--muted);">{% if task.assigned_to %}{{ task.assigned_to.get_full_name|default:task.assigned_to.username }}{% else %}Unassigned{% endif %}</td>
           <td style="padding:6px 0; color:var(--muted);">{{ task.due_at|date:"j M, H:i"|default:"—" }}</td>
         </tr>
         {% endfor %}
@@ -808,7 +808,7 @@
             <div class="dc-vitals-grid">
               <div class="dc-vital {% if assessment.vital_flags.temperature %}is-alert{% endif %}">
                 <span class="dc-vital-k">Temperature</span>
-                <span class="dc-vital-v">{{ assessment.temperature|default:"—" }}<em>°C</em></span>
+                <span class="dc-vital-v">{{ assessment.temperature|default:"—" }}<em>°F</em></span>
               </div>
               <div class="dc-vital {% if assessment.vital_flags.pulse %}is-alert{% endif %}">
                 <span class="dc-vital-k">Pulse</span>
@@ -1397,7 +1397,7 @@
           <button type="button" class="dc-rail-link" data-goto-tab="assessment">View all →</button>
         </div>
         <div class="dc-rail-vitals">
-          <div class="{% if assessment.vital_flags.temperature %}is-alert{% endif %}"><span>Temp</span><strong>{{ assessment.temperature|default:"—" }}°</strong></div>
+          <div class="{% if assessment.vital_flags.temperature %}is-alert{% endif %}"><span>Temp</span><strong>{{ assessment.temperature|default:"—" }}°F</strong></div>
           <div class="{% if assessment.vital_flags.pulse %}is-alert{% endif %}"><span>Pulse</span><strong>{{ assessment.pulse|default:"—" }}</strong></div>
           <div class="{% if assessment.vital_flags.bp %}is-alert{% endif %}"><span>BP</span><strong>{% if assessment.bp_systolic %}{{ assessment.bp_systolic }}/{{ assessment.bp_diastolic }}{% else %}—{% endif %}</strong></div>
           <div class="{% if assessment.vital_flags.spo2 %}is-alert{% endif %}"><span>SpO₂</span><strong>{{ assessment.spo2|default:"—" }}%</strong></div>

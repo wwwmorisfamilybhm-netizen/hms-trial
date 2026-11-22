@@ -96,7 +96,7 @@
                 <div class="np-qmeta">
                   <span>{{ ticket.patient.uhid|default:"No UHID" }}</span>
                   <span>{{ ticket.patient.age|default:"—" }} yrs · {{ ticket.patient.get_gender_display|default:"—" }}</span>
-                  <span>From {{ ticket.sent_by.get_full_name|default:ticket.sent_by.username|default:"Nurse desk" }}</span>
+                  <span>From {% if ticket.sent_by %}{{ ticket.sent_by.get_full_name|default:ticket.sent_by.username }}{% else %}Nurse desk{% endif %}</span>
                 </div>
                 {% if ticket.visit_note %}<div class="np-qnote">“{{ ticket.visit_note }}”</div>{% endif %}
                 {% if ticket.patient.allergies %}<div class="np-qnote" style="color:#b91c1c;">⚠ Allergies: {{ ticket.patient.allergies }}</div>{% endif %}
@@ -130,7 +130,7 @@
               <div class="np-qname">{{ ticket.patient.full_name }} <span class="np-badge teal">In assessment</span></div>
               <div class="np-qmeta">
                 <span>{{ ticket.patient.uhid|default:"No UHID" }}</span>
-                <span>{% if ticket.claimed_by_id == user.pk %}Claimed by you{% else %}Nurse: {{ ticket.claimed_by.get_full_name|default:ticket.claimed_by.username|default:"—" }}{% endif %}</span>
+                <span>{% if ticket.claimed_by_id == user.pk %}Claimed by you{% elif ticket.claimed_by %}Nurse: {{ ticket.claimed_by.get_full_name|default:ticket.claimed_by.username }}{% else %}Nurse: —{% endif %}</span>
               </div>
             </div>
             <div class="np-qactions">
@@ -172,7 +172,7 @@
                   {% elif ticket.band %}<span class="np-badge routine">Routine · {{ ticket.band.score }}</span>{% endif %}
                 </div>
                 <div class="np-qmeta">
-                  <span>By {{ ticket.completed_by.get_full_name|default:ticket.completed_by.username|default:"—" }}</span>
+                  <span>By {% if ticket.completed_by %}{{ ticket.completed_by.get_full_name|default:ticket.completed_by.username }}{% else %}—{% endif %}</span>
                   <span>Awaits doctor allocation</span>
                 </div>
               </div>

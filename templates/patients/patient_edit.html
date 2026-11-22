@@ -39,7 +39,7 @@
     </div>
   {% endif %}
 
-  <form class="card patient-edit-form" method="post" enctype="multipart/form-data" novalidate>
+  <form class="card patient-edit-form" method="post" enctype="multipart/form-data" novalidate autocomplete="off">
     {% csrf_token %}
 
     <section class="patient-edit-section" aria-labelledby="edit-personal-heading">

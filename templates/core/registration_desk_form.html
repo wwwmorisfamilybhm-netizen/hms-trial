@@ -48,7 +48,7 @@
     </div>
   {% endif %}
 
-  <form method="post" enctype="multipart/form-data" novalidate>
+  <form method="post" enctype="multipart/form-data" autocomplete="off" novalidate>
     {% csrf_token %}
 
     <!-- ── SECTION 1: Personal Information ── -->

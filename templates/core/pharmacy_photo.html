@@ -5,7 +5,7 @@
 <section class="ph-panel">
 <h2>{{ medicine.name }}</h2><p>{{ medicine.strength }} · {{ medicine.form }} · {{ medicine.manufacturer|default:"Manufacturer unspecified" }} · {{ medicine.pack_size }} {{ medicine.unit }} per pack{% if medicine.barcode %} · {{ medicine.barcode }}{% endif %}</p>
 {% if error %}<p class="ops-warning" role="alert">{{ error }}</p>{% endif %}
-{% if medicine.photo %}<div class="ph-current-photo">{% include "core/pharmacy_thumbnail.html" %}<div><p>Approved {{ medicine.photo_approved_at|date:"d M Y H:i" }} by {{ medicine.photo_approved_by.get_full_name|default:medicine.photo_approved_by.username }}</p>{% if medicine.photo_source %}<a href="{{ medicine.photo_source }}" target="_blank" rel="noopener noreferrer">Image source</a>{% endif %}
+{% if medicine.photo %}<div class="ph-current-photo">{% include "core/pharmacy_thumbnail.html" %}<div><p>Approved {{ medicine.photo_approved_at|date:"d M Y H:i" }} by {% if medicine.photo_approved_by %}{{ medicine.photo_approved_by.get_full_name|default:medicine.photo_approved_by.username }}{% else %}—{% endif %}</p>{% if medicine.photo_source %}<a href="{{ medicine.photo_source }}" target="_blank" rel="noopener noreferrer">Image source</a>{% endif %}
 <form method="post">{% csrf_token %}<button class="np-btn" name="action" value="remove">Remove photo</button></form></div></div>{% endif %}
 <p><a class="np-btn teal" href="{{ search_url }}" target="_blank" rel="noopener noreferrer">Search images ↗</a></p>
 <p class="ph-note">Find the matching pack, then copy its image or paste its product-page link below.</p>

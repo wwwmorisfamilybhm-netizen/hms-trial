@@ -276,6 +276,7 @@
       const box = document.getElementById("aiContent");
       const vitals = {
         temp: assessment.temperature || "",
+        temperature_unit: "F",
         pulse: assessment.pulse || "",
         rr: assessment.respiratory_rate || "",
         bpSys: assessment.bp_systolic || "",
@@ -1139,7 +1140,7 @@
 
     if (!isPrescription && assessment && (assessment.temperature || assessment.pulse)) {
       const vitals = [
-        ["Temperature", assessment.temperature ? assessment.temperature + " °C" : "—"],
+        ["Temperature", assessment.temperature ? assessment.temperature + " °F" : "—"],
         ["Pulse", assessment.pulse ? assessment.pulse + " /min" : "—"],
         ["BP", assessment.bp_systolic ? assessment.bp_systolic + "/" + assessment.bp_diastolic + " mmHg" : "—"],
         ["SpO₂", assessment.spo2 ? assessment.spo2 + " %" : "—"],

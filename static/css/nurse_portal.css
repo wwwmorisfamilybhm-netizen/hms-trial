@@ -1565,6 +1565,373 @@ body[data-role="nurse"] .container {
   color: #787886;
 }
 
+/* ── 4-Column KPI Grid for Assessment Queue ──────────────────── */
+.np-kpis.np-kpis-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 1100px) {
+  .np-kpis.np-kpis-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 580px) {
+  .np-kpis.np-kpis-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Compact Integrated Header for Assessment Queue ───────────── */
+.np-head.np-head-queue {
+  padding: 16px 22px;
+  border-radius: 24px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.np-head.np-head-queue .np-head-main {
+  flex: 0 1 auto;
+  min-width: 220px;
+}
+
+.np-head.np-head-queue .np-title {
+  font-size: 24px;
+  letter-spacing: -0.6px;
+  margin: 1px 0 0;
+  line-height: 1.15;
+}
+
+.np-head.np-head-queue .np-kicker {
+  font-size: 10.5px;
+  letter-spacing: 1.2px;
+  margin-bottom: 2px;
+}
+
+.np-head.np-head-queue .np-sub {
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 3px 0 0;
+  color: rgba(255, 255, 255, 0.88);
+  max-width: 380px;
+}
+
+/* Integrated Header KPI Micro-Cards */
+.np-head-kpis {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.np-hkpi {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: #ffffff;
+  color: #1b1c26;
+  border-radius: 14px;
+  padding: 6px 12px 6px 9px;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 4px 14px -6px rgba(27, 28, 38, 0.28);
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s ease, border-color 0.16s ease;
+  min-width: 124px;
+  cursor: pointer;
+}
+
+.np-hkpi:hover {
+  text-decoration: none;
+  color: #1b1c26;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -6px rgba(27, 28, 38, 0.38);
+}
+
+.np-hkpi:focus-visible {
+  outline: 2px solid #d4f150;
+  outline-offset: 2px;
+}
+
+/* Active filter state */
+.np-hkpi.is-active {
+  box-shadow: 0 0 0 2.5px #d4f150, 0 8px 20px -6px rgba(0, 0, 0, 0.35);
+  border-color: #d4f150;
+}
+
+.np-hkpi-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.np-hkpi-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.np-hkpi-label {
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #787886;
+}
+
+.np-hkpi-sub {
+  font-size: 9.5px;
+  color: #9d9da8;
+  font-weight: 550;
+  margin-top: 1px;
+  white-space: nowrap;
+}
+
+.np-hkpi-num {
+  font-size: 18px;
+  font-weight: 850;
+  letter-spacing: -0.5px;
+  color: #1b1c26;
+  margin-left: auto;
+  padding-left: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Card variant: Urgent */
+.np-hkpi.urgent {
+  background: #ffffff;
+}
+.np-hkpi.urgent:hover {
+  border-color: #f97316;
+}
+.np-hkpi.urgent.is-active {
+  box-shadow: 0 0 0 2px #ea580c, 0 8px 20px -6px rgba(234, 88, 12, 0.4);
+  border-color: #ea580c;
+}
+
+/* Card variant: Done */
+.np-hkpi.done:hover {
+  border-color: #16a34a;
+}
+.np-hkpi.done.is-active {
+  box-shadow: 0 0 0 2px #16a34a, 0 8px 20px -6px rgba(22, 163, 74, 0.4);
+  border-color: #16a34a;
+}
+
+/* Pulse tag in urgent */
+.np-hkpi .np-tag-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ea580c;
+  display: inline-block;
+  margin-right: 3px;
+  vertical-align: middle;
+  animation: npPulse 1.8s infinite ease-in-out;
+}
+
+@media (max-width: 1200px) {
+  .np-head.np-head-queue {
+    align-items: flex-start;
+  }
+  .np-head-kpis {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    margin-top: 6px;
+  }
+}
+
+@media (max-width: 680px) {
+  .np-head.np-head-queue {
+    padding: 14px 16px;
+  }
+  .np-head-kpis {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .np-hkpi {
+    min-width: 0;
+  }
+}
+
+/* Remove bottom line for modern cards in np-kpis-4 */
+.np-kpis.np-kpis-4 .np-kpi::after {
+  display: none;
+}
+
+/* Interactive card links */
+.np-kpi-link {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 22px;
+  padding: 18px 20px;
+  background: #ffffff;
+  border: 1px solid rgba(155, 135, 248, 0.16);
+  box-shadow: 0 10px 26px -20px rgba(27, 28, 38, 0.45);
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease, border-color 0.18s ease;
+  min-height: 124px;
+}
+.np-kpi-link:hover {
+  text-decoration: none;
+  color: inherit;
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px -20px rgba(99, 82, 181, 0.45);
+  border-color: rgba(155, 135, 248, 0.38);
+}
+.np-kpi-link:focus-visible {
+  outline: 2px solid #9b87f8;
+  outline-offset: 2px;
+}
+
+/* Selected / active filter state */
+.np-kpi-link.is-active {
+  border-color: #9b87f8;
+  box-shadow: 0 0 0 1.5px #9b87f8, 0 14px 32px -20px rgba(99, 82, 181, 0.5);
+  background: #ffffff;
+}
+
+/* Header row inside KPI */
+.np-kpi-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.np-kpi-top .np-kpi-label {
+  font-size: 11.5px;
+  font-weight: 750;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #787886;
+  margin: 0;
+}
+
+/* Icon badges */
+.np-kpi-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+.np-kpi-link:hover .np-kpi-icon {
+  transform: scale(1.08);
+}
+.np-kpi-icon.icon-lav {
+  background: #f1effc;
+  color: #6352b5;
+}
+.np-kpi-icon.icon-slate {
+  background: #f4f4f7;
+  color: #4b4b58;
+}
+.np-kpi-icon.icon-amber {
+  background: #ffedd5;
+  color: #ea580c;
+}
+.np-kpi-icon.icon-green {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+/* Card variants */
+.np-kpi-link.urgent {
+  background: linear-gradient(180deg, #ffffff 0%, #fffaf5 100%);
+  border-color: rgba(254, 215, 170, 0.85);
+}
+.np-kpi-link.urgent:hover {
+  border-color: #f97316;
+  box-shadow: 0 16px 36px -20px rgba(234, 88, 12, 0.45);
+}
+.np-kpi-link.urgent.is-active {
+  border-color: #ea580c;
+  box-shadow: 0 0 0 1.5px #ea580c, 0 14px 32px -20px rgba(234, 88, 12, 0.45);
+}
+
+.np-kpi-link.done {
+  background: linear-gradient(180deg, #ffffff 0%, #f6fcf8 100%);
+  border-color: rgba(187, 247, 208, 0.85);
+}
+.np-kpi-link.done:hover {
+  border-color: #16a34a;
+  box-shadow: 0 16px 36px -20px rgba(22, 163, 74, 0.45);
+}
+.np-kpi-link.done.is-active {
+  border-color: #16a34a;
+  box-shadow: 0 0 0 1.5px #16a34a, 0 14px 32px -20px rgba(22, 163, 74, 0.45);
+}
+
+/* Footer row */
+.np-kpi-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  min-height: 20px;
+}
+.np-kpi-foot .np-kpi-note {
+  margin: 0;
+  font-size: 11.5px;
+  color: #787886;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Status tag / pill */
+.np-kpi-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.3px;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.np-kpi-tag.active {
+  background: #6352b5;
+  color: #ffffff;
+}
+.np-kpi-tag.muted {
+  background: #f4f3fb;
+  color: #787886;
+}
+.np-kpi-tag.alert {
+  background: #ffedd5;
+  color: #c2410c;
+}
+.np-tag-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ea580c;
+  display: inline-block;
+  animation: npPulse 1.8s infinite ease-in-out;
+}
+@keyframes npPulse {
+  0%, 100% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.3); opacity: 1; }
+}
+
 /* ── Cards ──────────────────────────────────────────────────── */
 .np-card {
   background: #ffffff;

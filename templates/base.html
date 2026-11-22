@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20261102d">
   <link rel="stylesheet" href="{% static 'css/mindbloom.css' %}?v=20261102d">
-  <link rel="stylesheet" href="{% static 'css/nurse_portal.css' %}?v=nursing-desk-2">
+  <link rel="stylesheet" href="{% static 'css/nurse_portal.css' %}?v=nursing-desk-4">
   <style>
     .workspace-switch {
       display: grid;
@@ -33,6 +33,123 @@
     .workspace-switch a:hover { background: rgba(255, 255, 255, 0.12); text-decoration: none; }
     .workspace-switch a[aria-current="true"] { background: #d6f25f; color: #202024; }
     .workspace-switch a:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+    .opd-tools-trigger { width: 100%; border: 0; text-align: left; cursor: pointer; font: inherit; background: transparent; }
+    .opd-tools-chevron { margin-left: auto; font-size: 22px; line-height: 1; }
+    .opd-tools-panel {
+      position: fixed;
+      inset: 12px auto 12px 268px;
+      width: 346px;
+      height: calc(100dvh - 24px);
+      max-width: none;
+      max-height: none;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      color: #f5f4fa;
+      background: #202024;
+      border: 1px solid #3b3944;
+      border-radius: 20px;
+      box-shadow: 10px 14px 44px rgba(14, 12, 22, .32);
+    }
+    .opd-tools-panel[open] { display: flex; flex-direction: column; }
+    .opd-tools-panel::backdrop { background: rgba(19, 16, 31, .36); }
+    .opd-tools-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 18px 16px;
+      background: linear-gradient(116deg, #38304b, #25232c 76%);
+      border-bottom: 1px solid #44404f;
+    }
+    .opd-tools-header h2 { margin: 0; font-size: 23px; letter-spacing: -.5px; }
+    .opd-tools-close {
+      display: grid;
+      place-items: center;
+      min-width: 36px;
+      min-height: 36px;
+      padding: 0 9px;
+      color: inherit;
+      background: #ffffff0d;
+      border: 1px solid #ffffff20;
+      border-radius: 10px;
+      font: inherit;
+      cursor: pointer;
+    }
+    .opd-tools-close:hover { background: #ffffff20; }
+    .opd-tools-close-icon { font-size: 23px; line-height: 1; }
+    .opd-tools-back-label { display: none; }
+    .opd-tools-list {
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      min-height: 0;
+      overflow: auto;
+      overscroll-behavior: contain;
+      padding: 12px 14px 16px;
+      scrollbar-width: thin;
+      scrollbar-color: #686175 transparent;
+    }
+    .opd-tools-group {
+      padding: 6px;
+      background: #29282f;
+      border: 1px solid #ffffff12;
+      border-radius: 13px;
+    }
+    .opd-tools-group h3 {
+      margin: 0;
+      padding: 5px 8px 6px;
+      color: #c5b9f4;
+      font-size: 10.5px;
+      font-weight: 750;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .opd-tools-group a {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 34px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      color: #e5e3ee;
+      font-size: 13px;
+      font-weight: 550;
+    }
+    .opd-tools-group a::after {
+      content: "";
+      width: 6px;
+      height: 6px;
+      flex: 0 0 6px;
+      border-top: 1.5px solid currentColor;
+      border-right: 1.5px solid currentColor;
+      transform: rotate(45deg);
+      opacity: .5;
+    }
+    .opd-tools-group a:hover { background: #ffffff12; text-decoration: none; }
+    .opd-tools-group a[aria-current="page"] {
+      background: var(--lime, #d4f150);
+      color: #202024;
+      font-weight: 700;
+    }
+    .opd-tools-panel :is(a, button):focus-visible {
+      outline: 2px solid #c5b9f4;
+      outline-offset: -2px;
+    }
+    @media (max-width: 860px) {
+      .opd-tools-panel {
+        inset: 0 auto 0 0;
+        width: min(86vw, 300px);
+        height: 100dvh;
+        border-width: 0 1px 0 0;
+        border-radius: 0;
+      }
+      .opd-tools-close { min-height: 40px; }
+      .opd-tools-close-icon { display: none; }
+      .opd-tools-back-label { display: inline; font-size: 12px; font-weight: 650; }
+      .opd-tools-group a { min-height: 42px; }
+    }
 
     /* OPD Single-Line Topbar Guard */
     .topbar { flex-wrap: nowrap !important; }
@@ -340,107 +457,7 @@
         <a href="{% url 'pharmacy_receive' %}" class="nav-item {% if request.resolver_match.url_name == 'pharmacy_receive' %}active{% endif %}"><span class="nav-icon" aria-hidden="true">＋</span><span class="nav-label">Receive stock</span></a>
         <a href="{% url 'pharmacy_adjust' %}" class="nav-item {% if request.resolver_match.url_name == 'pharmacy_adjust' %}active{% endif %}"><span class="nav-icon" aria-hidden="true">±</span><span class="nav-label">Adjust stock</span></a>
       {% elif request.session.designation == 'opd_assistant' or request.resolver_match.url_name == 'opd_assistant_dashboard' or 'opd' in request.resolver_match.url_name or 'nurse' in request.resolver_match.url_name %}
-        <div class="nav-section-label">Flow &amp; Triage</div>
-
-        <a href="{% url 'opd_assistant_dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'opd_assistant_dashboard' %}active{% endif %}">
-          <span class="nav-icon">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="2" y="2" width="6" height="6" rx="1.5"/>
-              <rect x="10" y="2" width="6" height="6" rx="1.5"/>
-              <rect x="2" y="10" width="6" height="6" rx="1.5"/>
-              <rect x="10" y="10" width="6" height="6" rx="1.5"/>
-            </svg>
-          </span>
-          <span class="nav-label">Dashboard</span>
-          <span class="nav-subtag live">● Live</span>
-        </a>
-
-        <a href="{% url 'opd_patient_queue' %}" class="nav-item {% if request.resolver_match.url_name == 'opd_patient_queue' %}active{% endif %}">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M18 8h5M20.5 5.5v5"/></svg></span>
-          <span class="nav-label">Patient Queue</span>
-          <span class="nav-subtag">Pool</span>
-        </a>
-
-        <a href="{% url 'nurse_queue' %}" class="nav-item {% if request.resolver_match.url_name == 'nurse_queue' %}active{% endif %}">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.3"/><circle cx="3.5" cy="12" r="1.3"/><circle cx="3.5" cy="18" r="1.3"/></svg></span>
-          <span class="nav-label">Assessment Queue</span>
-          <span class="nav-subtag">Triage</span>
-        </a>
-
-        <a href="{% url 'nurse_tasks' %}" class="nav-item {% if request.resolver_match.url_name == 'nurse_tasks' %}active{% endif %}">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="17" rx="2"/><path d="M9 3h6v3H9zM8 11h8M8 15h5"/></svg></span>
-          <span class="nav-label">Nursing Tasks</span>
-          <span class="nav-subtag">Care board</span>
-        </a>
-
-        <a href="{% url 'nurse_handover' %}" class="nav-item {% if request.resolver_match.url_name == 'nurse_handover' %}active{% endif %}">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h11l5 5v11H4z"/><path d="M15 4v5h5M8 13h8M8 17h5"/></svg></span>
-          <span class="nav-label">Shift Handover</span>
-          <span class="nav-subtag">Print</span>
-        </a>
-
-        <a href="{% url 'opd_referrals' %}" class="nav-item {% if request.resolver_match.url_name == 'opd_referrals' %}active{% endif %}">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="m9 11 6-4M9 13l6 4"/></svg></span>
-          <span class="nav-label">Cross-consultation</span>
-          <span class="nav-subtag">Referrals</span>
-        </a>
-
-        <a href="{% url 'appointment_list' %}" class="nav-item {% if request.resolver_match.url_name == 'appointment_list' or request.resolver_match.url_name == 'appointment_create' or request.resolver_match.url_name == 'appointment_edit' or request.resolver_match.url_name == 'doctor_appointments' or request.resolver_match.app_name == 'appointments' %}active{% endif %}">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="18" height="16" rx="3"/><path d="M1 8h18M6 1v4M14 1v4"/></svg></span>
-          <span class="nav-label">Appointments</span>
-          <span class="nav-subtag">OPD</span>
-        </a>
-
-        <a href="{% url 'history' %}" class="nav-item {% if request.resolver_match.url_name == 'history' %}active{% endif %}">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v3l2 2"/></svg></span>
-          <span class="nav-label">Patient Register</span>
-          <span class="nav-subtag">Search &amp; fix</span>
-        </a>
-
-        <div class="nav-section-label">Clinical Services</div>
-
-        <a href="{% url 'opd_service_queue' 'procedure-room' %}" class="nav-item {% if request.resolver_match.url_name == 'opd_service_queue' and request.resolver_match.kwargs.service == 'procedure-room' %}active{% endif %}">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 7 3 3M4 20l5-1 11-11-4-4L5 15l-1 5Z"/></svg></span>
-          <span class="nav-label">Procedures</span>
-          <span class="nav-subtag">Minor OT</span>
-        </a>
-
-        <details class="nav-group" {% if request.resolver_match.url_name == 'opd_service_queue' and request.resolver_match.kwargs.service != 'procedure-room' and request.resolver_match.kwargs.service != 'pharmacy' %}open{% endif %}>
-          <summary class="nav-item">
-            <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="2" cy="6" r="1"/><circle cx="2" cy="12" r="1"/><circle cx="2" cy="18" r="1"/></svg></span>
-            <span class="nav-label">Other Queues</span>
-          </summary>
-          <div class="nav-subgroup">
-            <a href="{% url 'opd_service_queue' 'radiology' %}" class="nav-subitem">Radiology · X-Ray &amp; USG</a>
-            <a href="{% url 'opd_service_queue' 'laboratory' %}" class="nav-subitem">Laboratory</a>
-            <a href="{% url 'opd_service_queue' 'cardiology' %}" class="nav-subitem">Cardiology · ECG</a>
-            <a href="{% url 'opd_service_queue' 'physiotherapy' %}" class="nav-subitem">Physiotherapy</a>
-            <a href="{% url 'opd_service_queue' 'counselling' %}" class="nav-subitem">Counselling</a>
-          </div>
-        </details>
-
-        <div class="nav-section-label">Management</div>
-
-        <a href="{% url 'opd_module' 'reports' %}" class="nav-item {% if request.resolver_match.kwargs.module == 'reports' %}active{% endif %}">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg></span>
-          <span class="nav-label">Reports</span>
-          <span class="nav-subtag">Analytics</span>
-        </a>
-
-        <a href="{% url 'opd_module' 'master-data' %}" class="nav-item {% if request.resolver_match.kwargs.module == 'master-data' %}active{% endif %}">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg></span>
-          <span class="nav-label">Master Data</span>
-        </a>
-
-        <a href="{% url 'opd_module' 'audit-trail' %}" class="nav-item {% if request.resolver_match.kwargs.module == 'audit-trail' %}active{% endif %}">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
-          <span class="nav-label">Audit Trail</span>
-        </a>
-
-        <a href="{% url 'opd_module' 'settings' %}" class="nav-item {% if request.resolver_match.kwargs.module == 'settings' %}active{% endif %}">
-          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 13.5a7 7 0 0 0 0-3l2-1.5-2-3.5-2.4 1a8 8 0 0 0-2.6-1.5L13.5 2h-4L9 5a8 8 0 0 0-2.6 1.5L4 5.5 2 9l2 1.5a7 7 0 0 0 0 3L2 15l2 3.5 2.4-1A8 8 0 0 0 9 19l.5 3h4l.5-3a8 8 0 0 0 2.6-1.5l2.4 1 2-3.5z"/></svg></span>
-          <span class="nav-label">Settings</span>
-        </a>
+        {% include "core/_opd_sidebar.html" %}
       {% else %}
         <!-- Default/Other branch -->
         <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
@@ -704,6 +721,26 @@
 </div>
 
 <script src="{% static 'js/refresh-logout.js' %}"></script>
+<script src="{% static 'js/autofill-guard.js' %}"></script>
+<script>
+  (function () {
+    var trigger = document.getElementById("opdToolsTrigger");
+    var panel = document.getElementById("opdToolsPanel");
+    if (!trigger || !panel) return;
+    trigger.addEventListener("click", function () {
+      panel.showModal();
+      trigger.setAttribute("aria-expanded", "true");
+      panel.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest" });
+    });
+    panel.addEventListener("click", function (event) {
+      if (event.target === panel || event.target.closest("a")) panel.close();
+    });
+    panel.addEventListener("close", function () {
+      trigger.setAttribute("aria-expanded", "false");
+      if (trigger.getClientRects().length) trigger.focus();
+    });
+  })();
+</script>
 {% if request.resolver_match.url_name == 'opd_inpatient_dashboard' or request.session.designation == 'registration_desk' or request.resolver_match.url_name == 'reception_dashboard' or request.resolver_match.url_name == 'registration_desk' or request.resolver_match.url_name == 'emergency_registration' or request.resolver_match.url_name == 'bill_command_center' or request.resolver_match.url_name == 'pharmacy_billing' or request.resolver_match.url_name == 'lab_billing' or request.resolver_match.url_name == 'general_billing' or request.resolver_match.url_name == 'ip_billing' or request.session.designation == 'pharmacy' or request.session.designation == 'opd_assistant' %}<script>
   (function () {
     var toggle = document.getElementById("receptionNavToggle");
@@ -722,7 +759,7 @@
       if (event.target.closest("a")) setOpen(false);
     });
     document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape" && document.body.classList.contains("reception-nav-open")) {
+      if (event.key === "Escape" && !document.getElementById("opdToolsPanel")?.open && document.body.classList.contains("reception-nav-open")) {
         setOpen(false);
         toggle.focus();
       }

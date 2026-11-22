@@ -124,7 +124,7 @@
     var rbs = numVal("rbs");
     var pain = numVal("pain");
 
-    if (temp !== null && (temp < 35 || temp > 41)) { issues.push("Temp " + temp + "°C"); }
+    if (temp !== null && (temp < 95 || temp > 105.8)) { issues.push("Temp " + temp + "°F"); }
     if (pulse !== null && (pulse < 40 || pulse > 130)) { issues.push("Pulse " + pulse + "/min"); }
     if (rr !== null && (rr < 12 || rr > 30)) { issues.push("RR " + rr + "/min"); }
     if (bpSys !== null && bpSys > 140) { issues.push("Systolic " + bpSys + " mmHg"); }
@@ -509,7 +509,7 @@
     if (!vitalsEl) { return; }
 
     var parts = [];
-    if (val("temp")) { parts.push("Temp " + val("temp") + "°C"); }
+    if (val("temp")) { parts.push("Temp " + val("temp") + "°F"); }
     if (val("pulse")) { parts.push("Pulse " + val("pulse")); }
     if (val("bpSys") && val("bpDia")) { parts.push("BP " + val("bpSys") + "/" + val("bpDia")); }
     if (val("spo2")) { parts.push("SpO₂ " + val("spo2") + "%"); }
@@ -613,7 +613,7 @@
 
         var payload = {
           vitals: {
-            temp: val("temp"), pulse: val("pulse"), rr: val("rr"),
+            temp: val("temp"), temperature_unit: "F", pulse: val("pulse"), rr: val("rr"),
             bpSys: val("bpSys"), bpDia: val("bpDia"), spo2: val("spo2"),
             height: val("height"), weight: val("weight"),
             bmi: val("bmi"), rbs: val("rbs")
@@ -677,6 +677,7 @@
     return {
       patient_id: PATIENT_ID,
       temperature: val("temp"),
+      temperature_unit: "F",
       pulse: val("pulse"),
       respiratory_rate: val("rr"),
       bp_systolic: val("bpSys"),

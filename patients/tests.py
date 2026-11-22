@@ -87,6 +87,23 @@ class PatientRegistrationFormTests(TestCase):
         self.assertEqual(state_choices[1:], INDIAN_STATES_AND_UNION_TERRITORIES)
         self.assertEqual(religion_choices[1:5], COMMON_RELIGIONS)
 
+    def test_entry_fields_opt_out_of_browser_autofill(self):
+        """The operator's saved name/address details must never land in a patient record.
+
+        Chrome ignores autocomplete="off" for its address autofill profile and
+        silently filled the operator's own last name ("Mayer") into the patient's
+        Last Name field. Every entry field opts out so autofill has nothing to
+        match on, and the rendered form carries the autofill guard.
+        """
+        form = PatientRegistrationForm()
+        for name in (
+            "first_name", "second_name", "last_name", "phone", "email", "address",
+            "care_of", "aadhar_no", "abha_no", "pin_code", "district", "village",
+            "block", "zone", "reference_no",
+        ):
+            with self.subTest(field=name):
+                self.assertEqual(form.fields[name].widget.attrs.get("autocomplete"), "off")
+
 
 @override_settings(STORAGES={
     **settings.STORAGES,
@@ -181,6 +198,19 @@ class PatientEditViewTests(TestCase):
         patient.refresh_from_db()
         self.assertEqual(patient.date_of_birth.year, timezone.localdate().year - 20)
         self.assertEqual(patient.phone, "+919876543210")
+
+    def test_detail_renders_unassigned_open_task(self):
+        """An open nurse task without an assignee must not crash patient detail."""
+        from .models import NurseTask
+
+        NurseTask.objects.create(
+            patient=self.patient, title="Dressing change", status="pending"
+        )
+        response = self.client.get(self.detail_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dressing change")
+        self.assertContains(response, "Unassigned")
 
     def test_invalid_submission_shows_linked_errors_and_retains_values(self):
         response = self.client.post(

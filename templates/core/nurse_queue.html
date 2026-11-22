@@ -4,12 +4,59 @@
 {% block title %}Assessment Queue — OPD Desk{% endblock %}
 
 {% block heading %}
-<div class="np-head">
-  <div>
+<div class="np-head np-head-queue">
+  <div class="np-head-main">
     <div class="np-kicker">OPD Desk · Assessment Queue</div>
     <h1 class="np-title">Assessment Queue</h1>
     <p class="np-sub">Every visit waiting for or in initial assessment, ordered emergency first, then urgent, then by arrival.</p>
   </div>
+
+  <div class="np-head-kpis" role="region" aria-label="Assessment Queue KPI Summary">
+    <a href="{% url 'nurse_queue' %}?status=open{% if query %}&q={{ query }}{% endif %}" class="np-hkpi {% if status_filter == 'open' and not priority_filter %}is-active{% endif %}" title="Open visits">
+      <div class="np-hkpi-icon icon-lav" aria-hidden="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="np-hkpi-info">
+        <div class="np-hkpi-label">Open</div>
+        <div class="np-hkpi-sub">In progress</div>
+      </div>
+      <div class="np-hkpi-num">{{ counts.open }}</div>
+    </a>
+
+    <a href="{% url 'nurse_queue' %}?status=waiting{% if query %}&q={{ query }}{% endif %}" class="np-hkpi {% if status_filter == 'waiting' %}is-active{% endif %}" title="Waiting / unclaimed visits">
+      <div class="np-hkpi-icon icon-slate" aria-hidden="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div class="np-hkpi-info">
+        <div class="np-hkpi-label">Waiting</div>
+        <div class="np-hkpi-sub">Unclaimed</div>
+      </div>
+      <div class="np-hkpi-num">{{ counts.waiting }}</div>
+    </a>
+
+    <a href="{% url 'nurse_queue' %}?status=open&priority=urgent_all{% if query %}&q={{ query }}{% endif %}" class="np-hkpi urgent {% if priority_filter == 'urgent_all' %}is-active{% endif %}" title="Urgent & emergency cases">
+      <div class="np-hkpi-icon icon-amber" aria-hidden="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div class="np-hkpi-info">
+        <div class="np-hkpi-label">Urgent</div>
+        <div class="np-hkpi-sub">{% if counts.emergency > 0 %}<span class="np-tag-pulse"></span>Action{% else %}Priority{% endif %}</div>
+      </div>
+      <div class="np-hkpi-num">{{ counts.emergency }}</div>
+    </a>
+
+    <a href="{% url 'nurse_queue' %}?status=completed{% if query %}&q={{ query }}{% endif %}" class="np-hkpi done {% if status_filter == 'completed' %}is-active{% endif %}" title="Completed assessments today">
+      <div class="np-hkpi-icon icon-green" aria-hidden="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </div>
+      <div class="np-hkpi-info">
+        <div class="np-hkpi-label">Done</div>
+        <div class="np-hkpi-sub">Returned</div>
+      </div>
+      <div class="np-hkpi-num">{{ counts.completed_today }}</div>
+    </a>
+  </div>
+
   <div class="np-head-actions">
     <a href="{% url 'opd_assistant_dashboard' %}" class="np-btn">← OPD Desk</a>
   </div>
@@ -17,12 +64,6 @@
 {% endblock %}
 
 {% block content %}
-<div class="np-kpis">
-  <div class="np-kpi"><div class="np-kpi-label">Open</div><div class="np-kpi-value">{{ counts.open }}</div><div class="np-kpi-note">Waiting / in progress</div></div>
-  <div class="np-kpi"><div class="np-kpi-label">Waiting</div><div class="np-kpi-value">{{ counts.waiting }}</div><div class="np-kpi-note">Not yet claimed</div></div>
-  <div class="np-kpi urgent"><div class="np-kpi-label">Urgent</div><div class="np-kpi-value">{{ counts.emergency }}</div><div class="np-kpi-note">Emergency + urgent</div></div>
-  <div class="np-kpi done"><div class="np-kpi-label">Completed today</div><div class="np-kpi-value">{{ counts.completed_today }}</div><div class="np-kpi-note">Returned to OPD Desk</div></div>
-</div>
 
 <form class="np-filter" method="get">
   <div class="np-filter-search">

@@ -154,10 +154,13 @@
     transition: background 0.14s ease, color 0.14s ease;
   }
   .dm-edit:hover { background: #f5f5f6; color: var(--ink); text-decoration: none; }
+  .dm-delete { color:#b91c1c; border-color:#fecaca; }
+  .dm-delete:hover { color:#991b1b; background:#fef2f2; }
 
   .dm-empty { text-align: center; padding: 56px 24px; color: var(--muted); font-size: 14px; }
 
   @media (max-width: 1080px) { .dm-layout { grid-template-columns: 1fr; } .dm-card { position: static; } }
+  @media (max-width: 600px) { .dm-row { flex-wrap:wrap; gap:8px; } .dm-info { flex:1 1 65%; } }
 </style>
 {% endblock %}
 
@@ -277,6 +280,7 @@
           <svg width="13" height="13" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.5 2.5H5A1.5 1.5 0 0 0 3.5 4v10A1.5 1.5 0 0 0 5 15.5h8a1.5 1.5 0 0 0 1.5-1.5V6.5"/><path d="M13.5 2.5a1.6 1.6 0 0 1 2.3 2.3L8 12.6l-3 .8.8-3Z"/></svg>
           Edit
         </a>
+        {% if row.can_delete %}<a class="dm-edit dm-delete" href="{% url 'admin_staff_delete' row.user.pk %}" aria-label="Delete {{ row.user.get_full_name|default:row.user.username }}">Delete</a>{% endif %}
       </li>
       {% empty %}
       <li class="dm-empty">No staff match this filter. Add the first account on the left.</li>

@@ -114,6 +114,7 @@
   .jc-override summary{color:#b91c1c;font-size:12px;font-weight:800;cursor:pointer;padding:10px 12px;list-style:none}
   .jc-override summary::-webkit-details-marker{display:none}
   .jc-override-body{padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}
+  .mb-status-tag.doctor-assigned{background:#dcfce7;color:#166534}
 </style>
 <div class="mb-bento">
   <div class="mb-main-col">
@@ -149,7 +150,7 @@
                 <span class="mb-q-idx">{{ row.patient.first_name|slice:":1" }}{{ row.patient.last_name|slice:":1" }}</span>
                 <div class="mb-q-info">
                   <div class="mb-q-patient">{{ row.patient.full_name }}</div>
-                  <div class="mb-q-doc">{{ row.patient.uhid }} · {{ row.visit_number }} · {{ row.status }}</div>
+                  <div class="mb-q-doc">{{ row.patient.uhid }} · {{ row.visit_number }}{% if row.doctor %} · Dr. {{ row.doctor.get_full_name|default:row.doctor.username }}{% endif %}</div>
                 </div>
               </div>
               <span class="mb-status-tag {{ row.status|slugify }}">{{ row.status }}</span>
@@ -191,7 +192,7 @@
                 <span class="jc-demog">{{ selected.patient.age|default:"—" }}y / {{ selected.patient.get_gender_display|default:"—" }}</span>
               </div>
               {% if selected.appointment %}
-                <div class="jc-appt">Appointment {{ selected.appointment.date|date:"j M" }} · {{ selected.appointment.start_time|date:"H:i" }}{% if selected.appointment.doctor %} · Dr. {{ selected.appointment.doctor.full_name }}{% else %} · doctor to be assigned{% endif %}</div>
+                <div class="jc-appt">Appointment {{ selected.appointment.date|date:"j M" }} · {{ selected.appointment.start_time|date:"H:i" }}{% if selected.appointment.doctor %} · Booked with {{ selected.appointment.doctor.full_name }}{% endif %}</div>
               {% endif %}
               <div class="jc-wait-pill">
                 <span class="jc-pulse-dot"></span>
@@ -242,6 +243,8 @@
                 <strong>Record the initial assessment</strong>
               {% elif selected.needs_doctor %}
                 <strong>Initial assessment complete — awaiting doctor allocation</strong>
+              {% elif selected.status == "Doctor Assigned" %}
+                <strong>Doctor assigned — waiting to start consultation</strong>
               {% elif selected.consultation %}
                 <strong>Consultation {{ selected.consultation.get_status_display|lower }}</strong>
               {% elif selected.status == "Completed" %}
@@ -288,6 +291,7 @@
               </form>
 
             {% elif selected.needs_doctor %}
+              {% if not doctors %}<div class="jc-muted">No active doctors available. Add or activate a doctor account to assign this visit.</div>{% endif %}
               <div class="jc-chip-row">
                 {% for doctor in doctors|slice:":4" %}
                   <form method="post" action="{% url 'assign_doctor' selected.patient.pk %}" class="jc-chip-form">
@@ -327,16 +331,16 @@
               <form method="post" action="{% url 'assign_doctor' selected.patient.pk %}" class="jc-sticky" style="display:flex;gap:8px;">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                <select name="doctor_id" style="flex:1; padding:9px 12px; border-radius:12px; border:1.5px solid #dcdce2; font:inherit; font-size:12px;">
+                <select name="doctor_id" required {% if not doctors %}disabled{% endif %} aria-label="Assign a doctor" style="flex:1; padding:9px 12px; border-radius:12px; border:1.5px solid #dcdce2; font:inherit; font-size:12px;">
                   <option value="">Assign a doctor…</option>
                   {% for doctor in doctors %}
                     <option value="{{ doctor.pk }}">Dr. {{ doctor.get_full_name|default:doctor.username }}</option>
                   {% endfor %}
                 </select>
-                <button type="submit" class="jc-cta" style="width:auto; padding:11px 18px;">Assign</button>
+                <button type="submit" class="jc-cta" {% if not doctors %}disabled{% endif %} style="width:auto; padding:11px 18px;">Assign</button>
               </form>
 
-            {% elif selected.doctor and selected.status == "Doctor Allocation" %}
+            {% elif selected.doctor and selected.status == "Doctor Assigned" %}
               <div class="jc-muted">
                 Assigned to <strong>Dr. {{ selected.doctor.get_full_name|default:selected.doctor.username }}</strong>
                 — the consultation starts from the doctor's desk.
@@ -344,6 +348,13 @@
               <div class="jc-sticky">
                 <a class="jc-cta is-link" href="?allocation=services&q={{ query|urlencode }}">Track in service queues →</a>
               </div>
+              {% if doctors %}
+                <form method="post" action="{% url 'assign_doctor' selected.patient.pk %}" style="display:flex;gap:8px;flex-wrap:wrap;">
+                  {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  <select name="doctor_id" required aria-label="Reassign doctor"><option value="">Reassign doctor…</option>{% for doctor in doctors %}<option value="{{ doctor.pk }}">Dr. {{ doctor.get_full_name|default:doctor.username }}</option>{% endfor %}</select>
+                  <button type="submit" class="jc-ghost">Reassign</button>
+                </form>
+              {% endif %}
 
             {% elif selected.consultation %}
               <div class="jc-muted">
@@ -375,13 +386,14 @@
               <form class="jc-override-body" method="post" action="{% url 'assign_doctor' selected.patient.pk %}">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                <select name="doctor_id" style="padding:8px 12px; border-radius:10px; border:1px solid #fca5a5; font:inherit; font-size:12px;">
+                <select name="doctor_id" required {% if not doctors %}disabled{% endif %} aria-label="Select doctor for emergency" style="padding:8px 12px; border-radius:10px; border:1px solid #fca5a5; font:inherit; font-size:12px;">
                   <option value="">— Select doctor —</option>
                   {% for doctor in doctors %}
                     <option value="{{ doctor.pk }}">Dr. {{ doctor.get_full_name|default:doctor.username }}</option>
                   {% endfor %}
                 </select>
-                <button class="jc-ghost" type="submit" style="border-color:#fca5a5; color:#b91c1c; justify-content:center;">Allocate directly to doctor</button>
+                <button class="jc-ghost" type="submit" {% if not doctors %}disabled{% endif %} style="border-color:#fca5a5; color:#b91c1c; justify-content:center;">Allocate directly to doctor</button>
+                {% if not doctors %}<span class="jc-muted">No active doctors available.</span>{% endif %}
               </form>
             </details>
           {% endif %}
@@ -433,7 +445,7 @@
               <div class="jc-details-body">
                 <ol>
                   <li><time>{{ selected.patient.created_at|date:"H:i" }}</time> Visit registered</li>
-                  {% if selected.appointment %}<li><time>{{ selected.appointment.start_time|date:"H:i" }}</time> Appointment booked{% if selected.appointment.doctor %} · Dr. {{ selected.appointment.doctor.full_name }}{% else %} · Unassigned{% endif %}</li>{% endif %}
+                  {% if selected.appointment %}<li><time>{{ selected.appointment.start_time|date:"H:i" }}</time> Appointment booked{% if selected.appointment.doctor %} · {{ selected.appointment.doctor.full_name }}{% endif %}</li>{% endif %}
                   {% if selected.assessment %}<li><time>{{ selected.assessment.updated_at|date:"H:i" }}</time> Initial assessment saved</li>{% endif %}
                   {% if selected.consultation %}<li><time>{{ selected.consultation.updated_at|date:"H:i" }}</time> Consultation {{ selected.consultation.get_status_display|lower }}</li>{% for order in selected.consultation.orders.all %}<li><time>{{ order.created_at|date:"H:i" }}</time> {{ order.name }} · {{ order.status }}</li>{% endfor %}{% endif %}
                 </ol>

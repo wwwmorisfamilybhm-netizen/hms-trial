@@ -208,6 +208,8 @@
           4. Clinical Notes & Allergies
         </h3>
         <dl class="details" style="display:grid; grid-template-columns:160px 1fr; row-gap:10px; font-size:14px; margin:0;">
+          <dt style="color:var(--muted); font-weight:600;">Assigned Doctor</dt>
+          <dd style="margin:0;">{% if patient.assigned_doctor %}Dr. {{ patient.assigned_doctor.get_full_name|default:patient.assigned_doctor.username }}{% else %}Unassigned{% endif %}</dd>
           <dt style="color:var(--muted); font-weight:600;">Blood Group</dt>
           <dd style="margin:0;">
             {% if patient.blood_group %}
@@ -310,7 +312,7 @@
           <tr style="border-bottom:1px solid var(--line);">
             <td style="padding:7px 0; font-weight:600;">{{ task.title }}</td>
             <td style="padding:7px 0; color:var(--muted);">{{ task.get_kind_display }}</td>
-            <td style="padding:7px 0; color:var(--muted);">{{ task.assigned_to.get_full_name|default:task.assigned_to.username|default:"Unassigned" }}</td>
+            <td style="padding:7px 0; color:var(--muted);">{% if task.assigned_to %}{{ task.assigned_to.get_full_name|default:task.assigned_to.username }}{% else %}Unassigned{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>

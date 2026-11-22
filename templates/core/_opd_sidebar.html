@@ -1,0 +1,43 @@
+<div class="nav-section-label">Patient Flow</div>
+<a href="{% url 'opd_assistant_dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'opd_assistant_dashboard' %}active{% endif %}"><span class="nav-icon">▦</span><span class="nav-label">Dashboard</span></a>
+<a href="{% url 'appointment_list' %}" class="nav-item{% if request.resolver_match.url_name == 'appointment_list' or request.resolver_match.url_name == 'appointment_create' or request.resolver_match.url_name == 'appointment_edit' %} active{% endif %}"><span class="nav-icon">▣</span><span class="nav-label">Appointments</span></a>
+<a href="{% url 'opd_patient_queue' %}" class="nav-item {% if request.resolver_match.url_name == 'opd_patient_queue' %}active{% endif %}"><span class="nav-icon">◉</span><span class="nav-label">Patient Queue</span></a>
+<a href="{% url 'nurse_queue' %}" class="nav-item {% if request.resolver_match.url_name == 'nurse_queue' or request.resolver_match.url_name == 'nurse_triage' %}active{% endif %}"><span class="nav-icon">☷</span><span class="nav-label">Assessment Queue</span></a>
+<a href="{% url 'nurse_tasks' %}" class="nav-item {% if request.resolver_match.url_name == 'nurse_tasks' %}active{% endif %}"><span class="nav-icon">✓</span><span class="nav-label">Nursing Tasks</span></a>
+<button type="button" class="nav-item opd-tools-trigger{% if request.resolver_match.url_name == 'nurse_handover' or request.resolver_match.url_name == 'opd_referrals' or request.resolver_match.url_name == 'history' or request.resolver_match.url_name == 'opd_service_queue' or request.resolver_match.url_name == 'opd_module' or request.resolver_match.url_name == 'reports' %} active{% endif %}" id="opdToolsTrigger" aria-expanded="false" aria-haspopup="dialog" aria-controls="opdToolsPanel"><span class="nav-icon">＋</span><span class="nav-label">All tools</span><span class="opd-tools-chevron" aria-hidden="true">›</span></button>
+
+<dialog class="opd-tools-panel" id="opdToolsPanel" aria-labelledby="opdToolsTitle">
+  <header class="opd-tools-header">
+    <h2 id="opdToolsTitle">All tools</h2>
+    <form method="dialog">
+      <button type="submit" class="opd-tools-close" aria-label="Back to sidebar" autofocus>
+        <span class="opd-tools-close-icon" aria-hidden="true">×</span>
+        <span class="opd-tools-back-label" aria-hidden="true">← Back</span>
+      </button>
+    </form>
+  </header>
+  <div class="opd-tools-list">
+    <section class="opd-tools-group" aria-labelledby="opdToolsCoordination">
+      <h3 id="opdToolsCoordination">Patient coordination</h3>
+      <a href="{% url 'history' %}"{% if request.resolver_match.url_name == 'history' %} aria-current="page"{% endif %}>Patient Register</a>
+      <a href="{% url 'opd_referrals' %}"{% if request.resolver_match.url_name == 'opd_referrals' %} aria-current="page"{% endif %}>Cross-consultation</a>
+      <a href="{% url 'nurse_handover' %}"{% if request.resolver_match.url_name == 'nurse_handover' %} aria-current="page"{% endif %}>Shift Handover</a>
+    </section>
+    <section class="opd-tools-group" aria-labelledby="opdToolsClinical">
+      <h3 id="opdToolsClinical">Clinical services</h3>
+      <a href="{% url 'opd_service_queue' 'procedure-room' %}"{% if request.resolver_match.kwargs.service == 'procedure-room' %} aria-current="page"{% endif %}>Procedures</a>
+      <a href="{% url 'opd_service_queue' 'laboratory' %}"{% if request.resolver_match.kwargs.service == 'laboratory' %} aria-current="page"{% endif %}>Laboratory</a>
+      <a href="{% url 'opd_service_queue' 'radiology' %}"{% if request.resolver_match.kwargs.service == 'radiology' %} aria-current="page"{% endif %}>Radiology · X-Ray &amp; USG</a>
+      <a href="{% url 'opd_service_queue' 'cardiology' %}"{% if request.resolver_match.kwargs.service == 'cardiology' %} aria-current="page"{% endif %}>Cardiology · ECG</a>
+      <a href="{% url 'opd_service_queue' 'physiotherapy' %}"{% if request.resolver_match.kwargs.service == 'physiotherapy' %} aria-current="page"{% endif %}>Physiotherapy</a>
+      <a href="{% url 'opd_service_queue' 'counselling' %}"{% if request.resolver_match.kwargs.service == 'counselling' %} aria-current="page"{% endif %}>Counselling</a>
+    </section>
+    <section class="opd-tools-group" aria-labelledby="opdToolsManagement">
+      <h3 id="opdToolsManagement">Management</h3>
+      <a href="{% url 'opd_module' 'reports' %}"{% if request.resolver_match.kwargs.module == 'reports' %} aria-current="page"{% endif %}>Reports</a>
+      <a href="{% url 'opd_module' 'master-data' %}"{% if request.resolver_match.kwargs.module == 'master-data' %} aria-current="page"{% endif %}>Master Data</a>
+      <a href="{% url 'opd_module' 'audit-trail' %}"{% if request.resolver_match.kwargs.module == 'audit-trail' %} aria-current="page"{% endif %}>Audit Trail</a>
+      <a href="{% url 'opd_module' 'settings' %}"{% if request.resolver_match.kwargs.module == 'settings' %} aria-current="page"{% endif %}>Settings</a>
+    </section>
+  </div>
+</dialog>

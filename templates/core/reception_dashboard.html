@@ -233,6 +233,18 @@
     justify-content: space-between;
     gap: 16px;
     box-shadow: 0 8px 22px rgba(0, 0, 0, 0.05);
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .mb-capsule:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 30px rgba(84, 68, 156, 0.16);
+    text-decoration: none;
+  }
+  .mb-capsule:focus-visible {
+    outline: 3px solid var(--mb-purple-hero);
+    outline-offset: 3px;
   }
   .mb-capsule-head {
     display: flex;
@@ -554,8 +566,16 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 0;
+    padding: 10px 8px;
     border-bottom: 1px solid #f0eff6;
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.12s ease;
+  }
+  .mb-doc-item:hover {
+    background: #faf9ff;
+    text-decoration: none;
   }
   .mb-doc-item:last-child { border-bottom: none; }
   .mb-doc-profile {
@@ -676,6 +696,17 @@
     font-size: 16px;
     font-weight: 850;
     color: var(--mb-text-dark);
+  }
+  .mb-finance-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    border-radius: 10px;
+    transition: background 0.12s ease;
+  }
+  .mb-finance-link:hover {
+    background: rgba(155, 135, 248, 0.08);
+    text-decoration: none;
   }
 
   /* Schedule Obsidian Card (#20232a) */
@@ -936,8 +967,8 @@
       <!-- 3 Floating Capsules with SVG Rings -->
       <div class="mb-hero-capsules">
 
-        <!-- Capsule 1: Registered Today -->
-        <div class="mb-capsule">
+        <!-- Capsule 1: Registered Today -> Direct to New Registration Form -->
+        <a class="mb-capsule" href="{% url 'registration_desk_new' %}" title="Register a new patient" aria-label="Register a new patient">
           <div class="mb-capsule-head">
             <span class="mb-capsule-title">Today's Intake</span>
             <span class="badge" style="background:#eef8f2; color:#1e7048; font-weight:750; font-size:11px; padding:3px 8px; border-radius:99px;">
@@ -946,28 +977,28 @@
           </div>
           <div class="mb-capsule-body">
             <div>
-              <div class="mb-capsule-num">{{ today_count|default:"0" }}</div>
+              <div class="mb-capsule-num">{{ today_count }}</div>
               <div class="mb-capsule-desc">Registered Patients Today</div>
             </div>
             <!-- Circular Progress Gauge -->
             <svg width="54" height="54" viewBox="0 0 44 44" aria-hidden="true">
               <circle cx="22" cy="22" r="17" fill="none" stroke="#f0eff8" stroke-width="4.5"/>
-              <circle cx="22" cy="22" r="17" fill="none" stroke="#9b87f8" stroke-width="4.5" stroke-dasharray="106.8" stroke-dashoffset="32" stroke-linecap="round" transform="rotate(-90 22 22)"/>
-              <text x="22" y="26" text-anchor="middle" font-size="11" font-weight="800" fill="#20232a">{{ today_count|default:"0" }}</text>
+              <circle cx="22" cy="22" r="17" fill="none" stroke="#9b87f8" stroke-width="4.5" stroke-dasharray="106.8" stroke-dashoffset="{{ today_gauge_offset }}" stroke-linecap="round" transform="rotate(-90 22 22)"/>
+              <text x="22" y="26" text-anchor="middle" font-size="11" font-weight="800" fill="#20232a">{{ today_count }}</text>
             </svg>
           </div>
-          <a href="{% url 'registration_desk_new' %}" class="mb-capsule-btn lime">
+          <span class="mb-capsule-btn lime">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
             <span>+ Patient Registration</span>
-          </a>
-        </div>
+          </span>
+        </a>
 
         <!-- Capsule 2: Pending Payments / Billing -->
-        <div class="mb-capsule">
+        <a class="mb-capsule" href="{% url 'bill_command_center' %}#pending-payments" title="Open the billing command center" aria-label="Open the billing command center">
           <div class="mb-capsule-head">
             <span class="mb-capsule-title">Counter Billing</span>
             <span class="badge" style="background:#fff7ed; color:#9a3412; font-weight:750; font-size:11px; padding:3px 8px; border-radius:99px;">
-              {{ pending_payments|default:"0" }} Due
+              {{ pending_payments }} Due
             </span>
           </div>
           <div class="mb-capsule-body">
@@ -978,50 +1009,53 @@
             <!-- Circular Progress Gauge -->
             <svg width="54" height="54" viewBox="0 0 44 44" aria-hidden="true">
               <circle cx="22" cy="22" r="17" fill="none" stroke="#f0eff8" stroke-width="4.5"/>
-              <circle cx="22" cy="22" r="17" fill="none" stroke="#eab308" stroke-width="4.5" stroke-dasharray="106.8" stroke-dashoffset="48" stroke-linecap="round" transform="rotate(-90 22 22)"/>
+              <circle cx="22" cy="22" r="17" fill="none" stroke="#eab308" stroke-width="4.5" stroke-dasharray="106.8" stroke-dashoffset="{{ billing_gauge_offset }}" stroke-linecap="round" transform="rotate(-90 22 22)"/>
               <text x="22" y="26" text-anchor="middle" font-size="10" font-weight="800" fill="#20232a">₹</text>
             </svg>
           </div>
-          <a href="{% url 'bill_command_center' %}" class="mb-capsule-btn lime">
+          <span class="mb-capsule-btn lime">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
             <span>Bill Command Center</span>
-          </a>
-        </div>
+          </span>
+        </a>
 
         <!-- Capsule 3: Appointments Today -->
-        <div class="mb-capsule">
+        <a class="mb-capsule" href="{% url 'appointment_list' %}?date={{ today|date:'Y-m-d' }}" title="View today's appointment schedule" aria-label="View today's appointment schedule">
           <div class="mb-capsule-head">
             <span class="mb-capsule-title">Appointments</span>
             <span class="badge" style="background:#eef2ff; color:#3b5bdb; font-weight:750; font-size:11px; padding:3px 8px; border-radius:99px;">
-              Scheduled
+              {{ appointments_completed_today }} Completed
             </span>
           </div>
           <div class="mb-capsule-body">
             <div>
-              <div class="mb-capsule-num">{{ appointments_today|default:"0" }}</div>
+              <div class="mb-capsule-num">{{ appointments_today }}</div>
               <div class="mb-capsule-desc">Expected at Desk Today</div>
             </div>
             <!-- Circular Progress Gauge -->
             <svg width="54" height="54" viewBox="0 0 44 44" aria-hidden="true">
               <circle cx="22" cy="22" r="17" fill="none" stroke="#f0eff8" stroke-width="4.5"/>
-              <circle cx="22" cy="22" r="17" fill="none" stroke="#3b5bdb" stroke-width="4.5" stroke-dasharray="106.8" stroke-dashoffset="52" stroke-linecap="round" transform="rotate(-90 22 22)"/>
-              <text x="22" y="26" text-anchor="middle" font-size="11" font-weight="800" fill="#20232a">{{ appointments_today|default:"0" }}</text>
+              <circle cx="22" cy="22" r="17" fill="none" stroke="#3b5bdb" stroke-width="4.5" stroke-dasharray="106.8" stroke-dashoffset="{{ appointments_gauge_offset }}" stroke-linecap="round" transform="rotate(-90 22 22)"/>
+              <text x="22" y="26" text-anchor="middle" font-size="11" font-weight="800" fill="#20232a">{{ appointments_today }}</text>
             </svg>
           </div>
-          <a href="{% url 'appointment_list' %}" class="mb-capsule-btn dark">
+          <span class="mb-capsule-btn dark">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
             <span>View Appointments</span>
-          </a>
-        </div>
+          </span>
+        </a>
 
       </div>
 
       <div style="display:flex; gap:9px; flex-wrap:wrap; margin-top:14px;">
-        <a href="{% url 'opd_patient_queue' %}?allocation=nurse" class="mb-btn-action ghost" style="background:rgba(255,255,255,.9);">
-          Ready for OPD · {{ ready_for_opd_count|default:"0" }}
+        <a href="{% url 'opd_patient_queue' %}?allocation=nurse" class="mb-btn-action ghost" style="background:rgba(255,255,255,.9);" title="Open the OPD assessment queue">
+          Ready for OPD · {{ ready_for_opd_count }}
         </a>
-        <a href="{% url 'post_consultation_billing' %}" class="mb-btn-action ghost" style="background:rgba(255,255,255,.9);">
-          Post-consultation billing · {{ post_consultation_count|default:"0" }}
+        <a href="{% url 'post_consultation_billing' %}" class="mb-btn-action ghost" style="background:rgba(255,255,255,.9);" title="Open post-consultation billing">
+          Post-consultation billing · {{ post_consultation_count }}
+        </a>
+        <a href="{% url 'registration_desk' %}?emergency=1&date={{ today|date:'Y-m-d' }}" class="mb-btn-action ghost" style="background:rgba(255,255,255,.9);" title="View today's emergency registrations">
+          🚨 Emergency today · {{ emergency_today }}
         </a>
       </div>
     </section>
@@ -1059,7 +1093,7 @@
                     </span>
                   {% endif %}
                 </div>
-                <div class="mb-token-patient">{{ p.full_name }}</div>
+                <a href="{% url 'patient_detail' p.pk %}" class="mb-token-patient" style="color:#ffffff; text-decoration:none;">{{ p.full_name }}</a>
                 <div class="mb-token-sub">{{ p.get_gender_display|default:"" }} · {{ p.phone|default:"No phone" }} · {{ p.created_at|date:"H:i" }}</div>
               </div>
               <a href="{% url 'patient_print_card' p.pk %}" class="mb-token-print-btn" title="Print registration card">
@@ -1077,10 +1111,10 @@
           {% endfor %}
         </div>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; pt:8px;">
-          <span style="font-size:12px; color:rgba(255,255,255,0.85); font-weight:500;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:8px;">
+          <a href="{% url 'registration_desk' %}" style="font-size:12px; color:rgba(255,255,255,0.9); font-weight:500; text-decoration:none;">
             Total in Database: <strong>{{ total_patients }}</strong>
-          </span>
+          </a>
           <a href="{% url 'registration_desk' %}" style="color:#ffffff; font-size:12.5px; font-weight:750; text-decoration:none;">
             Full Register →
           </a>
@@ -1094,45 +1128,31 @@
             <h3 class="mb-activity-title">Counter Flow Activity</h3>
             <span style="font-size:12px; color:var(--mb-text-muted);">Hourly walk-in &amp; registration volume</span>
           </div>
-          <span class="mb-badge-soft">Peak: 10:00 AM</span>
+          <span class="mb-badge-soft">Peak: {{ peak_display }}{% if peak_count %} · {{ peak_count }}{% endif %}</span>
         </div>
 
         <!-- Hourly Activity Columns with Lime Peak Bar -->
         <div class="mb-bars">
-          <div class="mb-bar-col">
-            <div class="mb-bar muted" style="height:35%;"></div>
-            <span class="mb-bar-label">08:00</span>
-          </div>
-          <div class="mb-bar-col">
-            <div class="mb-bar muted" style="height:65%;"></div>
-            <span class="mb-bar-label">09:00</span>
-          </div>
-          <div class="mb-bar-col">
-            <div class="mb-bar-badge">{{ today_count|default:"18" }} Regs</div>
-            <div class="mb-bar accent" style="height:92%;"></div>
-            <span class="mb-bar-label" style="font-weight:750; color:#1b1c26;">10:00</span>
-          </div>
-          <div class="mb-bar-col">
-            <div class="mb-bar muted" style="height:72%;"></div>
-            <span class="mb-bar-label">11:00</span>
-          </div>
-          <div class="mb-bar-col">
-            <div class="mb-bar muted" style="height:55%;"></div>
-            <span class="mb-bar-label">12:00</span>
-          </div>
-          <div class="mb-bar-col">
-            <div class="mb-bar muted" style="height:42%;"></div>
-            <span class="mb-bar-label">13:00</span>
-          </div>
-          <div class="mb-bar-col">
-            <div class="mb-bar muted" style="height:50%;"></div>
-            <span class="mb-bar-label">14:00</span>
-          </div>
+          {% for hour in hourly_flow %}
+            <div class="mb-bar-col" title="{{ hour.label }} · {{ hour.total }} registration{{ hour.total|pluralize }}">
+              {% if hour.peak %}
+                <div class="mb-bar-badge">{{ hour.total }} Reg{{ hour.total|pluralize }}</div>
+              {% endif %}
+              <div class="mb-bar {% if hour.peak %}accent{% else %}muted{% endif %}" style="height:{{ hour.height }}%;"></div>
+              <span class="mb-bar-label" {% if hour.peak %}style="font-weight:750; color:#1b1c26;"{% endif %}>{{ hour.label }}</span>
+            </div>
+          {% endfor %}
         </div>
 
         <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f0eff6; padding-top:14px; font-size:12.5px;">
-          <span style="color:var(--mb-text-muted);">Average Counter Intake: <strong style="color:var(--mb-text-dark);">2.4 mins / pt</strong></span>
-          <span style="color:#16a34a; font-weight:700;">● Smooth Flow</span>
+          <span style="color:var(--mb-text-muted);">
+            {% if avg_counter_minutes is not None %}
+              Average Counter Intake: <strong style="color:var(--mb-text-dark);">{{ avg_counter_minutes }} mins / pt</strong>
+            {% else %}
+              No counter intervals recorded yet
+            {% endif %}
+          </span>
+          <span style="color:{{ flow_status_color }}; font-weight:700;">● {{ flow_status }}</span>
         </div>
       </section>
 
@@ -1189,16 +1209,16 @@
 
       <!-- Financial Snapshot -->
       <div class="mb-collections-box">
-        <div>
+        <a href="{% url 'bill_command_center' %}#past-payments" class="mb-finance-link" title="View paid collections">
           <div class="mb-collect-label">Paid Collections Today</div>
           <div class="mb-collect-val" style="color:#16a34a;">₹{{ paid_today_amount|floatformat:0 }}</div>
-          <div style="font-size:11px; color:var(--mb-text-muted);">{{ paid_count|default:"0" }} Paid Receipts</div>
-        </div>
-        <div style="text-align:right;">
+          <div style="font-size:11px; color:var(--mb-text-muted);">{{ paid_count }} Paid Receipts</div>
+        </a>
+        <a href="{% url 'bill_command_center' %}#pending-payments" class="mb-finance-link" style="text-align:right;" title="View pending dues">
           <div class="mb-collect-label">Pending Due</div>
           <div class="mb-collect-val" style="color:#ea580c;">₹{{ pending_amount|floatformat:0 }}</div>
-          <div style="font-size:11px; color:var(--mb-text-muted);">{{ pending_payments|default:"0" }} Invoices</div>
-        </div>
+          <div style="font-size:11px; color:var(--mb-text-muted);">{{ pending_payments }} Invoices</div>
+        </a>
       </div>
     </div>
 
@@ -1214,7 +1234,7 @@
 
         <div>
           {% for doc in available_doctors|slice:":3" %}
-            <div class="mb-doc-item">
+            <a href="{% url 'appointment_list' %}?date={{ today|date:'Y-m-d' }}&doctor={{ doc.pk }}" class="mb-doc-item" title="View Dr. {{ doc.first_name }} {{ doc.last_name }}'s appointments today">
               <div class="mb-doc-profile">
                 <div class="mb-doc-avatar">
                   {{ doc.first_name|slice:":1" }}{{ doc.last_name|slice:":1" }}
@@ -1227,13 +1247,16 @@
               </div>
               <div>
                 <span class="badge" style="background:#eef8f2; color:#1e7048; font-weight:700; font-size:11px; padding:4px 9px; border-radius:99px;">
-                  Available
+                  {{ doc.appointments_today }} today
                 </span>
               </div>
-            </div>
+            </a>
           {% empty %}
             <div style="padding:16px 0; text-align:center; color:var(--mb-text-muted); font-size:13px;">
               No doctors currently listed.
+              <div style="margin-top:8px;">
+                <a href="{% url 'admin_doctors' %}" style="color:#6352b5; font-weight:700; text-decoration:none;">Add a doctor →</a>
+              </div>
             </div>
           {% endfor %}
         </div>

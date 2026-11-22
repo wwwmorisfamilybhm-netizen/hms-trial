@@ -67,6 +67,15 @@ class PatientForm(forms.ModelForm):
             "allergies": forms.Textarea(attrs={"rows": 2}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            if isinstance(
+                field.widget,
+                (forms.TextInput, forms.EmailInput, forms.NumberInput, forms.Textarea),
+            ):
+                field.widget.attrs.setdefault("autocomplete", "off")
+
 
 class PatientRegistrationForm(forms.ModelForm):
     """Registration form with database-backed options and server-calculated fees."""
@@ -152,6 +161,17 @@ class PatientRegistrationForm(forms.ModelForm):
             age = self._age_parts(self.instance.date_of_birth, timezone.localdate())
             for name, value in zip(("age_years", "age_months", "age_days"), age):
                 self.fields[name].initial = value
+
+        # None of these fields describe the person at the keyboard, so opt every
+        # entry field out of browser autofill. Without this, browsers silently
+        # fill the operator's own saved name/address details (e.g. Chrome's
+        # "Bob Mayer" identity profile) into the patient's fields on save.
+        for field in self.fields.values():
+            if isinstance(
+                field.widget,
+                (forms.TextInput, forms.EmailInput, forms.NumberInput, forms.Textarea),
+            ):
+                field.widget.attrs.setdefault("autocomplete", "off")
 
     def _fee_for(self, code):
         category_fee = self.category_fees.get(code)
@@ -288,7 +308,10 @@ class EmergencyRegistrationForm(forms.Form):
     collected afterwards from the Bill Command Center.
     """
 
-    name = forms.CharField(max_length=200, label="Patient Name")
+    name = forms.CharField(
+        max_length=200, label="Patient Name",
+        widget=forms.TextInput(attrs={"autocomplete": "off"}),
+    )
     age_years = forms.IntegerField(min_value=0, max_value=130, label="Age (Years)")
     gender = forms.ChoiceField(choices=Patient.Gender.choices, label="Sex")
     uhid = forms.CharField(max_length=20, label="UHID", required=False)

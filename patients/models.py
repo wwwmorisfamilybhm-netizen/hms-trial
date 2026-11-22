@@ -393,7 +393,8 @@ class InitialAssessment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     # Vitals
-    temperature = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    # Stored in Celsius; two decimals preserve a Fahrenheit reading to 0.1°F.
+    temperature = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     pulse = models.PositiveIntegerField(null=True, blank=True)
     respiratory_rate = models.PositiveIntegerField(null=True, blank=True)
     bp_systolic = models.PositiveIntegerField(null=True, blank=True)

@@ -6,7 +6,7 @@
 
 {% block content %}
 <section class="card card-form">
-  <form method="post" novalidate>
+  <form method="post" novalidate autocomplete="off">
     {% csrf_token %}
     {% include "partials/form_fields.html" %}
     <div class="form-actions">

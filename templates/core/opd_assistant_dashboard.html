@@ -1124,6 +1124,7 @@
   .mb-status-tag.waiting { background: #fef3c7; color: #92400e; }
   .mb-status-tag.in-central-pool { background: #e0e7ff; color: #3730a3; }
   .mb-status-tag.with-doctor { background: #dcfce7; color: #166534; }
+  .mb-status-tag.doctor-assigned { background: #dcfce7; color: #166534; }
   .mb-status-tag.pending-assignment { background: #fee2e2; color: #991b1b; }
   .mb-status-tag.investigations { background: #f3e8ff; color: #6b21a8; }
   .mb-status-tag.procedures { background: #ccfbf1; color: #115e59; }
@@ -1399,6 +1400,7 @@
                         {% if row.pre_visit_pending %}Payment pending
                         {% elif row.in_nurse_queue %}In assessment
                         {% elif row.needs_doctor %}Doctor allocation
+                        {% elif row.doctor and row.status == "Doctor Assigned" %}Doctor assigned · Dr. {{ row.doctor.get_full_name|default:row.doctor.username }}
                         {% elif row.status == "Assessment" %}Awaiting assessment
                         {% else %}{{ row.status }}{% endif %}
                         · {{ row.status }}
@@ -1491,6 +1493,7 @@
       <option value="Assessment" {% if status_filter == "Assessment" %}selected{% endif %}>Awaiting assessment</option>
       <option value="Waiting" {% if status_filter == "Waiting" %}selected{% endif %}>Waiting (in triage)</option>
       <option value="Doctor Allocation" {% if status_filter == "Doctor Allocation" %}selected{% endif %}>Doctor allocation</option>
+      <option value="Doctor Assigned" {% if status_filter == "Doctor Assigned" %}selected{% endif %}>Doctor assigned</option>
       <option value="With Doctor" {% if status_filter == "With Doctor" %}selected{% endif %}>With doctor</option>
       <option value="Investigations" {% if status_filter == "Investigations" %}selected{% endif %}>Investigations</option>
       <option value="Procedures" {% if status_filter == "Procedures" %}selected{% endif %}>Procedures</option>
@@ -1606,6 +1609,7 @@
                 <span class="badge" style="background:#fff1f2; color:#b91c1c; font-weight:750; font-size:11px; border-radius:99px; padding:5px 10px;" title="Pre-visit bill still pending — the Registration Desk collects it at the counter.">Payment pending · registration desk</span>
                 <a href="{% url 'opd_patient_queue' %}?patient={{ row.patient.pk }}" class="mb-btn-action ghost" style="padding:5px 12px; font-size:12px;">Track</a>
               {% elif row.needs_doctor %}
+                {% if doctors %}
                 <form method="post" action="{% url 'assign_doctor' row.patient.pk %}" style="display:inline-flex; align-items:center; gap:6px;">
                   {% csrf_token %}
                   <input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -1617,6 +1621,9 @@
                   </select>
                   <button type="submit" class="mb-btn-action lime" style="padding:5px 10px; font-size:11.5px;">Assign</button>
                 </form>
+                {% else %}
+                  <span>No active doctors available</span>
+                {% endif %}
               {% elif row.in_nurse_queue %}
                 <span class="badge" style="background:#fff7ed; color:#9a3412; font-weight:750; font-size:11px; border-radius:99px; padding:4px 9px;" title="Initial assessment in progress at the triage workstation">In assessment</span>
                 <a href="{% url 'opd_patient_queue' %}?patient={{ row.patient.pk }}" class="mb-btn-action ghost" style="padding:5px 12px; font-size:12px;">Track</a>

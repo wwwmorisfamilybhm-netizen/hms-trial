@@ -373,7 +373,7 @@ def dashboard(request):
         ),
         "doctor_accounts": (
             get_user_model()
-            .objects.filter(profile__designation=UserProfile.Designation.DOCTOR)
+            .objects.filter(profile__designation=UserProfile.Designation.DOCTOR, is_active=True)
             .order_by("first_name", "username")
         ),
     }
@@ -486,11 +486,14 @@ def assign_doctor(request, patient_id):
         messages.success(request, f"{patient.full_name} is now unassigned.")
         return _finish()
 
-    doctor = get_object_or_404(
-        get_user_model(),
-        pk=doctor_id,
+    doctor = get_user_model().objects.filter(
+        pk=doctor_id if doctor_id.isdigit() else None,
         profile__designation=UserProfile.Designation.DOCTOR,
-    )
+        is_active=True,
+    ).first()
+    if doctor is None:
+        messages.error(request, "Select an active doctor account.")
+        return _finish()
     patient.assigned_doctor = doctor
     patient.save(update_fields=["assigned_doctor"])
     specialty = doctor.profile.get_specialty_display() if doctor.profile.specialty else "General Medicine"
@@ -1095,6 +1098,11 @@ def admin_doctors(request):
             "designation": (
                 user.profile.designation if hasattr(user, "profile") else ""
             ),
+            "can_delete": (
+                user.pk != request.user.pk
+                and not user.is_superuser
+                and getattr(getattr(user, "profile", None), "designation", None) != UserProfile.Designation.ADMIN
+            ),
         }
         for user in staff_qs
     ]
@@ -1157,6 +1165,33 @@ def admin_doctor_edit(request, pk):
         "staff_user": user,
         "profile": getattr(user, "profile", None),
     })
+
+
+@login_required(login_url="login")
+def admin_staff_delete(request, pk):
+    """Delete a non-administrator staff account after explicit confirmation."""
+    from django.db.models.deletion import ProtectedError, RestrictedError
+
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    user = get_object_or_404(get_user_model().objects.select_related("profile"), pk=pk)
+    if (user.pk == request.user.pk or user.is_superuser or
+            getattr(getattr(user, "profile", None), "designation", None) == UserProfile.Designation.ADMIN):
+        return HttpResponseForbidden("Administrator accounts cannot be deleted here.")
+    if request.method == "POST":
+        name = user.get_full_name() or user.username
+        try:
+            user.delete()
+        except (ProtectedError, RestrictedError):
+            messages.error(request, f"{name} cannot be deleted because protected records refer to this account.")
+        else:
+            messages.success(request, f"Staff account for {name} was deleted.")
+        return redirect("admin_doctors")
+    if request.method != "GET":
+        from django.http import HttpResponseNotAllowed
+        return HttpResponseNotAllowed(["GET", "POST"])
+    return render(request, "core/admin_staff_delete.html", {"staff_user": user})
 
 
 @login_required(login_url="login")
@@ -1292,18 +1327,16 @@ def opd_assistant_dashboard(request):
         "waiting": sum(row["status"] == "Waiting" for row in rows),
         # The central pool holds every OPD visit for the day.
         "central_pool": len(rows),
-        # Patients still at the OPD Desk waiting for their initial assessment
-        # (same predicate as the queue's "Awaiting Assessment" tab — needs_doctor
-        # mirrors the machine's triage-complete flag).
+        # Patients still at the OPD Desk waiting for their initial assessment.
         "triage_allocation": sum(
             row["pre_visit_paid"]
             and row["consultation"] is None
             and not row["in_nurse_queue"]
-            and not row["needs_doctor"]
+            and row["status"] == "Assessment"
             for row in rows
         ),
         # Patients whose initial assessment is done and are waiting for a doctor.
-        "doctor_allocation": sum(row["status"] == "Doctor Allocation" for row in rows),
+        "doctor_allocation": sum(row["needs_doctor"] for row in rows),
         "with_doctors": sum(row["status"] == "With Doctor" for row in rows),
         "investigations": sum(row["status"] == "Investigations" for row in rows),
         # Per-department workload for the service tiles.
@@ -1363,7 +1396,7 @@ def opd_assistant_dashboard(request):
     # "On-Duty Doctors" card (specialty shown from the profile).
     doctors = (
         get_user_model()
-        .objects.filter(profile__designation=UserProfile.Designation.DOCTOR)
+        .objects.filter(profile__designation=UserProfile.Designation.DOCTOR, is_active=True)
         .select_related("profile")
         .annotate(
             patients_today=Count(
@@ -1512,7 +1545,12 @@ def _opd_patient_flow(patients):
         assessment = getattr(patient, "initial_assessment", None)
         consultations = list(patient.consultations.all())
         consultation = consultations[0] if consultations else None
-        assigned_doctor = patient.assigned_doctor or (consultation.doctor if consultation else None)
+        assigned_doctor = patient.assigned_doctor
+        if assigned_doctor is None and consultation and consultation.doctor:
+            historical_doctor = consultation.doctor
+            profile = getattr(historical_doctor, "profile", None)
+            if historical_doctor.is_active and profile and profile.designation == UserProfile.Designation.DOCTOR:
+                assigned_doctor = historical_doctor
         orders = [order for item in consultations for order in item.orders.all()]
         prescriptions = [prescription for item in consultations for prescription in item.prescriptions.all() if prescription.released_at and prescription.dispense_status != "cancelled"]
         pending_orders = [order for order in orders if order.status.casefold() not in ("completed", "cancelled")]
@@ -1598,7 +1636,7 @@ def _opd_patient_flow(patients):
         elif consultation and consultation.status == ConsultationSession.Status.IN_PROGRESS:
             status, location = "With Doctor", "Doctor Consultation"
         elif triage_complete_for_visit:
-            status, location = "Doctor Allocation", "Doctor Queue"
+            status, location = ("Doctor Assigned" if assigned_doctor else "Doctor Allocation"), "Doctor Queue"
         elif consultation:
             status, location = "With Doctor", "Doctor Consultation"
         else:
@@ -1627,6 +1665,7 @@ def _opd_patient_flow(patients):
                 pre_visit_paid
                 and consultation is None
                 and triage_complete_for_visit
+                and assigned_doctor is None
             ),
             "consultation": consultation,
             "appointment": next_appointment,
@@ -1706,14 +1745,12 @@ def opd_patient_queue(request):
     service_filter = (request.GET.get("service") or "all").strip().lower()
 
     def _needs_nurse(row):
-        # Same predicate as the dashboard's "Awaiting Assessment" KPI: paid,
-        # no consultation, not in triage, assessment gate not yet satisfied
-        # (needs_doctor mirrors the machine's triage-complete flag).
+        # Match the dashboard's "Awaiting Assessment" KPI.
         if not row["pre_visit_paid"]:
             return False
         if row["in_nurse_queue"] or row["consultation"] is not None:
             return False
-        return not row["needs_doctor"] and row["status"] not in ("Completed", "Cancelled")
+        return row["status"] == "Assessment"
 
     service_map = {
         "laboratory": "Laboratory",
@@ -1831,7 +1868,7 @@ def opd_patient_queue(request):
     page_obj = Paginator(rows, 20).get_page(request.GET.get("page"))
     doctors = (
         get_user_model()
-        .objects.filter(profile__designation=UserProfile.Designation.DOCTOR)
+        .objects.filter(profile__designation=UserProfile.Designation.DOCTOR, is_active=True)
         .select_related("profile")
         .annotate(
             patients_today=Count(
@@ -2143,22 +2180,27 @@ def reception_dashboard(request):
         messages.warning(request, "Access restricted: Doctor users should use the Doctor Dashboard.")
         return redirect("dashboard")
 
-    today = date.today()
-    todays_patients = Patient.objects.filter(created_at__date=today).order_by("-created_at")
+    today = timezone.localdate()
+    todays_patients = list(
+        Patient.objects.filter(created_at__date=today).order_by("-created_at")
+    )
     recent_patients = Patient.objects.order_by("-created_at")[:12]
     total_patients = Patient.objects.count()
-    emergency_today = Patient.objects.filter(created_at__date=today, is_emergency=True).count()
+    emergency_today = sum(1 for patient in todays_patients if patient.is_emergency)
+    today_count = len(todays_patients)
 
     # Billing: bills still awaiting payment.
     from decimal import Decimal
 
     from patients.models import PatientBill
-    pending_bills = PatientBill.objects.filter(status=PatientBill.Status.PENDING)
-    pending_count = pending_bills.count()
+    pending_bills = list(PatientBill.objects.filter(status=PatientBill.Status.PENDING))
+    pending_count = len(pending_bills)
     pending_due = sum((b.amount_due for b in pending_bills), Decimal("0"))
 
-    paid_today_bills = PatientBill.objects.filter(created_at__date=today, status=PatientBill.Status.PAID)
-    paid_count = paid_today_bills.count()
+    paid_today_bills = list(
+        PatientBill.objects.filter(created_at__date=today, status=PatientBill.Status.PAID)
+    )
+    paid_count = len(paid_today_bills)
     paid_today_amount = sum((b.amount_due for b in paid_today_bills), Decimal("0"))
 
     # Appointments expected at the counter today (cancelled slots excluded).
@@ -2166,10 +2208,22 @@ def reception_dashboard(request):
         status=Appointment.Status.CANCELLED
     ).select_related("patient", "doctor").order_by("start_time")
     appointments_today = todays_appointments_qs.count()
+    appointments_completed_today = todays_appointments_qs.filter(
+        status=Appointment.Status.COMPLETED
+    ).count()
     upcoming_appointments = list(todays_appointments_qs[:5])
 
-    # Available doctors for counter triage and allocation
-    available_doctors = Doctor.objects.all().order_by("first_name", "last_name")[:6]
+    # Doctor directory with today's booked load so the roster is actionable.
+    available_doctors = list(
+        Doctor.objects.annotate(
+            appointments_today=Count(
+                "appointments",
+                filter=Q(appointments__date=today)
+                & ~Q(appointments__status=Appointment.Status.CANCELLED),
+                distinct=True,
+            )
+        ).order_by("first_name", "last_name")[:6]
+    )
 
     from django.db.models import Q as _Q
     flow_patients = list(
@@ -2203,10 +2257,85 @@ def reception_dashboard(request):
         .count()
     )
 
+    # Hourly counter activity for the flow card (08:00–17:00 local time).
+    hourly_buckets = {hour: 0 for hour in range(8, 18)}
+    for patient in todays_patients:
+        local_created = timezone.localtime(patient.created_at)
+        if local_created.hour in hourly_buckets:
+            hourly_buckets[local_created.hour] += 1
+    max_hourly = max(hourly_buckets.values()) or 1
+    hourly_flow = []
+    peak_hour = None
+    peak_count = 0
+    for hour in range(8, 18):
+        count = hourly_buckets[hour]
+        if count > peak_count:
+            peak_hour = hour
+            peak_count = count
+        hourly_flow.append({
+            "hour": hour,
+            "label": f"{hour:02d}:00",
+            "total": count,
+            "height": max(8, round(count * 100 / max_hourly)),
+            "peak": False,
+        })
+    for item in hourly_flow:
+        item["peak"] = item["total"] == peak_count and peak_count > 0
+
+    peak_display = (
+        "—" if peak_hour is None
+        else f"{peak_hour % 12 or 12}:00 {'AM' if peak_hour < 12 else 'PM'}"
+    )
+
+    registration_times = sorted(
+        timezone.localtime(patient.created_at) for patient in todays_patients
+    )
+    if len(registration_times) > 1:
+        gaps = [
+            (later - earlier).total_seconds() / 60
+            for earlier, later in zip(registration_times, registration_times[1:])
+        ]
+        avg_counter_minutes = round(sum(gaps) / len(gaps), 1)
+    else:
+        avg_counter_minutes = None
+
+    if not today_count:
+        flow_status = "Awaiting first registration"
+        flow_status_color = "#6b7280"
+    elif avg_counter_minutes is not None and avg_counter_minutes <= 15:
+        flow_status = "Smooth Flow"
+        flow_status_color = "#16a34a"
+    elif avg_counter_minutes is not None and avg_counter_minutes <= 30:
+        flow_status = "Steady Flow"
+        flow_status_color = "#d97706"
+    else:
+        flow_status = "Busy Flow"
+        flow_status_color = "#dc2626"
+
+    # Gauge rings: today's share of the register, pending share of today's
+    # billing, and completed share of today's appointments.
+    gauge_circumference = 106.8
+
+    def _gauge_offset(percent):
+        percent = max(0, min(100, percent))
+        return round(gauge_circumference * (1 - percent / 100), 1)
+
+    billing_total = pending_due + paid_today_amount
+    today_gauge_offset = _gauge_offset(
+        (today_count / total_patients * 100) if total_patients else 0
+    )
+    billing_gauge_offset = _gauge_offset(
+        (float(pending_due) / float(billing_total) * 100) if billing_total else 0
+    )
+    appointments_gauge_offset = _gauge_offset(
+        (appointments_completed_today / appointments_today * 100)
+        if appointments_today else 0
+    )
+
     return render(request, "core/reception_dashboard.html", {
         "today": today,
         "total_patients": total_patients,
-        "today_count": todays_patients.count(),
+        "today_count": today_count,
         "todays_patients": todays_patients,
         "recent_patients": recent_patients,
         "pending_payments": pending_count,
@@ -2215,10 +2344,20 @@ def reception_dashboard(request):
         "paid_today_amount": paid_today_amount,
         "emergency_today": emergency_today,
         "appointments_today": appointments_today,
+        "appointments_completed_today": appointments_completed_today,
         "upcoming_appointments": upcoming_appointments,
         "available_doctors": available_doctors,
         "ready_for_opd_count": ready_for_opd_count,
         "post_consultation_count": post_consultation_count,
+        "hourly_flow": hourly_flow,
+        "peak_display": peak_display,
+        "peak_count": peak_count,
+        "avg_counter_minutes": avg_counter_minutes,
+        "flow_status": flow_status,
+        "flow_status_color": flow_status_color,
+        "today_gauge_offset": today_gauge_offset,
+        "billing_gauge_offset": billing_gauge_offset,
+        "appointments_gauge_offset": appointments_gauge_offset,
         "user": request.user,
     })
 
@@ -2244,6 +2383,7 @@ def registration_desk(request):
     query = request.GET.get("q", "").strip()
     status = request.GET.get("status", "").strip()
     date_str = request.GET.get("date", "").strip()
+    emergency = request.GET.get("emergency") == "1"
     selected_date = None
     if date_str:
         try:
@@ -2256,6 +2396,7 @@ def registration_desk(request):
         status=status,
         selected_date=selected_date,
         include_appointments=True,
+        emergency=emergency,
     )
 
     recent_registered = Patient.objects.order_by("-created_at")[:5]
@@ -2265,6 +2406,7 @@ def registration_desk(request):
         "row_count": len(rows),
         "query": query,
         "status": status,
+        "emergency": emergency,
         "selected_date": selected_date,
         "date_str": date_str,
         "status_choices": Appointment.Status.choices,
@@ -2527,7 +2669,7 @@ def patient_print_card(request, patient_id):
 
 # ── History ───────────────────────────────────────────────────────────────────
 
-def _history_rows(query="", status="", selected_date=None, include_appointments=False):
+def _history_rows(query="", status="", selected_date=None, include_appointments=False, emergency=False):
     """Build the history rows (patient registrations and, optionally, appointments).
 
     Shared by the History screen and the Registration Desk hub so both show the
@@ -2552,6 +2694,8 @@ def _history_rows(query="", status="", selected_date=None, include_appointments=
         )
     if selected_date:
         patients = patients.filter(created_at__date=selected_date)
+    if emergency:
+        patients = patients.filter(is_emergency=True)
     for patient in patients:
         rows.append({
             "kind": "patient",
@@ -2586,6 +2730,8 @@ def _history_rows(query="", status="", selected_date=None, include_appointments=
             appointments = appointments.filter(date=selected_date)
         if status:
             appointments = appointments.filter(status=status)
+        if emergency:
+            appointments = appointments.filter(patient__is_emergency=True)
         from datetime import datetime
 
         from django.utils import timezone
@@ -2671,6 +2817,23 @@ import urllib.request as _urllib_request
 import urllib.error as _urllib_error
 
 
+def _temperature_fahrenheit(value):
+    """Render the Celsius value stored in assessments to one decimal Fahrenheit."""
+    if value is None:
+        return ""
+    from decimal import Decimal, ROUND_HALF_UP
+    return str((Decimal(str(value)) * Decimal("1.8") + Decimal("32")).quantize(
+        Decimal("0.1"), rounding=ROUND_HALF_UP
+    ))
+
+
+def _temperature_celsius(value):
+    from decimal import Decimal, ROUND_HALF_UP
+    return ((Decimal(str(value)) - Decimal("32")) / Decimal("1.8")).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+
+
 def _medgemma_mock_draft(vitals, complaints, allergies):
     """Local fallback draft — mirrors the previous client-side mock."""
     v = vitals or {}
@@ -2679,7 +2842,7 @@ def _medgemma_mock_draft(vitals, complaints, allergies):
     allergy_text = ", ".join(allergies) if allergies else "—"
     summary = (
         "**Presenting complaint:** " + comp + ".\n"
-        "**Vitals:** Temp " + str(v.get("temp", "—")) + "°C, Pulse " + str(v.get("pulse", "—")) + "/min, RR " +
+        "**Vitals:** Temp " + str(v.get("temp", "—")) + ("°F" if v.get("temperature_unit") == "F" else "°C") + ", Pulse " + str(v.get("pulse", "—")) + "/min, RR " +
         str(v.get("rr", "—")) + "/min, BP " + str(v.get("bpSys", "—")) + "/" + str(v.get("bpDia", "—")) +
         " mmHg, SpO₂ " + str(v.get("spo2", "—")) + "%, BMI " + str(bmi) + ".\n"
         "**Relevant history:** Type 2 diabetes and hypertension on treatment; allergic to " + allergy_text + ".\n"
@@ -3032,13 +3195,20 @@ def save_initial_assessment(request):
         "pain_score": (int, 0, 10),
     }
     values = {}
+    temperature_unit = payload.get("temperature_unit", "C")
+    if temperature_unit not in ("C", "F"):
+        return JsonResponse({"ok": False, "error": "Invalid temperature unit."}, status=400)
     for field, (cast, lower, upper) in numeric_fields.items():
+        if field == "temperature" and temperature_unit == "F":
+            lower, upper = 77, 113
         raw_value = _value(field)
         values[field] = _num(raw_value, cast)
         if raw_value not in (None, "") and values[field] is None:
             return JsonResponse({"ok": False, "error": f"{field.replace('_', ' ').title()} must be numeric."}, status=400)
         if values[field] is not None and not lower <= values[field] <= upper:
             return JsonResponse({"ok": False, "error": f"{field.replace('_', ' ').title()} is outside the accepted entry range ({lower}-{upper})."}, status=400)
+        if field == "temperature" and temperature_unit == "F" and values[field] is not None:
+            values[field] = _temperature_celsius(values[field])
 
     action = payload.get("action", "draft")
     if action not in ("draft", "complete"):
@@ -3321,7 +3491,7 @@ def initial_assessment(request):
                 return "" if value is None else str(value)
 
             assessment_data.update({
-                "temperature": _txt(a.temperature),
+                "temperature": _temperature_fahrenheit(a.temperature),
                 "pulse": _txt(a.pulse),
                 "respiratory_rate": _txt(a.respiratory_rate),
                 "bp_systolic": _txt(a.bp_systolic),
@@ -3452,6 +3622,7 @@ def initial_assessment_patients(request):
 
 DOCTOR_QUEUE_STATUS = {
     "Doctor Allocation": "Waiting to start",
+    "Doctor Assigned": "Waiting to start",
     "With Doctor": "With you",
     "Investigations": "Investigations",
     "Procedures": "Procedures",
@@ -3465,7 +3636,7 @@ DOCTOR_QUEUE_STATUS = {
 }
 
 DOCTOR_QUEUE_STATUS_RANK = {
-    "Doctor Allocation": 0, "With Doctor": 1, "Investigations": 2,
+    "Doctor Allocation": 0, "Doctor Assigned": 0, "With Doctor": 1, "Investigations": 2,
     "Procedures": 3, "Pharmacy": 4, "Review Required": 5,
     "Awaiting Payment": 6, "Assessment": 7, "Waiting": 7,
     "Completed": 8, "Cancelled": 9,
@@ -3547,8 +3718,7 @@ def doctor_patient_queue(request):
     else:
         # Administrators observe every assigned visit instead of "mine".
         mine_rows = [row for row in rows if row["doctor_id"] is not None]
-    # Unassigned = assessed and passing the assignment gate, with no doctor
-    # claimed yet (needs_doctor alone also matches assigned-but-not-started).
+    # Unassigned = assessed and passing the assignment gate, with no doctor claimed yet.
     pool_rows = [
         row for row in rows
         if row["needs_doctor"] and row["doctor_id"] is None
@@ -3586,7 +3756,7 @@ def doctor_patient_queue(request):
             "tone": "amber",
             "rows": [
                 r for r in mine_rows
-                if r["status"] in ("Doctor Allocation", "Assessment", "Waiting")
+                if r["status"] in ("Doctor Allocation", "Doctor Assigned", "Assessment", "Waiting")
             ],
         },
         {
@@ -3676,7 +3846,7 @@ def doctor_patient_queue(request):
         "my_total": my_total,
         "counts": {
             "mine": len(all_mine) if show_all else len(mine_rows),
-            "waiting": sum(1 for r in mine_rows if r["status"] == "Doctor Allocation"),
+            "waiting": sum(1 for r in mine_rows if r["status"] in ("Doctor Allocation", "Doctor Assigned")),
             "unassigned": len(pool_rows),
         },
     })
@@ -4099,7 +4269,7 @@ def doctor_consultation(request):
             chronic = _normalise_conditions(ia.chronic_conditions)
             meds = _normalise_medications(ia.medications)
             initial_assessment_data = {
-                "temperature": str(ia.temperature) if ia.temperature is not None else "",
+                "temperature": _temperature_fahrenheit(ia.temperature),
                 "pulse": ia.pulse if ia.pulse is not None else "",
                 "respiratory_rate": ia.respiratory_rate if ia.respiratory_rate is not None else "",
                 "bp_systolic": ia.bp_systolic if ia.bp_systolic is not None else "",
@@ -4991,7 +5161,7 @@ def nurse_triage(request):
         if a is not None:
             vitals_status = a.status
             assessment_data.update({
-                "temperature": "" if a.temperature is None else str(a.temperature),
+                "temperature": _temperature_fahrenheit(a.temperature),
                 "pulse": "" if a.pulse is None else str(a.pulse),
                 "respiratory_rate": "" if a.respiratory_rate is None else str(a.respiratory_rate),
                 "bp_systolic": "" if a.bp_systolic is None else str(a.bp_systolic),
@@ -5344,7 +5514,12 @@ def nurse_save_triage(request):
         "pain_score": (int, 0, 10),
     }
     values = {}
+    temperature_unit = payload.get("temperature_unit", "C")
+    if temperature_unit not in ("C", "F"):
+        return JsonResponse({"ok": False, "error": "Invalid temperature unit."}, status=400)
     for field, (cast, lower, upper) in numeric_fields.items():
+        if field == "temperature" and temperature_unit == "F":
+            lower, upper = 77, 113
         raw = _value(field)
         values[field] = _num(raw, cast)
         if raw not in (None, "") and values[field] is None:
@@ -5357,6 +5532,8 @@ def nurse_save_triage(request):
                 {"ok": False, "error": f"{field.replace('_', ' ').title()} is outside {lower}-{upper}."},
                 status=400,
             )
+        if field == "temperature" and temperature_unit == "F" and values[field] is not None:
+            values[field] = _temperature_celsius(values[field])
 
     complaints = payload.get("complaints") or []
     has_complaint = (

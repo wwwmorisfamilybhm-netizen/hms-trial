@@ -144,8 +144,8 @@
           </div>
           <div class="np-vitals">
             <div class="np-vital" data-vital="temperature">
-              <label for="v-temperature">Temperature (°C)</label>
-              <input id="v-temperature" name="temperature" type="number" step="0.1" min="25" max="45" inputmode="decimal" value="{{ assessment.temperature }}">
+              <label for="v-temperature">Temperature (°F)</label>
+              <input id="v-temperature" name="temperature" type="number" step="0.1" min="77" max="113" inputmode="decimal" value="{{ assessment.temperature }}">
               <div class="np-vital-hint"></div>
             </div>
             <div class="np-vital" data-vital="pulse">
@@ -529,7 +529,7 @@ window.NURSE_TRIAGE = {
 
   /* ── Vitals: BMI + range hints + live score ─────────────── */
   var ranges = {
-    temperature: [36.1, 37.5, 0], pulse: [60, 100, 0], bp_systolic: [90, 140, 0],
+    temperature: [97.0, 99.5, 0], pulse: [60, 100, 0], bp_systolic: [90, 140, 0],
     bp_diastolic: [60, 90, 0], spo2: [95, 100, 0], respiratory_rate: [12, 20, 0],
     rbs: [70, 180, 0], pain_score: [0, 3, 0], weight: [0, 500, 0], height: [0, 250, 0]
   };
@@ -587,7 +587,7 @@ window.NURSE_TRIAGE = {
     var rr = num("respiratory_rate");
     if (rr !== null) s += (rr > 30 || rr < 10) ? 25 : rr > 24 ? 12 : 0;
     var temp = num("temperature");
-    if (temp !== null) s += temp >= 39.5 ? 20 : temp >= 38.5 ? 12 : temp < 35 ? 20 : 0;
+    if (temp !== null) s += temp >= 103.1 ? 20 : temp >= 101.3 ? 12 : temp < 95 ? 20 : 0;
     var pain = num("pain_score");
     if (pain !== null) s += pain >= 8 ? 20 : pain >= 5 ? 10 : 0;
     var rbs = num("rbs");
@@ -758,6 +758,7 @@ window.NURSE_TRIAGE = {
       patient_id: form.elements["patient_id"].value,
       action: action,
       temperature: form.elements["temperature"].value,
+      temperature_unit: "F",
       pulse: form.elements["pulse"].value,
       bp_systolic: form.elements["bp_systolic"].value,
       bp_diastolic: form.elements["bp_diastolic"].value,

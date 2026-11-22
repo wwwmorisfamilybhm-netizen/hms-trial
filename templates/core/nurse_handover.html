@@ -78,7 +78,7 @@
             <td style="font-size:12px; max-width:220px;">{{ row.ticket.assessment.complaints|default:"—"|truncatechars:90 }}</td>
             <td><span class="np-badge {% if row.score >= 70 %}emergency{% elif row.score >= 40 %}urgent{% else %}routine{% endif %}">{{ row.score }}</span></td>
             <td style="font-size:12px; color:#b91c1c;">{{ row.alerts|join:" · "|default:"—" }}</td>
-            <td style="font-size:12px;">{{ row.nurse.get_full_name|default:row.nurse.username|default:"—" }}</td>
+            <td style="font-size:12px;">{% if row.nurse %}{{ row.nurse.get_full_name|default:row.nurse.username }}{% else %}—{% endif %}</td>
             <td style="font-size:12px;">{{ row.ticket.completed_at|date:"H:i" }}</td>
           </tr>
         {% endfor %}
@@ -104,7 +104,7 @@
             <td>{{ task.patient.full_name }}</td>
             <td>{{ task.get_kind_display }}</td>
             <td>{{ task.due_at|date:"j M, H:i"|default:"—" }}</td>
-            <td>{{ task.assigned_to.get_full_name|default:task.assigned_to.username|default:"Unassigned" }}</td>
+            <td>{% if task.assigned_to %}{{ task.assigned_to.get_full_name|default:task.assigned_to.username }}{% else %}Unassigned{% endif %}</td>
           </tr>
         {% endfor %}
       </tbody>
@@ -120,7 +120,7 @@
             <td>{{ task.patient.full_name }}</td>
             <td>{{ task.get_kind_display }}</td>
             <td>{{ task.due_at|date:"j M, H:i"|default:"—" }}</td>
-            <td>{{ task.assigned_to.get_full_name|default:task.assigned_to.username|default:"Unassigned" }}</td>
+            <td>{% if task.assigned_to %}{{ task.assigned_to.get_full_name|default:task.assigned_to.username }}{% else %}Unassigned{% endif %}</td>
           </tr>
         {% endfor %}
       </tbody>
@@ -136,7 +136,7 @@
             <td>{{ task.patient.full_name }}</td>
             <td>{{ task.get_kind_display }}</td>
             <td>{{ task.due_at|date:"j M, H:i"|default:"—" }}</td>
-            <td>{{ task.assigned_to.get_full_name|default:task.assigned_to.username|default:"Unassigned" }}</td>
+            <td>{% if task.assigned_to %}{{ task.assigned_to.get_full_name|default:task.assigned_to.username }}{% else %}Unassigned{% endif %}</td>
           </tr>
         {% endfor %}
       </tbody>

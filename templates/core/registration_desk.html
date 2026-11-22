@@ -598,6 +598,7 @@
           Outpatient registration directory
         {% endif %}
         {% if selected_date %} on <strong style="color:var(--ink);">{{ selected_date|date:"d M Y" }}</strong>{% endif %}
+        {% if emergency %} · <strong style="color:var(--ink);">Emergency arrivals only</strong>{% endif %}
       </p>
     </div>
   </div>
@@ -610,7 +611,7 @@
       </svg>
       <input type="search" id="rdSearchInput" name="q" value="{{ query }}" placeholder="Search by name, UHID, phone, C/O, Aadhaar or ABHA…" autocomplete="off">
       {% if query %}
-        <a href="{% url 'registration_desk' %}{% if date_str %}?date={{ date_str }}{% endif %}" class="rd-clear-search" title="Clear query">✕</a>
+        <a href="{% url 'registration_desk' %}?{% if date_str %}date={{ date_str }}&{% endif %}{% if emergency %}emergency=1{% endif %}" class="rd-clear-search" title="Clear query">✕</a>
       {% endif %}
     </div>
 
@@ -618,6 +619,14 @@
       <label for="rdDateInput" class="rd-filter-label">Registered:</label>
       <input type="date" id="rdDateInput" name="date" value="{{ date_str }}">
     </div>
+
+    {% if emergency %}
+      <input type="hidden" name="emergency" value="1">
+      <div class="rd-filter-item">
+        <span class="rd-badge-pill rd-badge-emergency">⚑ Emergency only</span>
+        <a href="{% url 'registration_desk' %}{% if date_str %}?date={{ date_str }}{% endif %}" class="rd-btn-reset">Clear</a>
+      </div>
+    {% endif %}
 
     {% if not is_registration_desk %}
     <div class="rd-filter-item">
@@ -635,7 +644,7 @@
       <button type="submit" class="btn rd-btn-filter">
         Search
       </button>
-      {% if query or date_str or status %}
+      {% if query or date_str or status or emergency %}
         <a href="{% url 'registration_desk' %}" class="rd-btn-reset">Reset</a>
       {% endif %}
     </div>
@@ -737,7 +746,7 @@
       <p>{% if query %}No registrations match “{{ query }}”. Check the spelling or reset filters.{% else %}No patients have been registered yet.{% endif %}</p>
       
       <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
-        {% if query or date_str or status %}
+        {% if query or date_str or status or emergency %}
           <a href="{% url 'registration_desk' %}" class="btn rd-btn-outline">Clear Filters</a>
         {% endif %}
         {% if can_register %}

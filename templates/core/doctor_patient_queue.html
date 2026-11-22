@@ -77,7 +77,7 @@
   .cb-search{position:relative; display:flex; align-items:center}
 
   /* ── Board ── */
-  .cb-board{display:grid; grid-template-columns:repeat(6,minmax(214px,1fr)); gap:12px; overflow-x:auto; padding-bottom:6px}
+  .cb-board{display:grid; grid-template-columns:repeat(6,minmax(214px,1fr)); gap:12px; overflow-x:auto; padding-bottom:6px; max-width:100%; min-width:0; overscroll-behavior-x:contain}
   .cb-col{background:#eef2f7; border:1px solid var(--cb-line); border-radius:16px; min-height:220px; display:flex; flex-direction:column}
   .cb-col-head{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px; border-radius:15px 15px 0 0}
   .cb-col-head.red{background:var(--cb-red-soft); color:var(--cb-red)}
@@ -90,26 +90,32 @@
   .cb-col-count{font-size:12px; font-weight:800; background:#fff; border-radius:999px; padding:1px 9px; flex-shrink:0}
   .cb-col-body{display:flex; flex-direction:column; gap:8px; padding:10px; flex:1}
   .cb-col-empty{flex:1; display:grid; place-items:center; color:#94a3b8; font-weight:700; min-height:80px}
-  .cb-card{position:relative; display:flex; gap:9px; background:#fff; border:1px solid var(--cb-line); border-radius:12px; padding:10px 10px 10px 13px; text-decoration:none; color:inherit; transition:all .15s ease; overflow:hidden}
+  .cb-card{position:relative; display:flex; flex-direction:column; gap:8px; background:#fff; border:1px solid var(--cb-line); border-radius:12px; padding:10px 10px 10px 13px; text-decoration:none; color:inherit; transition:all .15s ease; min-width:0}
   a.cb-card:hover{border-color:var(--cb-blue); transform:translateY(-1px); box-shadow:0 8px 18px rgba(29,78,216,.10); text-decoration:none}
+  a.cb-card:focus-visible{border-color:var(--cb-blue); outline:2px solid var(--cb-blue); outline-offset:2px; box-shadow:0 8px 18px rgba(29,78,216,.10); text-decoration:none}
   .cb-card::before{content:""; position:absolute; left:0; top:8px; bottom:8px; width:3px; border-radius:0 3px 3px 0; background:var(--cb-green)}
   .cb-card.rail-red::before{background:var(--cb-red)}
   .cb-card.rail-amber::before{background:var(--cb-amber)}
   .cb-card.is-emergency{background:#fff7f7; border-color:#fecaca}
+  .cb-card-top{display:flex; gap:9px; align-items:flex-start; min-width:0}
   .cb-avatar{width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,#dbeafe,#bfdbfe); color:#1e40af; font-size:12px; font-weight:800; display:grid; place-items:center; flex-shrink:0}
   .cb-card.is-emergency .cb-avatar{background:#fee2e2; color:#b91c1c}
   .cb-card-main{flex:1; min-width:0; display:flex; flex-direction:column; gap:3px}
-  .cb-card-name{font-size:12.5px; font-weight:800; color:var(--cb-ink); display:flex; align-items:center; gap:6px; flex-wrap:wrap; line-height:1.2}
-  .cb-card-meta{font-size:10.5px; color:var(--cb-muted); font-weight:600}
-  .cb-wait{align-self:flex-start; font-size:9.5px; font-weight:800; padding:2px 8px; border-radius:999px}
+  .cb-card-name{font-size:12.5px; font-weight:800; color:var(--cb-ink); display:flex; align-items:center; gap:6px; flex-wrap:wrap; line-height:1.25; overflow-wrap:anywhere; word-break:break-word}
+  .cb-card-meta{font-size:10.5px; color:var(--cb-muted); font-weight:600; line-height:1.35; overflow-wrap:anywhere; word-break:break-word}
+  .cb-wait{align-self:flex-start; font-size:9.5px; font-weight:800; padding:2px 8px; border-radius:999px; white-space:nowrap}
   .cb-wait.ok{background:#dcfce7; color:#15803d}
   .cb-wait.warn{background:#fef3c7; color:#b45309}
   .cb-wait.late{background:#fee2e2; color:#b91c1c}
-  .cb-tag{font-size:9px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; padding:2px 7px; border-radius:999px; background:#fee2e2; color:#b91c1c; white-space:nowrap}
+  .cb-tag{font-size:9px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; padding:2px 7px; border-radius:999px; background:#fee2e2; color:#b91c1c; max-width:100%; overflow-wrap:anywhere; word-break:break-word}
   .cb-tag.amber{background:#fef3c7; color:#b45309}
+  .cb-card-foot{display:flex; flex-direction:column; align-items:stretch; gap:6px; min-width:0}
+  .cb-card-foot .cb-status{display:block; text-align:center; white-space:normal; overflow-wrap:anywhere; word-break:break-word; line-height:1.3}
   .cb-pick-form{margin:0}
-  .cb-pick{width:100%; border:none; border-radius:9px; background:var(--cb-blue); color:#fff; font:inherit; font-size:11.5px; font-weight:800; padding:7px 10px; cursor:pointer; transition:background .15s ease}
+  .cb-card-foot .cb-pick-form{width:100%}
+  .cb-pick{width:100%; border:none; border-radius:9px; background:var(--cb-blue); color:#fff; font:inherit; font-size:11.5px; font-weight:800; padding:7px 10px; cursor:pointer; transition:background .15s ease; line-height:1.3}
   .cb-pick:hover{background:var(--cb-blue-dark)}
+  .cb-pick:focus-visible{outline:2px solid var(--cb-blue-dark); outline-offset:2px; background:var(--cb-blue-dark)}
 
   /* ── List mode ── */
   .cb-cols{display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start}
@@ -128,6 +134,7 @@
   .cb-lrow + .cb-lrow{margin-top:9px}
   .cb-lrow-main{flex:1; min-width:0; display:flex; flex-direction:column; gap:4px}
   .cb-lrow-name{font-size:13.5px; font-weight:800; color:var(--cb-ink); display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .cb-lrow .cb-tag{white-space:nowrap}
   .cb-lrow-meta{font-size:11.5px; color:var(--cb-muted); font-weight:600}
   .cb-vitals{display:flex; gap:6px; flex-wrap:wrap}
   .cb-vital{font-size:10px; font-weight:800; color:#334155; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:7px; padding:2px 7px}
@@ -143,6 +150,12 @@
   .cb-action{font-size:12px; font-weight:800; color:var(--cb-blue); white-space:nowrap}
   .cb-empty{padding:26px 14px; text-align:center; color:#94a3b8; font-size:12.5px; font-weight:700; border:1.5px dashed var(--cb-line); border-radius:14px}
   .cb-list{display:flex; flex-direction:column}
+
+  /* ── Narrow screens: keep the six-column board scrollable and in-page ── */
+  @media (max-width:760px){
+    .cb-app{padding:14px 12px 18px}
+    .cb-board{grid-template-columns:repeat(6,minmax(186px,1fr))}
+  }
 </style>
 
 <div class="cb-census-title">{% if is_doctor %}My patients{% else %}Assigned patients{% endif %} · today — live census</div>
@@ -193,32 +206,41 @@
           {% for row in col.rows %}
             {% if col.key == "intake" %}
               <div class="cb-card rail-red {% if row.patient.is_emergency %}is-emergency{% endif %}">
-                <span class="cb-avatar">{{ row.patient.first_name|slice:":1"|upper }}{% if row.patient.last_name %}{{ row.patient.last_name|slice:":1"|upper }}{% endif %}</span>
-                <span class="cb-card-main">
-                  <span class="cb-card-name">{{ row.patient.full_name }}{% if row.patient.is_emergency %}<span class="cb-tag">Emergency</span>{% endif %}{% if row.alert %}<span class="cb-tag amber">{{ row.alert }}</span>{% endif %}</span>
-                  <span class="cb-card-meta">{{ row.patient.uhid|default:"No UHID" }} · {{ row.patient.age|default:"—" }}y · {{ row.patient.get_gender_display|default:"—" }}</span>
-                  <span class="cb-wait {% if row.wait_minutes >= 30 %}late{% elif row.wait_minutes >= 15 %}warn{% else %}ok{% endif %}">⏱ {{ row.wait_minutes }} min</span>
-                </span>
-                {% if is_doctor %}
-                  <form method="post" action="{% url 'assign_doctor' row.patient.pk %}" class="cb-pick-form">
-                    {% csrf_token %}
-                    <input type="hidden" name="doctor_id" value="{{ request.user.pk }}">
-                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                    <button type="submit" class="cb-pick">Pick this patient</button>
-                  </form>
-                {% else %}
-                  <span class="cb-status red">Unassigned</span>
-                {% endif %}
+                <div class="cb-card-top">
+                  <span class="cb-avatar">{{ row.patient.first_name|slice:":1"|upper }}{% if row.patient.last_name %}{{ row.patient.last_name|slice:":1"|upper }}{% endif %}</span>
+                  <span class="cb-card-main">
+                    <span class="cb-card-name">{{ row.patient.full_name }}{% if row.patient.is_emergency %}<span class="cb-tag">Emergency</span>{% endif %}{% if row.alert %}<span class="cb-tag amber">{{ row.alert }}</span>{% endif %}</span>
+                    <span class="cb-card-meta">{{ row.patient.uhid|default:"No UHID" }} · {{ row.patient.age|default:"—" }}y · {{ row.patient.get_gender_display|default:"—" }}</span>
+                    <span class="cb-wait {% if row.wait_minutes >= 30 %}late{% elif row.wait_minutes >= 15 %}warn{% else %}ok{% endif %}">⏱ {{ row.wait_minutes }} min</span>
+                  </span>
+                </div>
+                <div class="cb-card-foot">
+                  {% if is_doctor %}
+                    <form method="post" action="{% url 'assign_doctor' row.patient.pk %}" class="cb-pick-form">
+                      {% csrf_token %}
+                      <input type="hidden" name="doctor_id" value="{{ request.user.pk }}">
+                      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                      <button type="submit" class="cb-pick">Pick this patient</button>
+                    </form>
+                  {% else %}
+                    <span class="cb-status red">Unassigned</span>
+                  {% endif %}
+                </div>
               </div>
             {% else %}
               <a class="cb-card {% if row.patient.is_emergency %}rail-red is-emergency{% elif row.priority == 'Urgent' %}rail-amber{% endif %}" href="{% url 'doctor_consultation' %}?patient={{ row.patient.pk }}&q={{ query|urlencode }}&view=board">
-                <span class="cb-avatar">{{ row.patient.first_name|slice:":1"|upper }}{% if row.patient.last_name %}{{ row.patient.last_name|slice:":1"|upper }}{% endif %}</span>
-                <span class="cb-card-main">
-                  <span class="cb-card-name">{{ row.patient.full_name }}{% if row.patient.is_emergency %}<span class="cb-tag">Emergency</span>{% endif %}{% if row.alert %}<span class="cb-tag amber">{{ row.alert }}</span>{% endif %}</span>
-                  <span class="cb-card-meta">{{ row.patient.uhid|default:"No UHID" }} · {{ row.patient.age|default:"—" }}y · {{ row.patient.get_gender_display|default:"—" }}</span>
-                  <span class="cb-wait {% if row.wait_minutes >= 30 %}late{% elif row.wait_minutes >= 15 %}warn{% else %}ok{% endif %}">⏱ {{ row.wait_minutes }} min</span>
-                </span>
-                <span class="cb-status {{ col.tone }}">{{ row.doctor_status }}</span>
+                <div class="cb-card-top">
+                  <span class="cb-avatar">{{ row.patient.first_name|slice:":1"|upper }}{% if row.patient.last_name %}{{ row.patient.last_name|slice:":1"|upper }}{% endif %}</span>
+                  <span class="cb-card-main">
+                    <span class="cb-card-name">{{ row.patient.full_name }}{% if row.patient.is_emergency %}<span class="cb-tag">Emergency</span>{% endif %}{% if row.alert %}<span class="cb-tag amber">{{ row.alert }}</span>{% endif %}</span>
+                    <span class="cb-card-meta">{{ row.patient.uhid|default:"No UHID" }} · {{ row.patient.age|default:"—" }}y · {{ row.patient.get_gender_display|default:"—" }}</span>
+                    {% if not is_doctor and row.doctor %}<span class="cb-card-meta">Assigned to Dr. {{ row.doctor.get_full_name|default:row.doctor.username }}</span>{% endif %}
+                    <span class="cb-wait {% if row.wait_minutes >= 30 %}late{% elif row.wait_minutes >= 15 %}warn{% else %}ok{% endif %}">⏱ {{ row.wait_minutes }} min</span>
+                  </span>
+                </div>
+                <div class="cb-card-foot">
+                  <span class="cb-status {{ col.tone }}">{{ row.doctor_status }}</span>
+                </div>
               </a>
             {% endif %}
           {% empty %}
@@ -261,6 +283,7 @@
                   {% if row.alert %}<span class="cb-tag amber">{{ row.alert }}</span>{% endif %}
                 </span>
                 <span class="cb-lrow-meta">{{ row.patient.uhid|default:"No UHID" }} · {{ row.patient.age|default:"—" }}y · {{ row.patient.get_gender_display|default:"—" }} · waiting {{ row.wait_minutes }} min</span>
+                {% if not is_doctor and row.doctor %}<span class="cb-lrow-meta">Assigned to Dr. {{ row.doctor.get_full_name|default:row.doctor.username }}</span>{% endif %}
                 {% if row.assessment %}
                   <span class="cb-vitals">
                     {% if row.assessment.pulse %}<span class="cb-vital"><b>{{ row.assessment.pulse }}</b> bpm</span>{% endif %}
@@ -270,8 +293,8 @@
                   </span>
                 {% endif %}
               </span>
-              <span class="cb-status {% if row.status == 'Doctor Allocation' %}amber{% elif row.status == 'With Doctor' %}blue{% elif row.status == 'Investigations' %}sky{% elif row.status == 'Procedures' or row.status == 'Pharmacy' %}cyan{% elif row.status == 'Completed' %}green{% else %}muted{% endif %}">{{ row.doctor_status }}</span>
-              <span class="cb-action">{% if row.status == "Doctor Allocation" %}Start →{% elif row.status == "With Doctor" %}Resume →{% else %}Open →{% endif %}</span>
+              <span class="cb-status {% if row.status == 'Doctor Allocation' or row.status == 'Doctor Assigned' %}amber{% elif row.status == 'With Doctor' %}blue{% elif row.status == 'Investigations' %}sky{% elif row.status == 'Procedures' or row.status == 'Pharmacy' %}cyan{% elif row.status == 'Completed' %}green{% else %}muted{% endif %}">{{ row.doctor_status }}</span>
+              <span class="cb-action">{% if row.status == "Doctor Allocation" or row.status == "Doctor Assigned" %}Start →{% elif row.status == "With Doctor" %}Resume →{% else %}Open →{% endif %}</span>
             </a>
           {% empty %}
             <div class="cb-empty">No assigned visits{% if query %} match “{{ query }}”{% else %} for today{% endif %}.</div>

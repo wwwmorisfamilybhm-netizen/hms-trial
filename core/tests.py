@@ -61,6 +61,19 @@ class DoctorConsultationTests(TestCase):
         self.assertContains(response, "Prescription")
         self.assertContains(response, "Hospital Formulary")
 
+    def test_workspace_renders_unassigned_nurse_task(self):
+        """An open task without an assignee must not crash the open-tasks table."""
+        from patients.models import NurseTask
+
+        NurseTask.objects.create(
+            patient=self.patient, title="Collect sample", status="pending"
+        )
+        url = reverse("doctor_consultation") + f"?patient={self.patient.pk}"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Collect sample")
+        self.assertContains(response, "Unassigned")
+
     def test_drug_search_api(self):
         """Test drug search endpoint returns filtered formulary items."""
         url = reverse("drug_search_api") + "?q=paracetamol"
@@ -188,6 +201,8 @@ class OpdAssistantAccessTests(TestCase):
         self.assertContains(response, f'<a href="{opd_url}" aria-current="true">OPD</a>', html=True)
         self.assertContains(response, f'<a href="{inpatient_url}">Inpatient</a>', html=True)
         self.assertContains(response, "Assessment Queue")
+        self.assertRegex(response.content.decode(), r'</nav>\s*<div class="side-status-dock">')
+        self.assertContains(response, 'id="opdToolsPanel"')
 
         response = self.client.get(inpatient_url)
         self.assertContains(response, f'<a href="{opd_url}">OPD</a>', html=True)
