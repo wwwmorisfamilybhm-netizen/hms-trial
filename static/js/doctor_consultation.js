@@ -318,7 +318,11 @@
           AI_DRAFT.tests = data.tests || "";
           if (box) { box.classList.remove("is-loading"); }
           renderAi();
-          toast("AI draft ready — review it before using it.");
+          if (data._provider === "mock" && data._fallback) {
+            toast("Gemini is unavailable; showing a sample draft. Check server configuration and logs.", "error");
+          } else {
+            toast("AI draft ready — review it before using it.");
+          }
         })
         .catch(function (error) {
           if (box) { box.classList.remove("is-loading"); }

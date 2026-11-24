@@ -2924,7 +2924,7 @@ def _openai_compatible_draft(vitals, complaints, allergies, patient_name):
 
 def _gemini_draft(vitals, complaints, allergies, patient_name):
     key = os.environ.get("GEMINI_API_KEY", "").strip()
-    model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash").strip()
+    model = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash").strip()
     if not key:
         raise RuntimeError("GEMINI_API_KEY not set")
     system = (
