@@ -1,2 +1,2 @@
 release: sh release.sh
-web: sh -c "python manage.py collectstatic --noinput && exec gunicorn hms.wsgi:application --bind 0.0.0.0:${PORT:-8000}"
+web: sh web.sh
