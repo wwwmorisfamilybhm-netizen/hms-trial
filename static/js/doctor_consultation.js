@@ -319,7 +319,7 @@
           if (box) { box.classList.remove("is-loading"); }
           renderAi();
           if (data._provider === "mock" && data._fallback) {
-            toast("Gemini is unavailable; showing a sample draft. Check server configuration and logs.", "error");
+            toast("AI provider is unavailable; showing a sample draft. Check server configuration and logs.", "error");
           } else {
             toast("AI draft ready — review it before using it.");
           }
