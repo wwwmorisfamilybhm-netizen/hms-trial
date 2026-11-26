@@ -216,6 +216,13 @@
           {{ form.pin_code }}
         </div>
       </div>
+
+      <!-- Non-blocking duplicate warning: a possible match never prevents saving. -->
+      <div id="duplicate-warning" role="status" aria-live="polite" style="display:none; margin-top:18px; border-radius:14px; padding:14px 18px; background:#fef3c7; color:#92400e; font-weight:600; border:1px solid #fde68a;">
+        <strong style="display:block; margin-bottom:4px;">Possible existing patient found</strong>
+        <span id="duplicate-warning-text" style="font-size:13px; font-weight:500;"></span>
+        <div id="duplicate-matches" style="display:flex; flex-direction:column; gap:8px; margin-top:10px;"></div>
+      </div>
     </div>
 
     <!-- ── SECTION 3: Address & Location ── -->
@@ -299,6 +306,11 @@
         <div class="field">
           <label for="id_reference_no">Reference No.</label>
           {{ form.reference_no }}
+        </div>
+
+        <div class="field">
+          <label for="id_valid_upto">Valid Upto</label>
+          {{ form.valid_upto }}
         </div>
 
       </div>
@@ -528,5 +540,90 @@ function clearPhoto() {
   document.getElementById('photo_data').value = '';
   document.getElementById('id_photo_file').value = '';
 }
+
+// ── Non-blocking duplicate warning (phone / Aadhar) ─────────────────────────
+const duplicateUrl = "{% url 'registration_check_duplicate' %}";
+const patientDetailTemplate = "{% url 'patient_detail' 0 %}";
+const patientRevisitTemplate = "{% url 'registration_desk_revisit' 0 %}";
+const phoneField = document.getElementById('id_phone');
+const aadharField = document.getElementById('id_aadhar_no');
+const duplicateBanner = document.getElementById('duplicate-warning');
+const duplicateText = document.getElementById('duplicate-warning-text');
+const duplicateMatches = document.getElementById('duplicate-matches');
+let duplicateTimer = null;
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[character]);
+}
+
+function renderDuplicateMatches(matches) {
+  duplicateMatches.innerHTML = '';
+  if (!matches.length) {
+    duplicateBanner.style.display = 'none';
+    return;
+  }
+  duplicateText.textContent = matches.length === 1
+    ? 'Check this patient before creating a duplicate record.'
+    : matches.length + ' existing patients share these details.';
+  matches.forEach(match => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff; border:1px solid #fde68a; border-radius:10px; padding:8px 12px;';
+
+    const label = document.createElement('span');
+    label.style.cssText = 'font-size:12.5px; color:#1b1c26; flex:1; min-width:180px;';
+    label.textContent = match.full_name + ' · UHID #' + (match.uhid || match.pk)
+      + (match.phone ? ' · ' + match.phone : '');
+
+    const revisit = document.createElement('button');
+    revisit.type = 'submit';
+    revisit.formAction = patientRevisitTemplate.replace('/0/', '/' + match.pk + '/');
+    revisit.formNoValidate = true;
+    revisit.className = 'btn';
+    revisit.style.cssText = 'background:#1b1c26; color:#fff; border:none; padding:6px 12px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer;';
+    revisit.textContent = 'Start Revisit Instead →';
+
+    const open = document.createElement('a');
+    open.href = patientDetailTemplate.replace('/0/', '/' + match.pk + '/');
+    open.className = 'btn btn-outline';
+    open.style.cssText = 'padding:6px 12px; border-radius:8px; font-size:12px; text-decoration:none;';
+    open.textContent = 'Open Record';
+
+    row.append(label, revisit, open);
+    duplicateMatches.appendChild(row);
+  });
+  duplicateBanner.style.display = 'block';
+}
+
+async function checkDuplicate() {
+  const phone = phoneField ? phoneField.value.trim() : '';
+  const aadhar = aadharField ? aadharField.value.trim() : '';
+  if (phone.replace(/\D/g, '').length < 6 && aadhar.length < 4) {
+    duplicateBanner.style.display = 'none';
+    return;
+  }
+  try {
+    const params = new URLSearchParams({ phone, aadhar_no: aadhar });
+    const response = await fetch(duplicateUrl + '?' + params.toString(), {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    if (!response.ok) return;
+    const payload = await response.json();
+    renderDuplicateMatches(payload.matches || []);
+  } catch (error) {
+    // A failed lookup must never block registration.
+    duplicateBanner.style.display = 'none';
+  }
+}
+
+function scheduleDuplicateCheck() {
+  clearTimeout(duplicateTimer);
+  duplicateTimer = setTimeout(checkDuplicate, 400);
+}
+
+[phoneField, aadharField].forEach(field => {
+  if (field) field.addEventListener('input', scheduleDuplicateCheck);
+});
 </script>
 {% endblock %}

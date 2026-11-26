@@ -28,8 +28,9 @@ from patients.models import Medicine, MedicineImport
 from .operations import require_pharmacy, is_admin
 from .pharmacy_imports import (
     ImportUploadForm, ImportRowForm, ImportReviewError,
-    extract_rows, mapped_rows, commit_import, normalized,
+    extract_rows, mapped_rows, commit_import, normalized, prepare_invoice_rows,
 )
+from .pharmacy_invoice_parser import INVOICE_COLUMNS, InvoiceNotRecognised, parse_invoice_pdf
 from .pharmacy_photos import (
     photo_candidates, public_get, validated_photo, MAX_PHOTO_BYTES,
     medicine_image_query, linked_photo, stage_photo, read_photo_preview,
@@ -47,11 +48,38 @@ def draft_for(request, pk):
 @login_required(login_url="login")
 def import_upload(request):
     require_pharmacy(request.user)
-    form = ImportUploadForm(request.POST or None, request.FILES or None)
+    requested_kind = request.GET.get("kind", "catalogue")
+    if requested_kind not in ("catalogue", "stock"):
+        requested_kind = "catalogue"
+    stock_mode = requested_kind == "stock"
+    form = ImportUploadForm(request.POST or None, request.FILES or None, initial={"kind": requested_kind})
     if request.method == "POST" and form.is_valid():
         source = form.cleaned_data["source"]
         try:
-            columns, raw, fingerprint = extract_rows(source, form.cleaned_data["header"])
+            document = {}
+            if Path(source.name).suffix.lower() == ".pdf":
+                try:
+                    parsed = parse_invoice_pdf(source)
+                except InvoiceNotRecognised:
+                    parsed = None
+                if parsed:
+                    rows, match_warnings = prepare_invoice_rows(parsed["items"])
+                    document = parsed["document"]
+                    document["warnings"] = [*document.get("warnings", []), *match_warnings]
+                    document["auto_mapped"] = True
+                    defaults = {key: document.get(key, "") for key in ("supplier", "invoice_reference")}
+                    for row in rows:
+                        row.update(defaults)
+                    columns = [label for _, label in INVOICE_COLUMNS]
+                    raw = [[row.get(field, "") for field, _ in INVOICE_COLUMNS] for row in rows]
+                    mapping = {field: str(index) for index, (field, _) in enumerate(INVOICE_COLUMNS)}
+                    fingerprint = parsed["fingerprint"]
+                else:
+                    columns, raw, fingerprint = extract_rows(source, form.cleaned_data["header"])
+                    rows, mapping = [], {}
+            else:
+                columns, raw, fingerprint = extract_rows(source, form.cleaned_data["header"])
+                rows, mapping = [], {}
             previous = MedicineImport.objects.filter(fingerprint=fingerprint, committed_at__isnull=False)
             if not is_admin(request.user):
                 previous = previous.filter(owner=request.user)
@@ -60,12 +88,13 @@ def import_upload(request):
                 messages.info(request, "This exact file was imported previously. Its saved result is shown below.")
                 return redirect("pharmacy_import_review", pk=previous.pk)
             draft = MedicineImport.objects.create(owner=request.user, source=source, filename=Path(source.name).name[:255],
-                fingerprint=fingerprint, kind=form.cleaned_data["kind"], columns=columns, raw_rows=raw)
+                fingerprint=fingerprint, kind=form.cleaned_data["kind"], columns=columns, raw_rows=raw,
+                mapping=mapping, rows=rows, document=document)
             return redirect("pharmacy_import_review", pk=draft.pk)
         except ValidationError as exc:
             form.add_error("source", exc)
     drafts = MedicineImport.objects.all() if is_admin(request.user) else MedicineImport.objects.filter(owner=request.user)
-    return render(request, "core/pharmacy_import_upload.html", {"page_title": "Import medicines / stock", "form": form, "drafts": drafts[:20]})
+    return render(request, "core/pharmacy_import_upload.html", {"page_title": "Import stock from invoice" if stock_mode else "Import medicines / stock", "form": form, "drafts": drafts[:20], "stock_mode": stock_mode})
 
 
 def mapping_form(draft, data=None):
@@ -140,7 +169,7 @@ def import_review(request, pk):
     error_links = [{"row": int(index) + 1, "page": int(index) // 20 + 1} for index in errors]
     return render(request, "core/pharmacy_import_review.html", {
         "page_title": "Review import", "draft": draft, "mapping": mapping, "page": page,
-        "row_forms": row_forms, "error_links": error_links,
+        "row_forms": row_forms, "error_links": error_links, "document": draft.document,
         "preview": draft.raw_rows[:5], "columns": draft.columns,
         "preview_type": Path(draft.filename).suffix.lower(),
     })
@@ -150,8 +179,19 @@ def import_review(request, pk):
 def import_source(request, pk):
     draft = draft_for(request, pk)
     inline = request.GET.get("inline") == "1" and Path(draft.filename).suffix.lower() in (".pdf", ".jpg", ".jpeg", ".png")
-    response = FileResponse(draft.source.open("rb"), as_attachment=not inline, filename=draft.filename,
-                            content_type=mimetypes.guess_type(draft.filename)[0] or "application/octet-stream")
+    if inline and Path(draft.filename).suffix.lower() == ".pdf":
+        import pdfplumber
+        try:
+            with draft.source.open("rb") as source, pdfplumber.open(source) as pdf:
+                preview = pdf.pages[0].to_image(resolution=110).original.convert("RGB")
+                output = io.BytesIO()
+                preview.save(output, format="PNG")
+            response = HttpResponse(output.getvalue(), content_type="image/png")
+        except Exception:
+            return HttpResponse("PDF preview is unavailable. Download the original document instead.", status=415, content_type="text/plain")
+    else:
+        response = FileResponse(draft.source.open("rb"), as_attachment=not inline, filename=draft.filename,
+                                content_type=mimetypes.guess_type(draft.filename)[0] or "application/octet-stream")
     if inline:
         response["Content-Security-Policy"] = "sandbox"
         response["X-Frame-Options"] = "SAMEORIGIN"

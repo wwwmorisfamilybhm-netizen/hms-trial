@@ -24,6 +24,10 @@
           <span>+ New Registration →</span>
         </a>
       {% endif %}
+      <a href="{% url 'registration_desk_export' %}{% if query or date_str or status or emergency %}?{% if query %}q={{ query|urlencode }}&{% endif %}{% if date_str %}date={{ date_str }}&{% endif %}{% if status %}status={{ status|urlencode }}&{% endif %}{% if emergency %}emergency=1{% endif %}{% endif %}" class="btn rd-btn-outline" title="Download the filtered OPD register as a CSV file">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        <span>Export Register (CSV)</span>
+      </a>
       {% if last_registered %}
         <a href="{% url 'patient_print_card' last_registered.pk %}" class="btn rd-btn-outline" title="Print card for {{ last_registered.full_name }}">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -540,6 +544,86 @@
     align-items: center;
   }
 
+  /* Daily collection summary strip */
+  .rd-collection-strip {
+    display: flex;
+    align-items: stretch;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 14px 26px;
+    background: #fbfbfd;
+    border-bottom: 1px solid var(--line);
+  }
+  .rd-collection-title {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-width: 130px;
+    padding-right: 14px;
+    border-right: 1px solid var(--line);
+  }
+  .rd-collection-title span {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .rd-collection-title small {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .rd-collection-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 14px;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid rgba(155, 135, 248, 0.16);
+    min-width: 92px;
+  }
+  .rd-collection-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+  .rd-collection-value {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--ink);
+  }
+  .rd-collection-item small {
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .rd-collection-pending {
+    background: #fff7ed;
+    border-color: #fed7aa;
+  }
+  .rd-collection-pending .rd-collection-value {
+    color: #b45309;
+  }
+
+  .rd-action-btn.revisit {
+    background: var(--mb-lime);
+    color: #1b1c26;
+    border-color: #c8e742;
+    font-weight: 800;
+  }
+  .rd-action-btn.revisit:hover {
+    background: var(--mb-lime-hover);
+    border-color: #bfdf36;
+    text-decoration: none;
+  }
+  .rd-revisit-form {
+    display: inline-flex;
+    margin: 0;
+  }
+
   /* Empty state */
   .rd-empty-container {
     text-align: center;
@@ -650,6 +734,31 @@
     </div>
   </form>
 
+  <!-- Daily Collection Summary strip -->
+  <div class="rd-collection-strip" aria-label="Daily collection summary">
+    <div class="rd-collection-title">
+      <span>Daily Collection</span>
+      <small>{% if selected_date %}{{ selected_date|date:"d M Y" }}{% else %}Today · {{ row_count }} record{{ row_count|pluralize }}{% endif %}</small>
+    </div>
+    <div class="rd-collection-item">
+      <span class="rd-collection-label">Cash</span>
+      <span class="rd-collection-value">₹{{ collection_summary.cash|floatformat:2 }}</span>
+    </div>
+    <div class="rd-collection-item">
+      <span class="rd-collection-label">UPI</span>
+      <span class="rd-collection-value">₹{{ collection_summary.upi|floatformat:2 }}</span>
+    </div>
+    <div class="rd-collection-item">
+      <span class="rd-collection-label">Card</span>
+      <span class="rd-collection-value">₹{{ collection_summary.card|floatformat:2 }}</span>
+    </div>
+    <div class="rd-collection-item rd-collection-pending">
+      <span class="rd-collection-label">Pending</span>
+      <span class="rd-collection-value">₹{{ collection_summary.pending|floatformat:2 }}</span>
+      <small>{{ collection_summary.pending_count }} bill{{ collection_summary.pending_count|pluralize }}</small>
+    </div>
+  </div>
+
   <!-- Records Table -->
   {% if rows %}
     <div class="rd-table-wrap">
@@ -713,6 +822,14 @@
                     </a>
                   {% endif %}
                   {% if row.kind == 'patient' and row.patient_id %}
+                    {% if can_register %}
+                      <form method="post" action="{% url 'registration_desk_revisit' row.patient_id %}" class="rd-revisit-form">
+                        {% csrf_token %}
+                        <button type="submit" class="rd-action-btn revisit" title="Start a new OPD visit for this patient">
+                          + New Visit
+                        </button>
+                      </form>
+                    {% endif %}
                     <a href="{% url 'appointment_create' %}?patient={{ row.patient_id }}" class="rd-action-btn view" title="Book an appointment for this patient">
                       📅 Book
                     </a>

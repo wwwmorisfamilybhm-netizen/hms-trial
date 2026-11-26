@@ -1,0 +1,108 @@
+{% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · procurement{% endblock %}
+{% block operations_intro %}Record a supplier order without touching stock, or post a goods receipt straight into inventory.{% endblock %}
+{% block operations_content %}
+<a class="ph-back" href="{% url 'pharmacy_purchases' %}">← Purchases</a>
+<form method="post" class="ph-panel ph-stock-form ph-receipt-form">
+  {% csrf_token %}{{ form.request_key }}
+  <fieldset class="ph-mode-fieldset"><legend>What are you recording?</legend>
+    <div class="ph-mode-choices">{{ form.mode }}{{ form.mode.errors }}</div>
+    <p class="ph-note">{{ form.mode.help_text }}</p>
+  </fieldset>
+  <fieldset><legend>Supplier &amp; invoice</legend>
+    {% include "core/pharmacy_field.html" with field=form.supplier %}
+    {% include "core/pharmacy_field.html" with field=form.reference %}
+    {% include "core/pharmacy_field.html" with field=form.invoice_reference %}
+  </fieldset>
+
+  {{ form.non_field_errors }}
+  {{ formset.non_form_errors }}
+  {{ formset.management_form }}
+
+  <fieldset class="ph-receipt-lines"><legend>Purchase lines</legend>
+    <div class="ops-scroll">
+      <table class="ops-table ph-line-table">
+        <thead>
+          <tr>
+            <th scope="col">Medicine</th>
+            <th scope="col">Batch no.</th>
+            <th scope="col">Expiry</th>
+            <th scope="col">Qty</th>
+            <th scope="col">Cost</th>
+            <th scope="col">Sell price</th>
+            <th scope="col">MRP</th>
+            <th scope="col"><span class="ops-muted">Del.</span></th>
+          </tr>
+        </thead>
+        <tbody id="receiptLineBody">
+          {% for line in formset %}
+            <tr class="ph-line-row">
+              <td>{{ line.medicine }}{{ line.medicine.errors }}</td>
+              <td>{{ line.batch_number }}{{ line.batch_number.errors }}</td>
+              <td>{{ line.expiry_date }}{{ line.expiry_date.errors }}</td>
+              <td>{{ line.quantity }}{{ line.quantity.errors }}</td>
+              <td>{{ line.purchase_cost }}{{ line.purchase_cost.errors }}</td>
+              <td>{{ line.selling_price }}{{ line.selling_price.errors }}</td>
+              <td>{{ line.mrp }}{{ line.mrp.errors }}</td>
+              <td>{% if line.DELETE %}<label class="ph-line-remove">{{ line.DELETE }}</label>{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <button type="button" class="np-btn ph-add-line" id="addReceiptLine">＋ Add another line</button>
+    <div class="ph-summary" style="margin-top:12px;">
+      <div class="ph-summary-row"><span>Order value</span><strong data-receipt-total>₹0.00</strong></div>
+      <small>Quantity × purchase cost across all filled lines</small>
+    </div>
+    <p class="ph-note">Goods receipts increase stock immediately. Orders record the purchase without touching stock until you receive it from the purchase page. A line with batch number and expiry creates usable, FEFO-ordered stock.</p>
+  </fieldset>
+  <button class="np-btn teal" type="submit">Save purchase</button>
+</form>
+
+<template id="receiptLineTemplate">
+  <tr class="ph-line-row">
+    <td>{{ formset.empty_form.medicine }}</td>
+    <td>{{ formset.empty_form.batch_number }}</td>
+    <td>{{ formset.empty_form.expiry_date }}</td>
+    <td>{{ formset.empty_form.quantity }}</td>
+    <td>{{ formset.empty_form.purchase_cost }}</td>
+    <td>{{ formset.empty_form.selling_price }}</td>
+    <td>{{ formset.empty_form.mrp }}</td>
+    <td>{% if formset.can_delete %}<label class="ph-line-remove">{{ formset.empty_form.DELETE }}</label>{% endif %}</td>
+  </tr>
+</template>
+
+<script>
+  (function () {
+    "use strict";
+    var body = document.getElementById("receiptLineBody");
+    var button = document.getElementById("addReceiptLine");
+    var template = document.getElementById("receiptLineTemplate");
+    var total = document.getElementById("id_lines-TOTAL_FORMS");
+    var output = document.querySelector("[data-receipt-total]");
+    function recalc() {
+      if (!output) { return; }
+      var sum = 0;
+      body.querySelectorAll(".ph-line-row").forEach(function (row) {
+        var qty = Number(row.querySelector('input[name$="-quantity"]')?.value || 0);
+        var cost = Number(row.querySelector('input[name$="-purchase_cost"]')?.value || 0);
+        if (qty > 0 && cost >= 0) { sum += qty * cost; }
+      });
+      output.textContent = "₹" + sum.toFixed(2);
+    }
+    if (!body || !button || !template || !total) { return; }
+    button.addEventListener("click", function () {
+      var index = parseInt(total.value, 10);
+      var html = template.innerHTML.replace(/__prefix__/g, String(index));
+      var wrapper = document.createElement("tbody");
+      wrapper.innerHTML = html.trim();
+      body.appendChild(wrapper.firstElementChild);
+      total.value = String(index + 1);
+      recalc();
+    });
+    body.addEventListener("input", recalc);
+    recalc();
+  })();
+</script>
+{% endblock %}

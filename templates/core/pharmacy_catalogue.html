@@ -1,68 +1,174 @@
 {% extends "core/pharmacy_base.html" %}
 {% load static %}
+{% block body_class %}pharmacy-page ph-catalogue-page{% endblock %}
 {% block operations_content %}
 <div class="ops-kpis">
   <a class="ops-kpi{% if kpi_current == 'total' %} is-current{% endif %}" href="{% url 'medicine_catalogue' %}{% querystring status=None stock=None page=None saved=None %}">Medicines<strong>{{ counts.total }}</strong>matching this view</a>
   <a class="ops-kpi{% if kpi_current == 'active' %} is-current{% endif %}" href="{% url 'medicine_catalogue' %}{% querystring status='active' stock=None page=None saved=None %}">Active<strong>{{ counts.active }}</strong>ready to receive stock</a>
   <a class="ops-kpi{% if kpi_current == 'low' %} is-current{% endif %}" href="{% url 'medicine_catalogue' %}{% querystring status=None stock='low' page=None saved=None %}">Low stock<strong>{{ counts.low }}</strong>at or below reorder</a>
   <a class="ops-kpi{% if kpi_current == 'unstocked' %} is-current{% endif %}" href="{% url 'medicine_catalogue' %}{% querystring status=None stock='unstocked' page=None saved=None %}">No stock yet<strong>{{ counts.unstocked }}</strong>no batch received</a>
-  <a class="ops-kpi{% if kpi_current == 'expiring' %} is-current{% endif %}" href="{% url 'medicine_catalogue' %}{% querystring status=None stock='expiring' page=None saved=None %}">Expiring<strong>{{ counts.expiring }}</strong>batches within 90 days</a>
+  <a class="ops-kpi{% if kpi_current == 'expiring' %} is-current{% endif %}" href="{% url 'medicine_catalogue' %}{% querystring status=None stock='expiring' page=None saved=None %}">Expiring<strong>{{ counts.expiring }}</strong>batches within {{ warn_days }} days</a>
 </div>
-<form class="ops-search ph-catalogue-search" method="get" action="{% url 'medicine_catalogue' %}">
-  <input type="search" name="q" value="{{ query }}" placeholder="Name, generic, manufacturer or barcode" aria-label="Search medicines">
-  <select name="form" aria-label="Filter by form">
-    <option value="">All forms</option>
-    {% for option in form_options %}<option value="{{ option }}" {% if option == active_form %}selected{% endif %}>{{ option }}</option>{% endfor %}
-  </select>
-  <select name="status" aria-label="Filter by status">
-    <option value="">Active &amp; inactive</option>
-    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active only</option>
-    <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive only</option>
-  </select>
-  <select name="stock" aria-label="Filter by stock level">
-    <option value="">Any stock level</option>
-    <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>Low stock</option>
-    <option value="unstocked" {% if stock_filter == 'unstocked' %}selected{% endif %}>No stock yet</option>
-    <option value="expiring" {% if stock_filter == 'expiring' %}selected{% endif %}>Expiring in 90 days</option>
-  </select>
-  <select name="sort" aria-label="Sort medicines">
-    <option value="">Name A–Z</option>
-    <option value="stock" {% if sort == 'stock' %}selected{% endif %}>Lowest stock first</option>
-    <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Recently added</option>
-  </select>
-  <button class="np-btn" type="submit">Apply</button>
-</form>
-<p class="ph-result-count">{{ medicines.paginator.count }} medicine{{ medicines.paginator.count|pluralize }} shown</p>
+<section class="ph-catalogue-toolbar ph-panel">
+  <div class="ph-toolbar-top">
+    <form class="ph-catalogue-search ph-catalogue-search-row" method="get" action="{% url 'medicine_catalogue' %}">
+      <div class="ph-search-input-wrap">
+        <svg class="ph-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7.5"/><path d="m20 20-4-4"/></svg>
+        <input type="search" name="q" value="{{ query }}" placeholder="Search by name, generic, manufacturer or barcode…" aria-label="Search medicines">
+      </div>
+      <div class="ph-filter-group">
+        <select name="form" aria-label="Filter by form">
+          <option value="">All forms</option>
+          {% for option in form_options %}<option value="{{ option }}" {% if option == active_form %}selected{% endif %}>{{ option }}</option>{% endfor %}
+        </select>
+        <select name="status" aria-label="Filter by status">
+          <option value="">Active &amp; inactive</option>
+          <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active only</option>
+          <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive only</option>
+        </select>
+        <select name="stock" aria-label="Filter by stock level">
+          <option value="">Any stock level</option>
+          <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>Low stock</option>
+          <option value="unstocked" {% if stock_filter == 'unstocked' %}selected{% endif %}>No stock yet</option>
+          <option value="expiring" {% if stock_filter == 'expiring' %}selected{% endif %}>Expiring in {{ warn_days }} days</option>
+        </select>
+        <select name="sort" aria-label="Sort medicines">
+          <option value="">Name A–Z</option>
+          <option value="stock" {% if sort == 'stock' %}selected{% endif %}>Lowest stock first</option>
+          <option value="recent" {% if sort == 'recent' %}selected{% endif %}>Recently added</option>
+        </select>
+      </div>
+      <button class="np-btn teal ph-filter-apply" type="submit">Apply</button>
+    </form>
+  </div>
+  <div class="ph-toolbar-meta">
+    <div class="ph-toolbar-left">
+      <p class="ph-result-count"><strong>{{ medicines.paginator.count }}</strong> medicine{{ medicines.paginator.count|pluralize }} shown</p>
+      {% if query or active_form or status_filter or stock_filter or sort %}
+      <a class="ph-chip ph-chip-reset" href="{% url 'medicine_catalogue' %}">✕ Clear filters</a>
+      {% endif %}
+    </div>
+    <div class="ph-toolbar-right">
+      <div class="ph-view-toggle" role="group" aria-label="View mode">
+        <button type="button" class="ph-view-btn is-active" data-view="grid" aria-pressed="true" title="Grid view">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        </button>
+        <button type="button" class="ph-view-btn" data-view="table" aria-pressed="false" title="Table view">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        </button>
+      </div>
+      <a class="np-btn" href="{% url 'pharmacy_import' %}">Import</a>
+      <a class="np-btn teal ph-add-btn" href="#medicine-form">＋ Add medicine</a>
+    </div>
+  </div>
+</section>
 <div class="ph-med-grid">
   {% for medicine in medicines %}
   <article class="ph-med-card{% if not medicine.is_active %} is-inactive{% endif %}{% if medicine.pk == saved_pk %} is-saved{% endif %}" id="medicine-{{ medicine.pk }}">
-    <div class="ph-med-photo">
+    <div class="ph-med-photo{% if medicine.photo %} has-photo{% endif %}">
+      <div class="ph-med-photo-badges">
+        {% if not medicine.is_active %}<span class="ph-med-badge inactive">Inactive</span>
+        {% elif medicine.batch_count == 0 %}<span class="ph-med-badge nostock">No stock</span>
+        {% elif medicine.usable == 0 %}<span class="ph-med-badge out">Out of stock</span>
+        {% elif medicine.usable <= medicine.reorder_level %}<span class="ph-med-badge low">Low stock</span>
+        {% else %}<span class="ph-med-badge ok">In stock</span>{% endif %}
+        {% if medicine.is_active and medicine.expiring_count %}<span class="ph-med-badge expiring">Exp ≤ {{ warn_days }}d</span>{% endif %}
+      </div>
+      {% if medicine.is_controlled or medicine.prescription_required %}
+      <div class="ph-med-photo-tags">
+        {% if medicine.is_controlled %}<span class="ph-med-tag controlled" title="Controlled substance">CD</span>{% endif %}
+        {% if medicine.prescription_required %}<span class="ph-med-tag rx" title="Prescription required">Rx</span>{% endif %}
+      </div>
+      {% endif %}
       {% if medicine.photo %}
-      <a href="{{ medicine.photo.url }}" target="_blank" rel="noopener" aria-label="Enlarge photo of {{ medicine.name }}"><img src="{{ medicine.photo.url }}" alt="{{ medicine.name }} product packaging" loading="lazy"></a>
+      <a class="ph-med-photo-link" href="{{ medicine.photo.url }}" target="_blank" rel="noopener" aria-label="Enlarge photo of {{ medicine.name }}">
+        <img src="{{ medicine.photo.url }}" alt="{{ medicine.name }} product packaging" loading="lazy">
+      </a>
+      <a class="ph-med-photo-edit" href="{% url 'medicine_photo' medicine.pk %}" title="Change photo">Update</a>
       {% else %}
-      <a class="ph-med-monogram" href="{% url 'medicine_photo' medicine.pk %}" aria-label="Add a product photo for {{ medicine.name }}"><span aria-hidden="true">{{ medicine.name|slice:":1"|upper }}</span></a>
+      <a class="ph-med-monogram" href="{% url 'medicine_photo' medicine.pk %}" aria-label="Add a product photo for {{ medicine.name }}">
+        <span class="ph-monogram-letter" aria-hidden="true">{{ medicine.name|slice:":1"|upper }}</span>
+        <span class="ph-monogram-cta">＋ Add photo</span>
+      </a>
       {% endif %}
     </div>
-    <h3 class="ph-med-name"><a href="{% url 'medicine_edit' medicine.pk %}{% querystring saved=None %}#medicine-form">{{ medicine.name }}</a></h3>
-    <p class="ph-med-sub">{{ medicine.strength }} · {{ medicine.form }} · {{ medicine.pack_size }} {{ medicine.get_unit_display }} per pack · Reorder at {{ medicine.reorder_level }}</p>
-    <p class="ph-med-generic">{{ medicine.generic_name|default:"Generic not recorded" }} · {{ medicine.manufacturer|default:"Manufacturer unspecified" }}</p>
-    <p class="ph-med-stock"><strong>{{ medicine.usable }}</strong> {{ medicine.get_unit_display|lower }}{{ medicine.usable|pluralize }} available
-      {% if not medicine.is_active %}<span class="ph-med-badge inactive">Inactive</span>
-      {% elif medicine.batch_count == 0 %}<span class="ph-med-badge nostock">No stock yet</span>
-      {% elif medicine.usable == 0 %}<span class="ph-med-badge out">Out of stock</span>
-      {% elif medicine.usable <= medicine.reorder_level %}<span class="ph-med-badge low">Low</span>
-      {% else %}<span class="ph-med-badge ok">In stock</span>{% endif %}
-      {% if medicine.is_active and medicine.expiring_count %}<span class="ph-med-badge expiring">Expiring ≤ 90 d</span>{% endif %}
-    </p>
+    <div class="ph-med-body">
+      <div class="ph-med-title-wrap">
+        <h3 class="ph-med-name"><a href="{% url 'medicine_edit' medicine.pk %}{% querystring saved=None %}#medicine-form">{{ medicine.name }}</a></h3>
+        <p class="ph-med-generic">{{ medicine.generic_name|default:"Generic not recorded" }}{% if medicine.manufacturer %} · {{ medicine.manufacturer }}{% endif %}</p>
+      </div>
+      <dl class="ph-med-specs">
+        <div><dt>Form</dt><dd>{{ medicine.form|default:"—" }}</dd></div>
+        <div><dt>Strength</dt><dd>{{ medicine.strength|default:"—" }}</dd></div>
+        <div><dt>Pack</dt><dd>{{ medicine.pack_size }} {{ medicine.get_unit_display }}</dd></div>
+      </dl>
+      <div class="ph-med-stock-row">
+        <span class="ph-med-stock-qty"><strong>{{ medicine.usable }}</strong> {{ medicine.get_unit_display|lower }}{{ medicine.usable|pluralize }}</span>
+        <span class="ph-med-reorder">Reorder ≤ {{ medicine.reorder_level }}{% if medicine.rack_location %} · {{ medicine.rack_location }}{% endif %}</span>
+      </div>
+    </div>
     <div class="ph-med-actions">
-      <a class="np-btn" href="{% url 'medicine_edit' medicine.pk %}{% querystring saved=None %}#medicine-form">Edit</a>
-      <a class="np-btn" href="{% url 'medicine_photo' medicine.pk %}">Photo</a>
-      {% if medicine.is_active %}<a class="np-btn" href="{% url 'pharmacy_receive' %}?medicine={{ medicine.pk }}">Receive</a>{% endif %}
+      <a class="ph-med-action-primary" href="{% url 'medicine_edit' medicine.pk %}{% querystring saved=None %}#medicine-form">Edit</a>
+      <a class="ph-med-action" href="{% url 'medicine_photo' medicine.pk %}">Photo</a>
+      {% if medicine.is_active %}<a class="ph-med-action" href="{% url 'pharmacy_receive' %}?medicine={{ medicine.pk }}">Receive</a>{% endif %}
     </div>
   </article>
   {% empty %}
   <p class="ops-empty">{% if query or active_form or status_filter or stock_filter %}No medicines match this search and filters.{% else %}No medicines yet. Add the first entry below, or <a href="{% url 'pharmacy_import' %}">import your medicine list</a> from a CSV, Excel or PDF file.{% endif %}</p>
   {% endfor %}
+</div>
+<div class="ph-med-table-wrap ph-panel ops-scroll" hidden>
+  <table class="ops-table ph-med-table">
+    <thead>
+      <tr>
+        <th>Photo</th>
+        <th>Name</th>
+        <th>Generic / Manufacturer</th>
+        <th>Form</th>
+        <th>Strength</th>
+        <th>Pack</th>
+        <th>Stock</th>
+        <th>Status</th>
+        <th class="ph-col-action">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for medicine in medicines %}
+      <tr class="{% if not medicine.is_active %}is-inactive{% endif %}{% if medicine.pk == saved_pk %} is-saved{% endif %}">
+        <td>
+          {% if medicine.photo %}
+          <a class="ph-thumb" href="{{ medicine.photo.url }}" target="_blank" rel="noopener"><img src="{{ medicine.photo.url }}" alt="{{ medicine.name }}" loading="lazy"></a>
+          {% else %}
+          <a class="ph-thumb ph-med-monogram" href="{% url 'medicine_photo' medicine.pk %}" aria-label="Add photo for {{ medicine.name }}">{{ medicine.name|slice:":1"|upper }}</a>
+          {% endif %}
+        </td>
+        <td><strong><a href="{% url 'medicine_edit' medicine.pk %}{% querystring saved=None %}#medicine-form">{{ medicine.name }}</a></strong></td>
+        <td>{{ medicine.generic_name|default:"—" }}<br><small class="ops-muted">{{ medicine.manufacturer|default:"—" }}</small></td>
+        <td>{{ medicine.form|default:"—" }}</td>
+        <td>{{ medicine.strength|default:"—" }}</td>
+        <td>{{ medicine.pack_size }} {{ medicine.get_unit_display }}</td>
+        <td><strong>{{ medicine.usable }}</strong> <small class="ops-muted">{{ medicine.get_unit_display|lower }}{{ medicine.usable|pluralize }}</small></td>
+        <td>
+          {% if not medicine.is_active %}<span class="ph-med-badge inactive">Inactive</span>
+          {% elif medicine.batch_count == 0 %}<span class="ph-med-badge nostock">No stock</span>
+          {% elif medicine.usable == 0 %}<span class="ph-med-badge out">Out of stock</span>
+          {% elif medicine.usable <= medicine.reorder_level %}<span class="ph-med-badge low">Low</span>
+          {% else %}<span class="ph-med-badge ok">In stock</span>{% endif %}
+          {% if medicine.is_active and medicine.expiring_count %}<span class="ph-med-badge expiring">Expiring ≤ {{ warn_days }}d</span>{% endif %}
+        </td>
+        <td class="ph-col-action">
+          <div class="ph-table-actions">
+            <a class="ph-med-action-primary" href="{% url 'medicine_edit' medicine.pk %}{% querystring saved=None %}#medicine-form">Edit</a>
+            <a class="ph-med-action" href="{% url 'medicine_photo' medicine.pk %}">Photo</a>
+            {% if medicine.is_active %}<a class="ph-med-action" href="{% url 'pharmacy_receive' %}?medicine={{ medicine.pk }}">Receive</a>{% endif %}
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="9" class="ops-empty">{% if query or active_form or status_filter or stock_filter %}No medicines match this search and filters.{% else %}No medicines yet. Add the first entry below, or <a href="{% url 'pharmacy_import' %}">import your medicine list</a> from a CSV, Excel or PDF file.{% endif %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 {% include 'core/pharmacy_pagination.html' with page=medicines %}
 <section class="ph-panel" id="medicine-form">
@@ -79,17 +185,26 @@
       <fieldset><legend>Identity</legend>
         {% include "core/pharmacy_field.html" with field=form.name %}
         {% include "core/pharmacy_field.html" with field=form.generic_name %}
+        {% include "core/pharmacy_field.html" with field=form.composition %}
         {% include "core/pharmacy_field.html" with field=form.strength %}
         {% include "core/pharmacy_field.html" with field=form.form %}
         {% include "core/pharmacy_field.html" with field=form.unit %}{% if locked %}<input type="hidden" name="unit" value="{{ editing.unit }}">{% endif %}
         {% include "core/pharmacy_field.html" with field=form.pack_size %}
+        {% include "core/pharmacy_field.html" with field=form.category %}
+        {% include "core/pharmacy_field.html" with field=form.manufacturer %}
+        {% include "core/pharmacy_field.html" with field=form.barcode %}
+      </fieldset>
+      <fieldset><legend>Dispensing rules</legend>
+        {% include "core/pharmacy_field.html" with field=form.prescription_required %}
+        {% include "core/pharmacy_field.html" with field=form.is_controlled %}
+        {% include "core/pharmacy_field.html" with field=form.drug_schedule %}
+        {% include "core/pharmacy_field.html" with field=form.gst_rate %}
+        {% include "core/pharmacy_field.html" with field=form.hsn_code %}
       </fieldset>
       <fieldset><legend>Stock control</legend>
         {% include "core/pharmacy_field.html" with field=form.reorder_level %}
-      </fieldset>
-      <fieldset><legend>Details</legend>
-        {% include "core/pharmacy_field.html" with field=form.manufacturer %}
-        {% include "core/pharmacy_field.html" with field=form.barcode %}
+        {% include "core/pharmacy_field.html" with field=form.rack_location %}
+        {% include "core/pharmacy_field.html" with field=form.storage_instructions %}
         {% include "core/pharmacy_field.html" with field=form.is_active %}
       </fieldset>
     </div>
@@ -98,6 +213,27 @@
       {% if editing %}<a href="{% url 'medicine_photo' editing.pk %}">Product photo</a>{% endif %}
     </div>
   </form>
+  {% if editing %}
+  <div class="ph-panel-head"><h2>Batch prices</h2></div>
+  {% for row in price_batches %}{% with batch=row.batch %}
+  <form method="post" action="{% url 'medicine_batch_prices' editing.pk %}" class="ph-follow">{% csrf_token %}
+    <input type="hidden" name="batch" value="{{ batch.pk }}">
+    <input type="hidden" name="request_key" value="{{ row.request_key }}">
+    <p><strong>Batch {{ batch.batch_number }}</strong> <small class="ops-muted">expires {{ batch.expiry_date|date:"d M Y" }} · {{ batch.on_hand }} on hand</small></p>
+    <div class="ph-form-sections">
+      <fieldset>
+        <label class="ops-field">Purchase cost (₹)<input type="number" name="purchase_cost" step="0.01" min="0" value="{{ batch.purchase_cost }}" required></label>
+        <label class="ops-field">Selling price (₹)<input type="number" name="selling_price" step="0.01" min="0" value="{{ batch.selling_price }}" required></label>
+        <label class="ops-field">MRP (₹)<input type="number" name="mrp" step="0.01" min="0" value="{{ batch.mrp|default_if_none:'' }}"></label>
+        <label class="ops-field">Reason for change<input type="text" name="reason" maxlength="255" required></label>
+      </fieldset>
+    </div>
+    <div class="ops-actions"><button type="submit" class="np-btn">Save batch prices</button></div>
+  </form>
+  {% endwith %}{% empty %}
+  <p class="ops-muted">No stock has been received for this medicine yet, so there are no batch prices. Set prices when you <a href="{% url 'pharmacy_receive' %}?medicine={{ editing.pk }}">receive stock</a>.</p>
+  {% endfor %}
+  {% endif %}
 </section>
 {% endblock %}
 

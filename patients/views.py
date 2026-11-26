@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -23,8 +24,11 @@ def patient_list(request):
             | Q(aadhar_no__icontains=query)
             | Q(abha_no__icontains=query)
         )
+    patient_page = Paginator(patients, 30).get_page(request.GET.get("page"))
+    patient_total = patient_page.paginator.count
     context = {
-        "patients": patients,
+        "patients": patient_page,
+        "patient_total": patient_total,
         "query": query,
     }
     return render(request, "patients/patient_list.html", context)

@@ -102,17 +102,31 @@
 .pharmacy-page .ops-kpi.is-current { border-color: var(--ph-teal); color: var(--ph-teal); }
 .pharmacy-page .ops-search.ph-catalogue-search select { width: auto; flex: 0 1 auto; }
 .ph-result-count { margin: 10px 0 0; font-size: .78rem; color: var(--ph-muted); }
-.ph-med-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 18px; margin-block: 14px 0; align-items: start; }
+.ph-med-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(272px, 100%), 1fr)); gap: 18px; margin-block: 14px 0; align-items: stretch; }
 .ph-med-grid > .ops-empty { grid-column: 1 / -1; margin: 0; }
-.ph-med-card { min-width: 0; display: grid; gap: 9px; padding: 14px; background: #fff; border: 1px solid var(--ph-line); border-radius: 16px; box-shadow: 0 4px 18px #30204706; }
+.ph-med-card { min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px; background: #fff; border: 1px solid var(--ph-line); border-radius: 20px; box-shadow: 0 10px 28px -24px rgba(23, 33, 31, .45); transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
+.ph-med-card:hover { transform: translateY(-2px); border-color: #bfe4dc; box-shadow: 0 20px 36px -26px rgba(13, 107, 98, .35); }
 .ph-med-card.is-inactive { background: #fafaf7; }
 .ph-med-card.is-inactive .ph-med-name a { color: #7c7690; }
 .ph-med-card.is-saved { border-color: #7fcdc3; animation: ph-saved-flash 2.5s ease-out 1; }
-@keyframes ph-saved-flash { 0% { box-shadow: 0 0 0 5px rgba(16, 107, 100, .35); } 100% { box-shadow: 0 4px 18px #30204706; } }
-.ph-med-photo { display: grid; place-items: center; height: 148px; border: 1px solid var(--ph-line); border-radius: 12px; background: #fff; overflow: hidden; }
-.ph-med-photo a { display: grid; place-items: center; width: 100%; height: 100%; }
-.ph-med-photo img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.ph-med-monogram { display: grid; place-items: center; width: 100%; height: 100%; font-size: 1.7rem; font-weight: 800; color: #a9c9c3; background: #f4faf8; text-decoration: none; }
+@keyframes ph-saved-flash { 0% { box-shadow: 0 0 0 5px rgba(16, 107, 100, .35); } 100% { box-shadow: 0 10px 28px -24px rgba(23, 33, 31, .45); } }
+.ph-med-photo { position: relative; display: flex; align-items: center; justify-content: center; height: 164px; padding: 12px; border: 1px solid #eceaf3; border-radius: 14px; background: radial-gradient(circle at 50% 42%, #ffffff 0%, #f3f7f6 100%); overflow: hidden; }
+.ph-med-photo-link { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.ph-med-photo img { display: block; width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; transition: transform .22s ease; }
+.ph-med-card:hover .ph-med-photo.has-photo img { transform: scale(1.04); }
+.ph-med-photo-badges { position: absolute; top: 9px; left: 9px; z-index: 2; display: flex; flex-wrap: wrap; gap: 4px; max-width: calc(100% - 64px); pointer-events: none; }
+.ph-med-photo-badges .ph-med-badge { box-shadow: 0 2px 6px rgba(0, 0, 0, .06); }
+.ph-med-photo-tags { position: absolute; top: 9px; right: 9px; z-index: 2; display: flex; gap: 4px; pointer-events: none; }
+.ph-med-tag { display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: .66rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.ph-med-tag.rx { background: #ede9fe; color: #5b21b6; }
+.ph-med-tag.controlled { background: #fee2e2; color: #991b1b; }
+.ph-med-photo-edit { position: absolute; right: 9px; bottom: 9px; z-index: 2; padding: 4px 9px; border-radius: 999px; background: rgba(255, 255, 255, .92); border: 1px solid var(--ph-line); color: var(--ph-ink); font-size: .68rem; font-weight: 700; text-decoration: none; opacity: 0; transition: opacity .15s ease, border-color .15s ease, color .15s ease; }
+.ph-med-photo:hover .ph-med-photo-edit, .ph-med-photo:focus-within .ph-med-photo-edit { opacity: 1; }
+.ph-med-photo-edit:hover { border-color: var(--ph-teal); color: var(--ph-teal); text-decoration: none; }
+.ph-med-monogram { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 100%; border-radius: 10px; background: linear-gradient(145deg, #f3faf8, #f7f5fc); text-decoration: none; transition: background .15s ease; }
+.ph-med-monogram:hover { background: linear-gradient(145deg, #e7f6f2, #f1edfb); text-decoration: none; }
+.ph-monogram-letter { font-size: 2.1rem; font-weight: 800; line-height: 1; color: #8cbdb3; letter-spacing: -.04em; }
+.ph-monogram-cta { padding: 3px 10px; border-radius: 999px; background: #fff; border: 1px solid #d9ebe6; color: var(--ph-teal); font-size: .68rem; font-weight: 700; }
 .ph-med-name { margin: 0; font-size: 1rem; line-height: 1.3; overflow-wrap: anywhere; }
 .ph-med-name a { color: inherit; text-decoration: none; }
 .ph-med-name a:hover { text-decoration: underline; }
@@ -140,7 +154,7 @@
   .ph-form-sections fieldset { grid-template-columns: 1fr; }
 }
 @media print {
-  .ph-catalogue-search, .ph-med-actions, .ph-result-count { display: none; }
+  .ph-catalogue-toolbar, .ph-catalogue-search, .ph-med-actions, .ph-result-count, .ph-view-toggle, .ph-add-btn { display: none; }
   .ph-med-photo img { max-height: 84px; }
   .ph-med-photo { height: auto; }
 }
@@ -191,4 +205,1206 @@
 }
 @media print {
   .ph-history-kpis, .ph-history-presets, .ph-history-search, .ph-col-action, .ops-page { display: none; }
+}
+
+/* Operational dashboard, POS, procurement and returns */
+.ph-dash { display: grid; gap: 18px; }
+.ph-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 12px; }
+.ph-kpi { display: grid; gap: 4px; padding: 16px 18px; border: 1px solid var(--ph-line); border-radius: 16px; background: #fff; box-shadow: 0 4px 18px #30204708; }
+.ph-kpi span { color: var(--ph-muted); font-size: .78rem; font-weight: 650; letter-spacing: .02em; text-transform: uppercase; }
+.ph-kpi strong { font-size: clamp(1.35rem, 2vw, 1.8rem); font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.ph-kpi small { color: var(--ph-muted); font-size: .75rem; }
+.ph-quick .ph-quick-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); gap: 10px; margin-top: 12px; }
+.ph-quick-grid a { display: grid; gap: 3px; padding: 14px 16px; border: 1px solid var(--ph-line); border-radius: 12px; background: #fff; text-decoration: none; color: inherit; transition: border-color .15s ease, background .15s ease; }
+.ph-quick-grid a:hover { border-color: var(--ph-teal); background: #f3fbf9; }
+.ph-quick-grid strong { font-size: .92rem; }
+.ph-quick-grid span { color: var(--ph-muted); font-size: .75rem; line-height: 1.35; }
+.ph-dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 18px; align-items: start; }
+.ph-alert { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-block: 12px; border-bottom: 1px solid var(--ph-line); }
+.ph-alert:last-child { border-bottom: 0; }
+.ph-alert b { min-width: 34px; text-align: center; padding: 3px 9px; border-radius: 7px; background: #fceef1; color: #8a3142; }
+.ph-alert.low b, .ph-alert.expiring b { background: #fff2d5; color: #79510f; }
+
+.ph-pos { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1fr); gap: 18px; align-items: start; }
+.ph-pos-main { min-height: 480px; }
+.ph-pos-search { margin-block: 12px; }
+.ph-pos-results th { position: sticky; top: 0; background: #fff; }
+.ph-inline-form, .ph-cart-update { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ph-inline-qty { display: flex; align-items: center; gap: 4px; font-size: .75rem; color: var(--ph-muted); }
+.ph-inline-qty input, .ph-cart-update input { width: 64px; border: 1px solid #d7d2df; border-radius: 8px; padding: 6px 8px; }
+
+.ph-pos-cart { position: sticky; top: 16px; }
+.ph-cart-list { display: grid; gap: 10px; margin-bottom: 4px; }
+.ph-cart-line { padding: 12px 13px; border: 1px solid var(--ph-line); border-radius: 12px; background: #fcfbfe; }
+.ph-cart-line-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.ph-cart-line-total { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ph-cart-line-controls { display: flex; justify-content: space-between; gap: 10px; align-items: end; margin-top: 10px; flex-wrap: wrap; }
+.ph-cart-update label { display: grid; gap: 3px; font-size: .7rem; font-weight: 650; color: var(--ph-muted); text-transform: uppercase; letter-spacing: .03em; }
+.ph-cart-update input { width: 78px; }
+.ph-totals { margin: 16px 0; padding: 14px 16px; border: 1px solid var(--ph-line); border-radius: 12px; background: #faf9fd; }
+.ph-totals > div { display: flex; justify-content: space-between; gap: 12px; padding-block: 4px; font-size: .82rem; font-variant-numeric: tabular-nums; }
+.ph-totals dt { color: var(--ph-muted); }
+.ph-totals dd { margin: 0; font-weight: 650; }
+.ph-totals input { width: 92px; border: 1px solid #d7d2df; border-radius: 8px; padding: 4px 8px; text-align: right; }
+.ph-totals .ph-total-row { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--ph-line); font-size: .95rem; }
+.ph-patient-strip { margin: 10px 0 0; padding: 9px 12px; border-radius: 9px; background: #edf7f4; color: var(--ph-teal); font-size: .82rem; }
+.ph-pos-side { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.ph-pos-customer .ph-patient-search { margin-top: 0; }
+.ph-patient-results { display: grid; gap: 6px; margin-top: 10px; }
+.ph-patient-results a { display: flex; justify-content: space-between; padding: 9px 12px; border: 1px solid var(--ph-line); border-radius: 9px; background: #fff; text-decoration: none; color: inherit; }
+.ph-patient-results a:hover { border-color: var(--ph-teal); }
+.ph-checkout fieldset { margin: 0 0 14px; padding: 14px 16px 4px; border: 1px solid var(--ph-line); border-radius: 12px; background: #fff; position: relative; }
+.ph-checkout legend { padding: 0 6px; margin-left: -2px; font-size: .78rem; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; color: var(--ph-muted); }
+.ph-checkout .ops-field { margin-bottom: 10px; }
+.ph-checkout-btn { width: 100%; margin-top: 4px; }
+.ph-link-btn { border: 0; background: transparent; color: var(--ph-teal); font: inherit; font-weight: 650; cursor: pointer; text-decoration: underline; }
+.ph-batch-layout { display: grid; gap: 18px; }
+
+.ph-stock-table th { white-space: nowrap; }
+.ph-invoice { max-width: 980px; margin-inline: auto; }
+.ph-cancel-sale { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--ph-line); display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+.ph-cancel-sale .ops-field { flex: 1 1 320px; margin: 0; }
+
+@media (max-width: 1050px) { .ph-pos { grid-template-columns: 1fr; } .ph-pos-cart { position: static; } }
+@media (max-width: 640px) {
+  .ph-kpi-grid { grid-template-columns: 1fr 1fr; }
+  .ph-totals > div { font-size: .78rem; }
+  .ph-inline-form { flex-direction: column; align-items: stretch; }
+}
+@media print {
+  .ph-quick, .ph-kpi-grid, .ph-dash-grid, .ops-no-print, .ph-checkout, .ph-cancel-sale { display: none !important; }
+}
+.ph-kpi.ph-kpi-current { border-color: var(--ph-teal); box-shadow: 0 0 0 2px rgba(16,107,100,.12); }
+.ph-kpi.ph-kpi-current span { color: var(--ph-teal); }
+
+/* Multi-line goods receipt */
+.ph-receipt-form { max-width: 1180px; }
+.ph-receipt-lines { display: block !important; }
+.ph-line-table { min-width: 900px; }
+.ph-line-table th { white-space: nowrap; }
+.ph-line-table td { vertical-align: top; padding: 6px; }
+.ph-line-table input, .ph-line-table select { width: 100%; min-width: 0; }
+.ph-line-table input[type="number"] { width: 92px; }
+.ph-line-remove { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--ph-muted); }
+.ph-add-line { margin-top: 10px; }
+.ph-patient-search { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.ph-patient-search input { flex: 1 1 auto; margin-top: 0; }
+.ph-patient-search .np-btn { flex: 0 0 auto; }
+.ph-patient-strip a { margin-left: 8px; color: var(--ph-teal); font-weight: 600; }
+
+/* ==========================================================================
+   Pharmacy workspace revamp — teal hero, live capsules, bento desk.
+   Scoped to .pharmacy-page so no other designation inherits these rules.
+   ========================================================================== */
+
+.pharmacy-page {
+  --ph-ink: #17211f;
+  --ph-teal: #0d6b62;
+  --ph-teal-deep: #074a44;
+  --ph-mint: #e4f4f0;
+  --ph-mint-line: #bfe4dc;
+  --ph-lime: #d9f26a;
+  --ph-lime-ink: #33420a;
+  --ph-lav: #7b6cf6;
+  --ph-violet: #6d5bd0;
+  --ph-amber: #b45309;
+  --ph-rose: #b91c4b;
+  --ph-slate: #4b5563;
+  --ph-line: #e6e4ef;
+  --ph-muted: #6c6979;
+  --ph-canvas: #f4f5f9;
+  --ph-radius: 22px;
+  --ph-shadow: 0 18px 38px -30px rgba(23, 33, 31, .55);
+  background:
+    radial-gradient(1100px 420px at 12% -8%, #e9f5f1 0%, rgba(233, 245, 241, 0) 62%),
+    radial-gradient(900px 380px at 92% 0%, #efeafd 0%, rgba(239, 234, 253, 0) 58%),
+    var(--ph-canvas);
+}
+
+/* ── Workspace hero ─────────────────────────────────────────────────────── */
+.ph-hero {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px 26px;
+  margin: 4px 0 18px;
+  padding: clamp(20px, 2.6vw, 30px) clamp(20px, 2.8vw, 34px);
+  border-radius: 28px;
+  color: #f2fbf9;
+  background:
+    radial-gradient(620px 220px at 88% -30%, rgba(217, 242, 106, .28), rgba(217, 242, 106, 0) 70%),
+    radial-gradient(520px 260px at 8% 120%, rgba(123, 108, 246, .34), rgba(123, 108, 246, 0) 70%),
+    linear-gradient(135deg, #0b5c55 0%, #0d6b62 52%, #0a7368 100%);
+  box-shadow: 0 26px 60px -38px rgba(7, 74, 68, .9);
+  overflow: hidden;
+}
+.ph-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto -60px -120px auto;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .14);
+  pointer-events: none;
+}
+.ph-hero-main { min-width: 0; flex: 1 1 420px; }
+.ph-hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 5px 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .16);
+  color: #f4fffb;
+  font-size: .68rem;
+  font-weight: 750;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.ph-hero-kicker::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ph-lime);
+  box-shadow: 0 0 0 4px rgba(217, 242, 106, .22);
+}
+.ph-hero-title {
+  margin: 0 0 6px;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: 800;
+  letter-spacing: -.04em;
+  line-height: 1.08;
+  color: #fff;
+}
+.ph-hero-sub {
+  margin: 0;
+  max-width: 62ch;
+  color: rgba(236, 252, 248, .82);
+  font-size: .86rem;
+  line-height: 1.5;
+}
+.ph-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+.ph-hero-date {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .26);
+  background: rgba(255, 255, 255, .1);
+  color: #eafff9;
+  font-size: .74rem;
+  font-weight: 650;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.ph-hero-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 17px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: .78rem;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.ph-hero-btn:hover { transform: translateY(-1px); text-decoration: none; }
+.ph-hero-btn.lime {
+  background: var(--ph-lime);
+  color: var(--ph-lime-ink);
+  box-shadow: 0 12px 24px -14px rgba(217, 242, 106, .9);
+}
+.ph-hero-btn.lime:hover { background: #e4fa85; }
+.ph-hero-btn.ghost {
+  background: rgba(255, 255, 255, .12);
+  border-color: rgba(255, 255, 255, .3);
+  color: #f4fffb;
+}
+.ph-hero-btn.ghost:hover { background: rgba(255, 255, 255, .22); }
+
+/* ── Live capsules ──────────────────────────────────────────────────────── */
+.ph-caps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(168px, 100%), 1fr));
+  gap: 12px;
+  margin: 0 0 18px;
+}
+.ph-cap {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding: 15px 16px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--ph-line);
+  background: #fff;
+  color: var(--ph-ink);
+  text-decoration: none;
+  box-shadow: var(--ph-shadow);
+  overflow: hidden;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.ph-cap::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--cap-tone, var(--ph-teal));
+}
+.ph-cap:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--cap-tone, var(--ph-teal)) 55%, #fff);
+  box-shadow: 0 20px 36px -26px rgba(23, 33, 31, .45);
+  text-decoration: none;
+}
+.ph-cap-label {
+  color: var(--ph-muted);
+  font-size: .68rem;
+  font-weight: 750;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.ph-cap-value {
+  font-size: clamp(1.5rem, 2.2vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: -.04em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--cap-tone, var(--ph-teal));
+}
+.ph-cap-meta { color: var(--ph-muted); font-size: .73rem; line-height: 1.35; }
+.ph-cap-arrow {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  color: var(--cap-tone, var(--ph-teal));
+  font-weight: 800;
+  opacity: .55;
+  transition: transform .15s ease, opacity .15s ease;
+}
+.ph-cap:hover .ph-cap-arrow { transform: translateX(2px); opacity: 1; }
+.ph-cap-teal { --cap-tone: #0d6b62; }
+.ph-cap-lime { --cap-tone: #7c9408; }
+.ph-cap-amber { --cap-tone: #b45309; }
+.ph-cap-rose { --cap-tone: #b91c4b; }
+.ph-cap-slate { --cap-tone: #475569; }
+.ph-cap-violet { --cap-tone: #6d5bd0; }
+
+/* ── Bento body ─────────────────────────────────────────────────────────── */
+.ph-bento {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+.ph-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+@media (max-width: 980px) {
+  .ph-bento { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── Cards & panels ─────────────────────────────────────────────────────── */
+.pharmacy-page .ph-panel {
+  border: 1px solid var(--ph-line);
+  border-radius: var(--ph-radius);
+  background: #fff;
+  box-shadow: var(--ph-shadow);
+  padding: clamp(16px, 2vw, 24px);
+}
+.pharmacy-page .ph-panel-head {
+  align-items: flex-end;
+  padding-bottom: 12px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #f1eff7;
+}
+.ph-panel-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+.ph-panel-head h2::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ph-teal);
+  box-shadow: 0 0 0 4px rgba(13, 107, 98, .12);
+  flex: 0 0 auto;
+}
+.ph-panel-head > a {
+  color: var(--ph-teal);
+  font-size: .76rem;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ph-panel-head > a:hover { text-decoration: underline; }
+.ph-panel > h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.ph-panel > h2::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ph-teal);
+  box-shadow: 0 0 0 4px rgba(13, 107, 98, .12);
+}
+.ph-summary {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 13px 16px;
+  border-radius: 16px;
+  background: linear-gradient(120deg, #f1faf7, #f7f5ff);
+  border: 1px solid #e3efe9;
+}
+.ph-summary small {
+  color: var(--ph-muted);
+  font-size: .72rem;
+  font-weight: 650;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.ph-summary strong {
+  font-size: clamp(1.4rem, 2vw, 1.75rem);
+  letter-spacing: -.035em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ph-ink);
+}
+.ph-summary-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ph-summary-row span { color: var(--ph-muted); font-size: .76rem; }
+
+/* ── KPI tiles ──────────────────────────────────────────────────────────── */
+.ph-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(178px, 100%), 1fr));
+  gap: 12px;
+}
+.ph-kpi {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  padding: 15px 16px 14px;
+  border: 1px solid var(--ph-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: var(--ph-shadow);
+  color: inherit;
+  text-decoration: none;
+  overflow: hidden;
+  transition: transform .15s ease, border-color .15s ease;
+}
+.ph-kpi::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: var(--kpi-tone, var(--ph-teal));
+  opacity: .7;
+}
+a.ph-kpi:hover { transform: translateY(-2px); border-color: var(--kpi-tone, var(--ph-teal)); text-decoration: none; }
+.ph-kpi > span,
+.ph-kpi .ph-kpi-label {
+  color: var(--ph-muted);
+  font-size: .68rem;
+  font-weight: 750;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.ph-kpi strong {
+  font-size: clamp(1.45rem, 2.2vw, 1.85rem);
+  font-weight: 800;
+  letter-spacing: -.045em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.12;
+  color: var(--ph-ink);
+}
+.ph-kpi small { color: var(--ph-muted); font-size: .73rem; line-height: 1.35; }
+.ph-kpi.is-teal { --kpi-tone: #0d6b62; }
+.ph-kpi.is-lime { --kpi-tone: #8aa010; }
+.ph-kpi.is-amber { --kpi-tone: #b45309; }
+.ph-kpi.is-rose { --kpi-tone: #b91c4b; }
+.ph-kpi.is-violet { --kpi-tone: #6d5bd0; }
+.ph-kpi.is-slate { --kpi-tone: #475569; }
+.ph-kpi.ph-kpi-current { border-color: var(--kpi-tone, var(--ph-teal)); box-shadow: 0 0 0 2px rgba(13, 107, 98, .14); }
+.ph-kpi.ph-kpi-current span,
+.ph-kpi.ph-kpi-current > span { color: var(--kpi-tone, var(--ph-teal)); }
+
+/* Legacy ops KPI strips reused by pharmacy registers */
+.pharmacy-page .ops-kpis { gap: 12px; margin-bottom: 18px; }
+.pharmacy-page .ops-kpi {
+  position: relative;
+  padding: 15px 16px 16px;
+  border: 1px solid var(--ph-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: var(--ph-shadow);
+  color: var(--ph-muted);
+  font-size: .72rem;
+  font-weight: 650;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  overflow: hidden;
+  transition: transform .15s ease, border-color .15s ease;
+}
+.pharmacy-page .ops-kpi::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: var(--ph-teal);
+  opacity: .55;
+}
+.pharmacy-page .ops-kpi strong {
+  display: block;
+  margin: 5px 0 4px;
+  font-size: clamp(1.35rem, 2vw, 1.7rem);
+  font-weight: 800;
+  letter-spacing: -.04em;
+  text-transform: none;
+  color: var(--ph-ink);
+  font-variant-numeric: tabular-nums;
+}
+.pharmacy-page .ops-kpi:hover { transform: translateY(-2px); border-color: var(--ph-teal); text-decoration: none; }
+.pharmacy-page .ops-kpi.is-current { border-color: var(--ph-teal); box-shadow: 0 0 0 2px rgba(13, 107, 98, .14); }
+.pharmacy-page .ops-kpi.is-current strong { color: var(--ph-teal); }
+
+/* ── Queue rows & activity ──────────────────────────────────────────────── */
+.ph-queue { display: grid; gap: 8px; }
+.ph-qcard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 14px;
+  border: 1px solid var(--ph-line);
+  border-radius: 16px;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+.ph-qcard:hover {
+  border-color: var(--ph-mint-line);
+  background: #f8fdfb;
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+.ph-token {
+  display: grid;
+  place-items: center;
+  min-width: 46px;
+  height: 46px;
+  padding: 0 8px;
+  border-radius: 13px;
+  background: var(--ph-mint);
+  color: var(--ph-teal-deep);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  line-height: 1.15;
+}
+.ph-qmain { min-width: 0; }
+.ph-qname { font-size: .89rem; font-weight: 750; color: var(--ph-ink); line-height: 1.3; }
+.ph-qmeta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 3px; color: var(--ph-muted); font-size: .74rem; }
+.ph-qgo { color: var(--ph-teal); font-weight: 750; font-size: .76rem; white-space: nowrap; }
+
+.ph-activity { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.ph-activity li {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 9px 0;
+  border-bottom: 1px solid #f3f1f8;
+  font-size: .78rem;
+  line-height: 1.4;
+}
+.ph-activity li:last-child { border-bottom: 0; }
+.ph-activity time {
+  color: var(--ph-muted);
+  font-size: .7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding-top: 1px;
+}
+.ph-activity .ph-activity-who { color: var(--ph-muted); }
+
+.ph-alert {
+  border: 0;
+  border-radius: 13px;
+  padding: 11px 12px;
+  background: #fbf7ff;
+  margin-bottom: 6px;
+}
+.ph-alert:last-child { margin-bottom: 0; }
+.ph-alert span { font-size: .8rem; font-weight: 650; }
+.ph-alert b {
+  min-width: 34px;
+  text-align: center;
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: #f1ecfa;
+  color: #5b3fa8;
+  font-variant-numeric: tabular-nums;
+}
+.ph-alert.expired b { background: #fde8ee; color: #a01b44; }
+.ph-alert.expiring b { background: #fff3dd; color: #8a5207; }
+.ph-alert.low b { background: #fff7e2; color: #7a5a06; }
+.ph-alert.out b { background: #fde8ee; color: #a01b44; }
+
+.ph-quick .ph-quick-grid { gap: 8px; margin-top: 10px; }
+.ph-quick-grid a {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--ph-line);
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+.ph-quick-grid a:hover {
+  border-color: var(--ph-mint-line);
+  background: #f6fdfa;
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+.ph-quick-grid strong { font-size: .83rem; font-weight: 750; }
+.ph-quick-grid span { font-size: .72rem; line-height: 1.35; color: var(--ph-muted); }
+
+/* ── Status pills, chips, empty states ─────────────────────────────────── */
+.ph-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f1eff8;
+  color: #4b4660;
+  font-size: .69rem;
+  font-weight: 750;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.ph-status::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: .75;
+}
+.ph-status.ready { background: #e3f6ee; color: #106b4f; }
+.ph-status.pending { background: #fff2d6; color: #7a5008; }
+.ph-status.blocked { background: #fde8ee; color: #a01b44; }
+.ph-status.muted { background: #f1eff8; color: #635e73; }
+
+.ph-chip-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ph-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ph-line);
+  background: #fff;
+  color: #555163;
+  font-size: .73rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.ph-chip:hover { background: #f3f1fa; border-color: #d8d3e6; text-decoration: none; }
+.ph-chip.is-active { background: var(--ph-teal); border-color: var(--ph-teal); color: #fff; }
+.ph-chip.ph-chip-reset { background: #fff5f6; border-color: #f4d4dc; color: #a01b44; }
+
+.ph-empty {
+  padding: 30px 16px;
+  border: 1px dashed #ddd9e9;
+  border-radius: 16px;
+  background: #fbfafd;
+  text-align: center;
+}
+.ph-empty h3 { margin: 0 0 4px; font-size: .95rem; }
+.ph-empty p { margin: 0; color: var(--ph-muted); font-size: .8rem; }
+.ph-empty .np-btn { margin-top: 12px; }
+
+/* ── Tables ─────────────────────────────────────────────────────────────── */
+.pharmacy-page .ops-table { font-size: .82rem; }
+.pharmacy-page .ops-table th {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--ph-line);
+  color: var(--ph-muted);
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.pharmacy-page .ops-table td { padding: 12px 10px; border-bottom: 1px solid #f4f2f9; }
+.pharmacy-page .ops-table tbody tr:hover { background: #fbfafd; }
+.pharmacy-page .ops-table a { color: var(--ph-teal); text-decoration: none; font-weight: 650; }
+.pharmacy-page .ops-table a:hover { text-decoration: underline; }
+.pharmacy-page .ops-muted { color: var(--ph-muted); font-size: .73rem; }
+.pharmacy-page .ops-badge {
+  background: #f1ecfa;
+  color: #5b3fa8;
+  border-radius: 999px;
+  font-size: .68rem;
+  font-weight: 750;
+}
+.pharmacy-page .ops-warning {
+  border-radius: 14px;
+  border: 1px solid #f3dfb4;
+  background: #fffaee;
+  color: #7a5108;
+  font-size: .8rem;
+}
+.pharmacy-page .ops-search input,
+.pharmacy-page .ops-search select {
+  border-radius: 11px;
+  border-color: var(--ph-line);
+  background: #fff;
+}
+.pharmacy-page .ops-search input:focus,
+.pharmacy-page .ops-search select:focus { outline: 2px solid rgba(13, 107, 98, .35); outline-offset: 1px; }
+
+/* ── POS workstation ───────────────────────────────────────────────────── */
+.ph-pos { gap: 18px; }
+.ph-pos-main { min-height: 0; }
+.ph-pos-search { position: sticky; top: 8px; z-index: 3; background: #fff; padding-bottom: 10px; }
+.ph-pos-search input { border-radius: 12px; }
+.ph-pos-results tbody tr { cursor: default; }
+.ph-pos-results .ph-med-thumb { width: 38px; height: 38px; border-radius: 9px; }
+.ph-pos-side { gap: 14px; }
+.ph-pos-customer .ph-patient-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  border-radius: 12px;
+  background: var(--ph-mint);
+  color: var(--ph-teal-deep);
+}
+.ph-cart-line { border-radius: 14px; background: #fbfbfe; }
+.ph-cart-line-total { font-size: 1rem; letter-spacing: -.02em; }
+.ph-checkout {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--ph-line);
+  background: linear-gradient(160deg, #f7fcfa, #f7f5ff);
+}
+.ph-checkout legend {
+  background: #fff;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--ph-line);
+}
+.ph-totals { background: #fff; border-radius: 14px; }
+.ph-total-row dd { color: var(--ph-teal-deep); font-size: 1.18rem; font-weight: 800; letter-spacing: -.02em; }
+.ph-checkout-btn { padding-block: 13px; font-size: .9rem; letter-spacing: .01em; }
+
+/* ── Forms ──────────────────────────────────────────────────────────────── */
+.pharmacy-page .ph-stock-form { max-width: 880px; }
+.ph-stock-form fieldset {
+  border: 1px solid var(--ph-line);
+  border-radius: 18px;
+  padding: 16px 18px 4px;
+  margin: 0 0 16px;
+  background: #fcfcfe;
+}
+.ph-stock-form legend { padding: 0 8px; font-size: .78rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--ph-teal); }
+.pharmacy-page .ops-field { font-size: .72rem; letter-spacing: .03em; color: #4d4a5a; }
+.pharmacy-page .ops-field input,
+.pharmacy-page .ops-field select,
+.pharmacy-page .ops-field textarea { border-radius: 11px; background: #fff; }
+
+/* ── Print ──────────────────────────────────────────────────────────────── */
+@media print {
+  .ph-hero, .ph-caps, .ph-hero-actions, .ph-quick, .ph-kpi-grid { display: none !important; }
+  .pharmacy-page { background: #fff; }
+  .ph-panel { border: 0; box-shadow: none; padding: 0; }
+}
+
+/* Audit payload disclosure */
+.ph-audit-detail { margin-top: 4px; }
+.ph-audit-detail summary {
+  padding: 2px 0;
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--ph-teal);
+  cursor: pointer;
+}
+.ph-audit-json {
+  margin: 4px 0 8px;
+  padding: 8px 10px;
+  max-width: 420px;
+  overflow-x: auto;
+  border-radius: 9px;
+  background: #f7f6fb;
+  border: 1px solid #eeebf6;
+  font-size: .7rem;
+  line-height: 1.4;
+  color: #45414f;
+}
+.ph-mode-choices ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ph-mode-choices label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 13px;
+  border: 1px solid var(--ph-line);
+  border-radius: 13px;
+  background: #fff;
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ph-mode-choices label:has(input:checked) {
+  border-color: var(--ph-teal);
+  background: #f1faf7;
+  box-shadow: 0 0 0 2px rgba(13, 107, 98, .12);
+}
+.ph-mode-choices input[type=radio] { accent-color: var(--ph-teal); }
+
+/* Pharmacy overrides the shared purple "teal" button later in nurse_portal.css */
+.pharmacy-page .np-btn.teal {
+  background: var(--ph-teal);
+  border-color: var(--ph-teal);
+  color: #fff;
+  box-shadow: 0 10px 22px -16px rgba(13, 107, 98, .85);
+}
+.pharmacy-page .np-btn.teal:hover {
+  background: #0b5f57;
+  border-color: #0b5f57;
+  color: #fff;
+}
+
+/* Keep the POS search on one line at desk widths */
+.ph-pos-search { align-items: center; }
+.ph-pos-search input[type="search"] { flex: 1 1 280px; width: auto; min-width: 0; }
+.ph-pos-search .np-btn { flex: 0 0 auto; }
+
+/* Balanced KPI rows on desk-width screens (7 tiles = 4 + 3) */
+.ph-kpi-grid { grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
+
+/* The pharmacy sidebar carries 18 items; compact its rhythm so more stay visible */
+.pharmacy-page .sidebar .nav-item { padding-block: 8px; font-size: 13.5px; }
+.pharmacy-page .sidebar .side-nav { gap: 4px; }
+.pharmacy-page .sidebar .nav-section-label { padding-top: 9px; padding-bottom: 3px; }
+
+/* Toolbar forms inside card heads stay on one line at desk widths */
+.ph-panel-head .ph-search { flex: 0 1 720px; max-width: 100%; }
+.ph-panel-head .ph-search input { flex: 1 1 180px; min-width: 0; }
+.ph-panel-head .ph-search select { flex: 0 1 190px; min-width: 0; width: auto; }
+.ph-panel-head .ph-search .np-btn { flex: 0 0 auto; }
+.pharmacy-page .ops-search { flex-wrap: nowrap; }
+.pharmacy-page .ops-search input { flex: 1 1 220px; width: auto; max-width: 340px; }
+.pharmacy-page .ops-search select { flex: 0 1 230px; width: auto; max-width: 230px; }
+@media (max-width: 720px) {
+  .ph-panel-head .ph-search,
+  .pharmacy-page .ops-search { flex-wrap: wrap; }
+  .ph-panel-head .ph-search input,
+  .ph-panel-head .ph-search select { flex: 1 1 100%; }
+}
+@media (max-width: 640px) {
+  .ph-panel-head > div[style] { width: 100%; }
+}
+
+/* One balanced row of KPI tiles where the count allows it */
+.ph-kpi-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+.ph-kpi { flex: 1 1 140px; }
+
+/* POS result rows: keep the add control on one line */
+.ph-pos-results td:last-child { min-width: 200px; }
+.ph-pos-results td:first-child { min-width: 170px; }
+.ph-pos-results .ph-inline-form { flex-wrap: nowrap; }
+
+/* Expiry day count stays on one line */
+.pharmacy-page .ph-expiry-days { white-space: nowrap; }
+
+/* Four-column POS result table fits the left workstation without horizontal scroll */
+.ph-pos-results { table-layout: fixed; }
+.ph-pos-results th:nth-child(1) { width: 30%; }
+.ph-pos-results th:nth-child(2) { width: 26%; }
+.ph-pos-results th:nth-child(3) { width: 20%; }
+.ph-pos-results th:nth-child(4) { width: 24%; }
+.ph-pos-results td:last-child,
+.ph-pos-results td:first-child { min-width: 0; }
+.ph-pos-results .ph-inline-form { flex-wrap: wrap; }
+
+/* Ledger badges and expiry dates should not break across three lines */
+.pharmacy-page .ops-badge { white-space: nowrap; }
+.pharmacy-page .ph-stock-table td:nth-child(3) { white-space: nowrap; }
+
+/* Capsules share the KPI row rhythm */
+.ph-caps { display: flex; flex-wrap: wrap; gap: 12px; }
+.ph-cap { flex: 1 1 140px; }
+
+/* POS add control on one line inside the four-column result table */
+.ph-pos-results .ph-inline-form { flex-wrap: nowrap; gap: 4px; }
+.ph-pos-results .ph-inline-qty input { width: 46px; padding: 6px; }
+.ph-pos-results .np-btn { padding: 8px 11px; font-size: 12px; }
+
+/* Procurement mode picker: full-width, left-aligned options in two columns */
+.pharmacy-page .ph-stock-form fieldset.ph-mode-fieldset { display: block; }
+.ph-mode-choices ul { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.ph-mode-choices li { text-align: left; }
+.ph-mode-choices label { justify-content: flex-start; width: 100%; }
+.ph-mode-choices input[type="radio"] { flex: 0 0 auto; margin: 0; }
+.pharmacy-page .ph-receipt-form { max-width: 1180px; }
+
+/* Radios must not stretch to the full label width */
+.ph-mode-choices input[type="radio"] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  margin: 0;
+  padding: 0;
+}
+.ph-line-table th:nth-child(1) { width: 24%; }
+.ph-line-table th:nth-child(2) { width: 13%; }
+.ph-line-table th:nth-child(3) { width: 13%; }
+.ph-line-table th:last-child { width: 58px; }
+
+/* Procurement line table: fixed columns so selects never clip their labels */
+.ph-line-table { table-layout: fixed; min-width: 1000px; }
+.ph-line-table th:nth-child(4) { width: 9%; }
+.ph-line-table th:nth-child(5) { width: 10%; }
+.ph-line-table th:nth-child(6) { width: 10%; }
+.ph-line-table th:nth-child(7) { width: 8%; }
+
+/* ── Catalogue toolbar panel, structured cards & table view ─────────────── */
+.ph-catalogue-toolbar { margin-bottom: 18px; }
+.ph-catalogue-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ph-search-input-wrap {
+  position: relative;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.ph-search-input-wrap input {
+  width: 100%;
+  border: 1px solid var(--ph-line);
+  border-radius: 11px;
+  padding: 10px 12px 10px 38px;
+  background: #faf9fc;
+  font: inherit;
+  color: inherit;
+}
+.ph-search-input-wrap input:focus {
+  outline: 2px solid rgba(13, 107, 98, .35);
+  outline-offset: 1px;
+  background: #fff;
+}
+.ph-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ph-muted);
+  pointer-events: none;
+}
+.ph-filter-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 0 1 auto;
+}
+.ph-filter-group select {
+  border: 1px solid var(--ph-line);
+  border-radius: 11px;
+  padding: 10px 12px;
+  background: #fff;
+  font: inherit;
+  color: inherit;
+  width: auto;
+  max-width: 200px;
+}
+.ph-filter-group select:focus {
+  outline: 2px solid rgba(13, 107, 98, .35);
+  outline-offset: 1px;
+}
+.ph-filter-apply { flex: 0 0 auto; }
+
+.ph-toolbar-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f1eff7;
+}
+.ph-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ph-toolbar-meta .ph-result-count { margin: 0; }
+.ph-toolbar-meta .ph-result-count strong { color: var(--ph-ink); font-variant-numeric: tabular-nums; }
+.ph-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.ph-view-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: #f4f2f8;
+  border-radius: 10px;
+}
+.ph-view-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ph-muted);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.ph-view-btn.is-active {
+  background: #fff;
+  color: var(--ph-teal);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .08);
+}
+.ph-view-btn:hover:not(.is-active) { background: #eae7f1; }
+.ph-add-btn { white-space: nowrap; }
+
+.ph-med-grid[hidden],
+.ph-med-table-wrap[hidden] { display: none; }
+
+.ph-med-body { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-width: 0; }
+.ph-med-title-wrap { display: grid; gap: 2px; min-width: 0; }
+.ph-med-specs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 2px 0;
+  padding: 8px 10px;
+  background: #f8f7fc;
+  border: 1px solid #f0eef7;
+  border-radius: 11px;
+  font-size: .73rem;
+}
+.ph-med-specs div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.ph-med-specs dt {
+  color: var(--ph-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: .61rem;
+  letter-spacing: .05em;
+}
+.ph-med-specs dd {
+  margin: 0;
+  font-weight: 700;
+  color: var(--ph-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ph-med-stock-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+  margin-top: auto;
+  padding-top: 4px;
+  font-size: .82rem;
+}
+.ph-med-stock-qty { color: var(--ph-muted); }
+.ph-med-stock-qty strong { color: var(--ph-ink); font-size: .95rem; font-variant-numeric: tabular-nums; }
+.ph-med-reorder { font-size: .72rem; color: var(--ph-muted); }
+
+.ph-med-card .ph-med-actions { margin-top: 0; padding-top: 8px; border-top: 1px solid #f2f0f8; }
+.ph-med-action-primary {
+  flex: 1 1 auto;
+  text-align: center;
+  padding: 7px 12px;
+  border-radius: 9px;
+  background: var(--ph-teal);
+  color: #fff;
+  font-size: .76rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background .15s ease;
+}
+.ph-med-action-primary:hover { background: #0b5f57; color: #fff; text-decoration: none; }
+.ph-med-action {
+  padding: 7px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--ph-line);
+  background: #fff;
+  color: var(--ph-muted);
+  font-size: .76rem;
+  font-weight: 650;
+  text-decoration: none;
+  transition: border-color .15s ease, color .15s ease, background .15s ease;
+}
+.ph-med-action:hover { border-color: var(--ph-teal); color: var(--ph-teal); background: #f3fbf9; text-decoration: none; }
+
+.ph-med-table-wrap { margin-block: 14px 0; }
+.ph-med-table th { font-size: .68rem; }
+.ph-med-table .ph-thumb { width: 44px; height: 44px; border-radius: 9px; margin: 0; padding: 3px; font-size: .95rem; }
+.ph-med-table .ph-thumb img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.ph-med-table tr.is-inactive { opacity: .62; }
+.ph-med-table tr.is-saved { background: #f1faf7; }
+.ph-table-actions { display: inline-flex; gap: 6px; align-items: center; }
+.ph-table-actions .ph-med-action-primary { flex: 0 0 auto; }
+
+/* ── Compact header, KPIs & toolbar on Medicine Catalogue ──────────────── */
+.ph-catalogue-page .ph-hero {
+  align-items: center;
+  margin: 0 0 12px;
+  padding: 14px 22px;
+  border-radius: 20px;
+  gap: 12px 20px;
+}
+.ph-catalogue-page .ph-hero-kicker {
+  margin: 0 0 4px;
+  padding: 3px 10px;
+  font-size: .62rem;
+}
+.ph-catalogue-page .ph-hero-title {
+  margin: 0 0 2px;
+  font-size: clamp(1.3rem, 2.2vw, 1.7rem);
+}
+.ph-catalogue-page .ph-hero-sub { font-size: .78rem; line-height: 1.35; }
+.ph-catalogue-page .ph-hero-date,
+.ph-catalogue-page .ph-hero-btn { padding: 7px 13px; font-size: .74rem; }
+
+.ph-catalogue-page .ops-kpis { gap: 10px; margin-bottom: 12px; }
+.ph-catalogue-page .ops-kpi {
+  padding: 9px 13px 10px;
+  border-radius: 14px;
+  font-size: .65rem;
+  line-height: 1.25;
+}
+.ph-catalogue-page .ops-kpi strong {
+  margin: 2px 0;
+  font-size: 1.28rem;
+  line-height: 1.1;
+}
+
+.ph-catalogue-page .ph-catalogue-toolbar {
+  padding: 12px 15px;
+  border-radius: 18px;
+  margin-bottom: 14px;
+}
+.ph-catalogue-page .ph-search-input-wrap input {
+  padding: 7px 11px 7px 34px;
+  font-size: .82rem;
+}
+.ph-catalogue-page .ph-search-icon { left: 10px; width: 15px; height: 15px; }
+.ph-catalogue-page .ph-filter-group select {
+  padding: 7px 10px;
+  font-size: .82rem;
+}
+.ph-catalogue-page .ph-filter-apply,
+.ph-catalogue-page .ph-toolbar-right .np-btn {
+  padding: 7px 13px;
+  font-size: .78rem;
+}
+.ph-catalogue-page .ph-toolbar-meta {
+  margin-top: 9px;
+  padding-top: 9px;
+}
+.ph-catalogue-page .ph-view-btn { width: 28px; height: 28px; }
+
+@media (max-width: 720px) {
+  .ph-catalogue-search-row { flex-direction: column; align-items: stretch; }
+  .ph-search-input-wrap { flex: 1 1 auto; }
+  .ph-filter-group { width: 100%; }
+  .ph-filter-group select { flex: 1 1 calc(50% - 4px); max-width: none; }
+}
+
+/* Unified Dispense & POS — compact prescription queue and inline payment */
+.ph-desk-queue-strip { margin-bottom: 18px; padding: 14px 16px; }
+.ph-desk-queue-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ph-desk-queue-head h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: .98rem; }
+.ph-desk-queue-head h2::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ph-teal); box-shadow: 0 0 0 4px rgba(13, 107, 98, .12); }
+.ph-desk-queue-head p { margin: 3px 0 0; font-size: .74rem; }
+.ph-desk-queue-head > a { color: var(--ph-teal); font-size: .75rem; font-weight: 750; text-decoration: none; white-space: nowrap; }
+.ph-desk-queue-head > a:hover { text-decoration: underline; }
+.ph-desk-queue-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.ph-desk-queue-tabs a { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border: 1px solid var(--ph-line); border-radius: 999px; background: #faf9fd; color: var(--ph-muted); font-size: .74rem; font-weight: 700; text-decoration: none; }
+.ph-desk-queue-tabs a:hover { border-color: var(--ph-mint-line); background: #f3fbf9; text-decoration: none; }
+.ph-desk-queue-tabs a.is-active { border-color: var(--ph-teal); background: var(--ph-teal); color: #fff; }
+.ph-desk-queue-tabs strong { font-variant-numeric: tabular-nums; }
+.ph-desk-queue-cards { display: flex; gap: 8px; margin-top: 10px; padding-bottom: 3px; overflow-x: auto; scrollbar-width: thin; }
+.ph-desk-queue-card { display: grid; flex: 0 0 254px; gap: 5px; min-width: 0; padding: 10px 12px; border: 1px solid var(--ph-line); border-radius: 13px; background: #fff; color: inherit; text-decoration: none; transition: border-color .15s ease, background .15s ease; }
+.ph-desk-queue-card:hover { border-color: var(--ph-mint-line); background: #f8fdfb; text-decoration: none; }
+.ph-desk-queue-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.ph-desk-queue-card-top > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .81rem; }
+.ph-desk-queue-card .ph-status { padding: 3px 7px; font-size: .61rem; }
+.ph-desk-queue-meta { color: var(--ph-muted); font-size: .69rem; line-height: 1.35; }
+.ph-desk-queue-go { color: var(--ph-teal); font-size: .71rem; font-weight: 750; }
+.ph-desk-queue-empty { margin: 4px 0; padding: 10px; color: var(--ph-muted); font-size: .78rem; }
+.ph-desk-queue-pages { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--ph-muted); font-size: .7rem; }
+.ph-desk-queue-pages a { color: var(--ph-teal); font-weight: 700; text-decoration: none; }
+.ph-desk-queue-pages a:hover { text-decoration: underline; }
+
+.ph-inline-prepare, .ph-inline-pay { margin-bottom: 18px; }
+.ph-inline-prepare .ph-rx:first-of-type { margin-top: 14px; }
+.ph-inline-issue-links { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ph-line); font-size: .76rem; }
+.ph-inline-issue-links a { padding: 5px 9px; border-radius: 8px; background: var(--ph-mint); color: var(--ph-teal-deep); font-weight: 700; text-decoration: none; }
+.ph-inline-pay .ops-total { margin-top: 14px; font-size: 1.08rem; font-weight: 800; color: var(--ph-teal-deep); }
+.ph-inline-payment { display: flex; align-items: end; flex-wrap: wrap; gap: 9px; padding: 12px; border: 1px solid var(--ph-mint-line); border-radius: 14px; background: linear-gradient(120deg, #f1faf7, #f7f5ff); }
+.ph-inline-payment .ops-field { flex: 1 1 150px; min-width: 0; margin: 0; }
+.ph-inline-payment .ops-field input, .ph-inline-payment .ops-field select { max-width: none; }
+.ph-inline-payment .np-btn { flex: 0 0 auto; }
+.ph-inline-pay .ops-actions { align-items: center; }
+
+@media (max-width: 640px) {
+  .ph-desk-queue-strip { padding: 12px; }
+  .ph-desk-queue-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ph-desk-queue-tabs a { justify-content: center; padding: 6px 7px; font-size: .67rem; }
+  .ph-desk-queue-card { flex-basis: 232px; }
+  .ph-inline-payment { align-items: stretch; }
+  .ph-inline-payment .ops-field, .ph-inline-payment .np-btn { flex: 1 1 100%; }
+}
+@media print {
+  .ph-desk-queue-strip, .ph-inline-prepare, .ph-inline-pay .ops-actions { display: none !important; }
 }

@@ -1,0 +1,44 @@
+{% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · audit trail{% endblock %}
+{% block operations_intro %}Append-only record of every sale, receipt, return, hold and policy change.{% endblock %}
+{% block operations_content %}
+<section class="ph-panel">
+  <div class="ph-panel-head">
+    <h2>All audit entries</h2>
+    <form method="get" class="ph-search">
+      <input type="search" name="q" value="{{ query }}" placeholder="Action, entity or summary" aria-label="Search audit">
+      <select name="action">
+        <option value="">All actions</option>
+        {% for value in actions %}<option value="{{ value }}" {% if value == action %}selected{% endif %}>{{ value }}</option>{% endfor %}
+      </select>
+      <button class="np-btn">Filter</button>
+    </form>
+  </div>
+  <div class="ops-scroll"><table class="ops-table">
+    <thead><tr><th>When</th><th>Action</th><th>Summary</th><th>Entity</th><th>Staff</th><th>Reason</th></tr></thead>
+    <tbody>{% for audit in audits %}<tr>
+      <td>{{ audit.created_at|date:"d M Y H:i" }}</td>
+      <td><span class="ops-badge">{{ audit.action }}</span></td>
+      <td>{{ audit.summary }}{% if audit.before or audit.after %}
+        <details class="ph-audit-detail"><summary>Before / after</summary>
+          {% if audit.before %}<div class="ops-muted">Before</div><pre class="ph-audit-json">{{ audit.before }}</pre>{% endif %}
+          {% if audit.after %}<div class="ops-muted">After</div><pre class="ph-audit-json">{{ audit.after }}</pre>{% endif %}
+        </details>
+      {% endif %}</td>
+      <td>
+        {% if audit.entity == 'PharmacySale' and audit.entity_id %}<a href="{% url 'pharmacy_sale_invoice' audit.entity_id %}">Sale #{{ audit.entity_id }}</a>
+        {% elif audit.entity == 'PharmacyPurchase' and audit.entity_id %}<a href="{% url 'pharmacy_purchase_detail' audit.entity_id %}">Purchase #{{ audit.entity_id }}</a>
+        {% elif audit.entity == 'MedicineBatch' and audit.entity_id %}<a href="{% url 'pharmacy_batch_detail' audit.entity_id %}">Batch #{{ audit.entity_id }}</a>
+        {% elif audit.entity == 'PharmacyReturn' and audit.entity_id %}<a href="{% url 'pharmacy_returns' %}?return={{ audit.entity_id }}">Return #{{ audit.entity_id }}</a>
+        {% elif audit.entity == 'PharmacySupplier' and audit.entity_id %}<a href="{% url 'pharmacy_supplier_edit' audit.entity_id %}">Supplier #{{ audit.entity_id }}</a>
+        {% elif audit.entity == 'PharmacySettings' %}<a href="{% url 'pharmacy_settings' %}">Pharmacy settings</a>
+        {% elif audit.entity %}{{ audit.entity }}{% if audit.entity_id %} #{{ audit.entity_id }}{% endif %}
+        {% else %}—{% endif %}
+      </td>
+      <td>{% firstof audit.actor.get_full_name audit.actor.username "—" %}</td>
+      <td>{{ audit.reason|default:"—" }}</td>
+    </tr>{% empty %}<tr><td colspan="6" class="ops-empty">No pharmacy audit records match this view.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% include "core/pharmacy_pagination.html" with page=audits %}
+</section>
+{% endblock %}

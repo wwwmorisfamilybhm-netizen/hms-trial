@@ -41,6 +41,8 @@ class ImportRowForm(forms.Form):
     pack_size = forms.IntegerField(min_value=1, max_value=1000000)
     manufacturer = forms.CharField(max_length=200, required=False)
     barcode = forms.CharField(max_length=100, required=False)
+    hsn_code = forms.CharField(max_length=20, required=False, label="HSN code")
+    gst_rate = forms.DecimalField(min_value=0, max_value=100, max_digits=5, decimal_places=2, required=False, label="GST %")
     reorder_level = forms.IntegerField(min_value=0, initial=10)
     batch_number = forms.CharField(max_length=100, required=False)
     expiry_date = forms.DateField(required=False, input_formats=["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"], widget=forms.DateInput(attrs={"type": "date"}))
@@ -50,6 +52,7 @@ class ImportRowForm(forms.Form):
     quantity_basis = forms.ChoiceField(required=False, choices=[("", "Choose quantity basis"), ("packs", "Packs"), ("units", "Dispensing units")])
     purchase_cost = forms.DecimalField(min_value=0, max_digits=10, decimal_places=2, required=False)
     selling_price = forms.DecimalField(min_value=0, max_digits=10, decimal_places=2, required=False)
+    mrp = forms.DecimalField(min_value=0, max_digits=10, decimal_places=2, required=False, label="MRP per dispensing unit (₹)")
     price_basis = forms.ChoiceField(required=False, choices=[("", "Choose price basis"), ("packs", "Per pack"), ("units", "Per dispensing unit")])
     duplicate_ok = forms.BooleanField(required=False, label="I reviewed the existing invoice / batch and this is an additional receipt")
 
@@ -192,6 +195,61 @@ def mapped_rows(draft, mapping, defaults):
     return result
 
 
+def prepare_invoice_rows(items):
+    """Disambiguate invoice brands and preselect only safe catalogue matches."""
+    rows = []
+    for item in items:
+        row = dict(item)
+        row["include"] = True
+        row["_base_name"] = row["name"]
+        rows.append(row)
+
+    groups = {}
+    for row in rows:
+        groups.setdefault(normalized(row["name"]), []).append(row)
+    for group in groups.values():
+        if len(group) < 2:
+            continue
+        for row in group:
+            suffix = row.get("strength") or row.get("form") or ""
+            row["name"] = " ".join(part for part in (row["name"], suffix) if part).strip()
+
+    warnings = []
+    for number, row in enumerate(rows, 1):
+        aliases = []
+        for value in (row["name"], row.get("source_description"), row.get("_base_name")):
+            value = normalized(value)
+            if value and value not in aliases:
+                aliases.append(value)
+        candidates = {}
+        for alias in aliases:
+            for medicine in Medicine.objects.filter(name__iexact=alias):
+                candidates[medicine.pk] = medicine
+        if not candidates:
+            continue
+        compatible = []
+        for medicine in candidates.values():
+            matches = True
+            for field in ("strength", "form", "unit", "pack_size"):
+                incoming, existing = row.get(field), getattr(medicine, field)
+                if incoming not in (None, "") and existing not in (None, "") and normalized(incoming) != normalized(existing):
+                    matches = False
+                    break
+            if matches:
+                compatible.append(medicine)
+        if len(compatible) == 1:
+            medicine = compatible[0]
+            row["medicine"] = medicine.pk
+            row["name"] = medicine.name
+            if not medicine.is_active:
+                warnings.append(f"Row {number}: matched catalogue medicine is inactive. Review it before importing.")
+        elif len(candidates) > 1:
+            warnings.append(f"Row {number}: multiple catalogue medicines match this product. Choose the correct existing medicine.")
+        else:
+            warnings.append(f"Row {number}: a similarly named catalogue medicine has different product details. Review the name, strength, form and pack size.")
+    return rows, warnings
+
+
 def resolve_medicine(data):
     medicine = data.get("medicine")
     candidates = list(Medicine.objects.filter(name__iexact=data["name"]))
@@ -199,21 +257,28 @@ def resolve_medicine(data):
         if len(candidates) != 1:
             raise ValidationError("Choose the existing catalogue entry explicitly.")
         medicine = candidates[0]
-    metadata = {name: data[name] for name in MedicineForm._meta.fields if name in data}
+    metadata = {name: data[name] for name in MedicineForm._meta.fields if name in data and data[name] not in (None, "")}
     metadata["is_active"] = True
     if medicine:
-        for field in ("name", "strength", "form", "unit", "pack_size", "manufacturer", "barcode"):
+        for field in ("name", "strength", "form", "unit", "pack_size", "manufacturer", "barcode", "hsn_code"):
             incoming, existing = data.get(field), getattr(medicine, field)
             if incoming not in (None, "") and normalized(incoming) != normalized(existing):
                 if existing or field not in ("manufacturer", "barcode", "strength") or (field == "strength" and medicine.batches.exists()):
                     raise ValidationError(f"{field.replace('_', ' ').title()} differs from the existing medicine. Correct this row or use a distinct product name.")
+        incoming_gst = data.get("gst_rate")
+        if incoming_gst not in (None, "") and incoming_gst != medicine.gst_rate:
+            if medicine.gst_rate not in (0, Decimal("0")):
+                raise ValidationError("GST % differs from the existing medicine. Correct this row or update the catalogue explicitly.")
         if not medicine.is_active:
             raise ValidationError("This catalogue medicine is inactive. Review it before receiving stock.")
         additions = []
-        for field in ("manufacturer", "barcode", "generic_name", "strength"):
+        for field in ("manufacturer", "barcode", "generic_name", "strength", "hsn_code"):
             if not getattr(medicine, field) and data.get(field):
                 setattr(medicine, field, data[field])
                 additions.append(field)
+        if incoming_gst not in (None, "") and medicine.gst_rate in (0, Decimal("0")):
+            medicine.gst_rate = incoming_gst
+            additions.append("gst_rate")
         if additions:
             medicine.full_clean()
             medicine.save(update_fields=additions)
@@ -266,7 +331,7 @@ def commit_import(draft_id, user):
                     receive_stock(user=user, medicine=medicine, batch_number=data["batch_number"],
                                   expiry_date=data["expiry_date"], supplier=data["supplier"],
                                   invoice_reference=data["invoice_reference"], quantity_units=quantity,
-                                  purchase_cost=unit_cost, selling_price=unit_price,
+                                  purchase_cost=unit_cost, selling_price=unit_price, mrp=data.get("mrp"),
                                   request_key=uuid5(NAMESPACE_URL, f"medicine-import/{draft.pk}/{index}"))
                     MedicineImportReceipt.objects.create(draft=draft, medicine=medicine, row_number=index, signature=signature)
                     result["received"] += 1

@@ -1,0 +1,108 @@
+{% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · returns and refunds{% endblock %}
+{% block operations_intro %}Patient returns enter quarantine first; supplier returns credit stock back. Refunds are settled as a separate, auditable step.{% endblock %}
+{% block operations_content %}
+<div class="ph-kpi-grid">
+  <a class="ph-kpi is-slate{% if not kind %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_returns' %}{% querystring kind=None page=None %}">
+    <span>All returns</span><strong>{{ counts.all }}</strong><small>Patient and supplier</small>
+  </a>
+  <a class="ph-kpi is-teal{% if kind == 'patient' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_returns' %}{% querystring kind='patient' page=None %}">
+    <span>Patient returns</span><strong>{{ counts.patient }}</strong><small>Quarantined for review</small>
+  </a>
+  <a class="ph-kpi is-amber{% if kind == 'supplier' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_returns' %}{% querystring kind='supplier' page=None %}">
+    <span>Supplier returns</span><strong>{{ counts.supplier }}</strong><small>Credited back to the supplier</small>
+  </a>
+  <a class="ph-kpi is-rose" href="{% url 'pharmacy_returns' %}{% querystring kind='patient' page=None %}">
+    <span>Refunds to settle</span><strong>{{ counts.refund_due }}</strong><small>Quarantined and awaiting cash</small>
+  </a>
+</div>
+
+{% if selected_sale %}
+<div class="ph-panel" style="margin-bottom:14px;">
+  <div class="ph-panel-head">
+    <h2>Returning against {{ selected_sale.reference }}</h2>
+    <a href="{% url 'pharmacy_returns' %}">Show all sales →</a>
+  </div>
+  <p class="ph-note" style="margin:0;">
+    {% if selected_sale.patient %}{{ selected_sale.patient.full_name }} · {{ selected_sale.patient.uhid }} · {% endif %}
+    {{ selected_sale.completed_at|date:"d M Y H:i" }} · ₹{{ selected_sale.total|floatformat:2 }} · {{ selected_sale.get_payment_method_display }}
+    <a class="ph-chip" href="{% url 'pharmacy_sale_invoice' selected_sale.pk %}">Open invoice</a>
+  </p>
+</div>
+{% endif %}
+{% if selected_batch %}
+<div class="ph-panel" style="margin-bottom:14px;">
+  <div class="ph-panel-head">
+    <h2>Returning batch {{ selected_batch.batch_number }}</h2>
+    <a href="{% url 'pharmacy_returns' %}">Show all batches →</a>
+  </div>
+  <p class="ph-note" style="margin:0;">{{ selected_batch.medicine.name }} · {{ selected_batch.on_hand }} on hand · {{ selected_batch.quarantined }} held
+    <a class="ph-chip" href="{% url 'pharmacy_batch_detail' selected_batch.pk %}">Open batch</a>
+  </p>
+</div>
+{% endif %}
+
+<div class="ph-bento">
+  <div class="ph-col">
+    <section class="ph-panel">
+      <div class="ph-panel-head">
+        <h2>Return history</h2>
+        <div class="ph-chip-row">
+          <a class="ph-chip{% if not kind %} is-active{% endif %}" href="{% url 'pharmacy_returns' %}{% querystring kind=None page=None %}">All</a>
+          <a class="ph-chip{% if kind == 'patient' %} is-active{% endif %}" href="{% url 'pharmacy_returns' %}{% querystring kind='patient' page=None %}">Patient</a>
+          <a class="ph-chip{% if kind == 'supplier' %} is-active{% endif %}" href="{% url 'pharmacy_returns' %}{% querystring kind='supplier' page=None %}">Supplier</a>
+        </div>
+      </div>
+      <p class="ph-note" style="margin:0 0 12px;">Patient returns move to quarantine, never straight back to sellable stock. Release the hold on the batch page after assessment, and settle the refund once cash has been handed back.</p>
+      <div class="ops-scroll"><table class="ops-table">
+        <thead><tr><th>When</th><th>Type</th><th>Sale</th><th>Medicine / batch</th><th>Qty</th><th>Refund</th><th>Status</th><th>Reason</th><th></th></tr></thead>
+        <tbody>{% for ret in returns %}<tr>
+          <td>{{ ret.created_at|date:"d M Y H:i" }}</td>
+          <td><span class="ops-badge">{{ ret.get_kind_display }}</span></td>
+          <td>{% if ret.sale %}<a href="{% url 'pharmacy_sale_invoice' ret.sale.pk %}">{{ ret.sale.reference }}</a>{% else %}—{% endif %}</td>
+          <td><a href="{% url 'pharmacy_batch_detail' ret.batch_id %}">{{ ret.batch.medicine.name }}</a><div class="ops-muted">{{ ret.batch.batch_number }}</div></td>
+          <td>{{ ret.quantity }}</td><td>₹{{ ret.refund|floatformat:2 }}</td>
+          <td><span class="ph-status {% if ret.status == 'quarantined' or ret.status == 'completed' %}ready{% elif ret.status == 'rejected' %}blocked{% else %}pending{% endif %}">{{ ret.get_status_display }}</span></td>
+          <td>{{ ret.reason }}</td>
+          <td>{% if ret.kind == 'patient' and ret.status == 'quarantined' %}
+            <form method="post" action="{% url 'pharmacy_refund_settle' %}">{% csrf_token %}
+              <input type="hidden" name="return_id" value="{{ ret.pk }}">
+              <input type="hidden" name="request_key" value="{{ request_id }}">
+              <button class="np-btn" type="submit">Settle refund</button>
+            </form>
+          {% else %}—{% endif %}</td>
+        </tr>{% empty %}<tr><td colspan="9" class="ops-empty">No returns recorded in this view.</td></tr>{% endfor %}</tbody>
+      </table></div>
+      {% include "core/pharmacy_pagination.html" with page=returns %}
+    </section>
+  </div>
+
+  <div class="ph-col">
+    <section class="ph-panel">
+      <h2>Process a patient return</h2>
+      <p class="ph-note">Find the sale first if you came from an invoice; the selector below then lists only that sale's lines.</p>
+      <form method="get" class="ph-search" style="margin-bottom:12px;">
+        <input type="search" name="sale" placeholder="Sale reference or ID" aria-label="Find a sale" value="{% if selected_sale %}{{ selected_sale.reference|default:selected_sale.pk }}{% endif %}">
+        <button class="np-btn" type="submit">Find sale</button>
+      </form>
+      <form method="post" action="{% url 'pharmacy_return_new' %}" class="ph-stock-form">{% csrf_token %}{{ form.request_key }}{{ form.non_field_errors }}
+        {% include "core/pharmacy_field.html" with field=form.sale_line %}
+        {% include "core/pharmacy_field.html" with field=form.quantity %}
+        {% include "core/pharmacy_field.html" with field=form.reason %}
+        <button class="np-btn teal" type="submit">Record return into quarantine</button>
+      </form>
+    </section>
+
+    <section class="ph-panel">
+      <h2>Return stock to the supplier</h2>
+      <p class="ph-note">Use this for expired, recalled or excess stock. Only unreserved physical stock can leave, and held units are released first.</p>
+      <form method="post" action="{% url 'pharmacy_supplier_return' %}" class="ph-stock-form">{% csrf_token %}{{ supplier_form.request_key }}{{ supplier_form.non_field_errors }}
+        {% include "core/pharmacy_field.html" with field=supplier_form.batch %}
+        {% include "core/pharmacy_field.html" with field=supplier_form.quantity %}
+        {% include "core/pharmacy_field.html" with field=supplier_form.reason %}
+        <button class="np-btn teal" type="submit">Record supplier return</button>
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}

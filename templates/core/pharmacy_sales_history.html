@@ -1,0 +1,55 @@
+{% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · sales register{% endblock %}
+{% block pharmacy_hero_actions %}
+<a class="ph-hero-btn ghost" href="{% url 'pharmacy_reports' %}">Reports</a>
+<a class="ph-hero-btn lime" href="{% url 'pharmacy_pos' %}">＋ New sale</a>
+{% endblock %}
+{% block operations_content %}
+<div class="ph-kpi-grid">
+  <a class="ph-kpi is-slate{% if not status and not payment %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_sales_history' %}{% querystring status=None payment=None page=None %}">
+    <span>All sales</span><strong>{{ counts.all }}</strong><small>Every direct pharmacy sale</small>
+  </a>
+  <a class="ph-kpi is-teal{% if status == 'completed' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_sales_history' %}{% querystring status='completed' payment=None page=None %}">
+    <span>Completed</span><strong>{{ counts.completed }}</strong><small>Paid and finalised</small>
+  </a>
+  <a class="ph-kpi is-rose{% if status == 'cancelled' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_sales_history' %}{% querystring status='cancelled' payment=None page=None %}">
+    <span>Cancelled</span><strong>{{ counts.cancelled }}</strong><small>Stock restored to the batch</small>
+  </a>
+  <a class="ph-kpi is-amber{% if payment == 'credit' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_sales_history' %}{% querystring payment='credit' status=None page=None %}">
+    <span>Credit outstanding</span><strong>₹{{ counts.credit_balance|floatformat:2 }}</strong><small>Authorised credit not yet collected</small>
+  </a>
+</div>
+
+<section class="ph-panel">
+  <div class="ph-panel-head">
+    <h2>All sales</h2>
+    <form method="get" class="ph-search">
+      <input type="search" name="q" value="{{ query }}" placeholder="Reference, patient, walk-in or UHID" aria-label="Search sales">
+      {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+      {% if payment %}<input type="hidden" name="payment" value="{{ payment }}">{% endif %}
+      <button class="np-btn">Search</button>
+    </form>
+  </div>
+  <div class="ph-chip-row" style="margin:4px 0 14px;">
+    {% for value,label in payment_methods %}
+    <a class="ph-chip{% if payment == value %} is-active{% endif %}" href="{% url 'pharmacy_sales_history' %}{% querystring payment=value page=None %}">{{ label }}</a>
+    {% endfor %}
+    {% if payment or query or status %}
+    <a class="ph-chip ph-chip-reset" href="{% url 'pharmacy_sales_history' %}">Clear filters</a>
+    {% endif %}
+  </div>
+  <div class="ops-scroll"><table class="ops-table">
+    <thead><tr><th>Sale</th><th>When</th><th>Customer</th><th>Payment</th><th>Total</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for sale in sales %}<tr>
+      <td><a href="{% url 'pharmacy_sale_invoice' sale.pk %}">{{ sale.reference|default:"Draft sale" }}</a></td>
+      <td>{{ sale.completed_at|date:"d M Y H:i"|default:"—" }}</td>
+      <td>{% if sale.patient %}{{ sale.patient.full_name }}<div class="ops-muted">{{ sale.patient.uhid }}</div>{% else %}{{ sale.walk_in_name|default:"Walk-in" }}{% endif %}</td>
+      <td>{{ sale.get_payment_method_display|default:"—" }}</td>
+      <td>₹{{ sale.total|floatformat:2 }}{% if sale.balance %}<div class="ops-muted">₹{{ sale.balance|floatformat:2 }} due</div>{% endif %}</td>
+      <td><span class="ph-status {% if sale.status == 'completed' %}ready{% elif sale.status == 'cancelled' %}blocked{% else %}muted{% endif %}">{{ sale.get_status_display }}</span></td>
+      <td><a href="{% url 'pharmacy_sale_invoice' sale.pk %}">Details</a></td>
+    </tr>{% empty %}<tr><td colspan="7" class="ops-empty">No pharmacy sales match this view. <a href="{% url 'pharmacy_pos' %}">Start a sale</a>.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% include "core/pharmacy_pagination.html" with page=sales %}
+</section>
+{% endblock %}

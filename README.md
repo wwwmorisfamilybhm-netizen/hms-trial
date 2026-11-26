@@ -1,6 +1,6 @@
 # 🏥 Cams HMS — Hospital Management System
 
-A hospital management system built from scratch with **Django** and **SQLite** (swap to PostgreSQL later if needed).
+A hospital management system built with **Django** and **PostgreSQL**.
 
 ## Features (v1)
 
@@ -15,9 +15,18 @@ A hospital management system built from scratch with **Django** and **SQLite** (
 cd hms
 python3.14 -m venv .venv          # only needed once
 .venv/bin/pip install -r requirements.txt
+brew install postgresql@17         # only needed once
+brew services start postgresql@17
+"$(brew --prefix postgresql@17)/bin/createuser" --login --pwprompt hms  # only once
+"$(brew --prefix postgresql@17)/bin/createdb" --owner=hms hms            # only once
+cp .env.example .env              # only needed once; match the password above
+set -a; . ./.env; set +a
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py runserver
 ```
+
+If your existing `db.sqlite3` has not yet been transferred, follow the
+[SQLite migration guide](docs/postgresql.md) before using the new PostgreSQL database.
 
 Open:
 
@@ -31,6 +40,7 @@ Open:
 | Start server | `.venv/bin/python manage.py runserver` |
 | Make migrations after editing models | `.venv/bin/python manage.py makemigrations` |
 | Apply migrations | `.venv/bin/python manage.py migrate` |
+| Run local PostgreSQL tests | `DATABASE_URL='postgresql:///hms?host=/tmp' .venv/bin/python manage.py test --noinput` |
 | Create admin user | `.venv/bin/python manage.py createsuperuser` |
 | Seed synthetic OPD demo visits | `.venv/bin/python manage.py seed_opd_demo` |
 | Django shell (query data) | `.venv/bin/python manage.py shell` |
@@ -53,7 +63,7 @@ stale — run:
 
 ## Deploy a test app on Domain India
 
-The project is configured to use SQLite locally and PostgreSQL when `DATABASE_URL` is set.
+The project requires PostgreSQL and a `DATABASE_URL` in every environment.
 For a test deployment on the Domain India App Platform:
 
 1. Push this project to a private GitHub repository and connect the repository in the App Platform dashboard.
@@ -66,6 +76,10 @@ For a test deployment on the Domain India App Platform:
 	- `DATABASE_URL` to the managed database URL (the platform may set this automatically)
 4. Deploy the selected branch. The `Procfile` applies migrations, collects static files, and starts Gunicorn.
 5. Test using fake patient data only. Do not put real patient records into a prototype deployment.
+
+The local SQLite transfer is separate from this test deployment; a new managed database
+starts empty. Keep `media/` and `private_reports/` on persistent storage and back them
+up with the database if the deployment later stores uploads.
 
 Generate a secret locally with:
 

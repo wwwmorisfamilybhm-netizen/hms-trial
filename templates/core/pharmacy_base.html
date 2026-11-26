@@ -1,11 +1,33 @@
 {% extends "core/operations_base.html" %}
 {% load static %}
 {% block body_class %}pharmacy-page{% endblock %}
-{% block page_styles %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/pharmacy.css' %}">{% endblock %}
+{% block page_styles %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/pharmacy.css' %}?v=ph-workspace-5">{% endblock %}
 {% block heading %}
-<header class="ph-head">
-  <div><p class="ph-kicker">Pharmacy</p><h1>{{ page_title }}</h1></div>
-  {% if request.user.profile.designation == 'pharmacy' %}<span class="ph-date">{{ today|date:"l, j M Y" }}</span>{% endif %}
+<header class="ph-hero">
+  <div class="ph-hero-main">
+    <p class="ph-hero-kicker">{% block pharmacy_kicker %}Pharmacy workspace{% endblock %}</p>
+    <h1 class="ph-hero-title">{{ page_title }}</h1>
+    <p class="ph-hero-sub">{% block operations_intro %}Dispense, sell and keep the shelf honest — every movement is counted.{% endblock %}</p>
+  </div>
+  <div class="ph-hero-actions">
+    <span class="ph-hero-date">{% if today %}{{ today|date:"D, j M Y" }}{% else %}{% now "D, j M Y" %}{% endif %}</span>
+    {% block pharmacy_hero_actions %}
+    <a class="ph-hero-btn lime" href="{% url 'pharmacy_pos' %}">Dispense &amp; POS</a>
+    <a class="ph-hero-btn ghost" href="{% url 'medicine_catalogue' %}">Medicine catalogue</a>
+    {% endblock %}
+  </div>
 </header>
+{% if vitals %}
+<section class="ph-caps" aria-label="Live pharmacy status">
+  {% for cap in vitals %}
+  <a class="ph-cap ph-cap-{{ cap.tone }}" href="{{ cap.url }}">
+    <span class="ph-cap-label">{{ cap.label }}</span>
+    <span class="ph-cap-value">{{ cap.value }}</span>
+    <span class="ph-cap-meta">{{ cap.meta }}</span>
+    <span class="ph-cap-arrow" aria-hidden="true">→</span>
+  </a>
+  {% endfor %}
+</section>
+{% endif %}
 {% endblock %}
 {% block operations_nav %}{% if request.user.profile.designation != 'pharmacy' %}{{ block.super }}{% endif %}{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "core/pharmacy_base.html" %}
+{% block operations_content %}
+<a class="ph-back" href="{% url 'pharmacy_suppliers' %}">← Suppliers</a>
+<form method="post" class="ph-panel ph-stock-form">
+  {% csrf_token %}{{ form.non_field_errors }}
+  <fieldset><legend>Supplier details</legend>
+    {% include "core/pharmacy_field.html" with field=form.name %}
+    {% include "core/pharmacy_field.html" with field=form.contact_person %}
+    {% include "core/pharmacy_field.html" with field=form.phone %}
+    {% include "core/pharmacy_field.html" with field=form.email %}
+    {% include "core/pharmacy_field.html" with field=form.address %}
+    {% include "core/pharmacy_field.html" with field=form.gstin %}
+    {% include "core/pharmacy_field.html" with field=form.drug_licence %}
+    {% include "core/pharmacy_field.html" with field=form.payment_terms %}
+    {% include "core/pharmacy_field.html" with field=form.credit_period_days %}
+    {% include "core/pharmacy_field.html" with field=form.is_active %}
+  </fieldset>
+  <button class="np-btn teal" type="submit">Save supplier</button>
+</form>
+{% endblock %}

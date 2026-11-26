@@ -59,3 +59,52 @@ document.querySelectorAll("[data-import-row]").forEach(function (row) {
   row.addEventListener("change", updateConversion);
   updateConversion();
 });
+
+// POS: keep the payable total and tendered amount in step with the bill discount.
+(function () {
+  "use strict";
+  var form = document.querySelector("[data-pos-checkout]");
+  if (!form) { return; }
+  var subtotal = Number(form.dataset.subtotal || 0);
+  var lineDiscount = Number(form.dataset.lineDiscount || 0);
+  var tax = Number(form.dataset.tax || 0);
+  var maxPercent = Number(form.dataset.maxDiscount || 0);
+  var discount = form.querySelector("[data-pos-discount]");
+  var totalOut = form.querySelector("[data-pos-total]");
+  var amount = form.querySelector("[data-pos-amount]");
+  var method = form.querySelector("[data-pos-method]");
+  var creditNote = form.querySelector("[data-pos-credit-note]");
+  var discountNote = form.querySelector("[data-pos-discount-note]");
+  var lastTotal = Number(form.dataset.total || 0);
+  var amountAuto = true;
+
+  function money(value) { return "₹" + value.toFixed(2); }
+
+  function recalc() {
+    var entered = discount ? Math.max(Number(discount.value) || 0, 0) : 0;
+    var limit = subtotal * maxPercent / 100;
+    var overLimit = entered > limit + 0.004;
+    var total = Math.max(subtotal - lineDiscount - entered + tax, 0);
+    if (totalOut) { totalOut.textContent = money(total); }
+    if (amount && amountAuto) { amount.value = total.toFixed(2); }
+    if (amount) { amount.min = method && method.value === "credit" ? "0" : total.toFixed(2); }
+    if (discount) { discount.setAttribute("aria-invalid", overLimit ? "true" : "false"); }
+    if (discountNote) {
+      discountNote.textContent = overLimit
+        ? "Discount exceeds the " + maxPercent + "% cap; reduce it before finalising."
+        : "Maximum bill discount is " + maxPercent + "% of the subtotal.";
+      discountNote.style.color = overLimit ? "#a01b44" : "";
+    }
+    if (creditNote) { creditNote.hidden = !method || method.value !== "credit"; }
+    lastTotal = total;
+  }
+
+  if (discount) { discount.addEventListener("input", recalc); }
+  if (method) { method.addEventListener("change", recalc); }
+  if (amount) {
+    amount.addEventListener("input", function () {
+      amountAuto = Number(amount.value) === lastTotal;
+    });
+  }
+  recalc();
+})();

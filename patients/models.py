@@ -79,6 +79,7 @@ class Patient(models.Model):
         CREDIT = "credit", "Credit"
         FREE = "free", "Free"
         CARD = "card", "Card"
+        UPI = "upi", "UPI"
         PART = "part", "Part"
         PENDING = "pending", "Pending (Payment Deferred)"
 
@@ -1084,6 +1085,15 @@ class Medicine(models.Model):
 
     manufacturer = models.CharField(max_length=200, blank=True)
     barcode = models.CharField(max_length=100, blank=True)
+    composition = models.CharField(max_length=255, blank=True, help_text="Active ingredients and strengths, where documented.")
+    category = models.CharField(max_length=80, blank=True, default="Medicine")
+    hsn_code = models.CharField(max_length=20, blank=True, verbose_name="HSN code")
+    drug_schedule = models.CharField(max_length=40, blank=True, help_text="Documented schedule or controlled-drug classification.")
+    prescription_required = models.BooleanField(default=True, help_text="Prescription medicines cannot appear in a direct OTC sale.")
+    is_controlled = models.BooleanField(default=False, help_text="Controlled medicines need documented pharmacist authorisation.")
+    storage_instructions = models.CharField(max_length=255, blank=True)
+    rack_location = models.CharField(max_length=100, blank=True)
+    gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0, help_text="Documented GST percentage for this medicine; zero when not configured.")
     photo = models.ImageField(upload_to="medicine_photos/", blank=True)
     photo_source = models.URLField(max_length=2000, blank=True)
     photo_approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="medicine_photos_approved")
@@ -1104,6 +1114,12 @@ class Medicine(models.Model):
 
 
 class MedicineBatch(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        QUARANTINED = "quarantined", "Quarantined"
+        RECALLED = "recalled", "Recalled"
+        DAMAGED = "damaged", "Damaged"
+
     medicine = models.ForeignKey(Medicine, on_delete=models.PROTECT, related_name="batches")
     batch_number = models.CharField(max_length=100)
     expiry_date = models.DateField()
@@ -1111,9 +1127,16 @@ class MedicineBatch(models.Model):
     invoice_reference = models.CharField(max_length=100)
     purchase_cost = models.DecimalField(max_digits=10, decimal_places=2)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
+    mrp = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="MRP")
     on_hand = models.PositiveIntegerField(default=0)
     reserved = models.PositiveIntegerField(default=0)
+    damaged = models.PositiveIntegerField(default=0)
+    quarantined = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    manufacturing_date = models.DateField(null=True, blank=True)
+    storage_location = models.CharField(max_length=100, blank=True, help_text="Rack or shelf where this batch is stored.")
     received_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["expiry_date", "id"]
@@ -1121,11 +1144,24 @@ class MedicineBatch(models.Model):
             models.UniqueConstraint(fields=["medicine", "batch_number"], name="medicine_batch_unique"),
             models.CheckConstraint(condition=models.Q(reserved__lte=models.F("on_hand")), name="batch_reservation_within_stock"),
             models.CheckConstraint(condition=models.Q(purchase_cost__gte=0, selling_price__gte=0), name="batch_prices_nonnegative"),
+            models.CheckConstraint(condition=models.Q(damaged__lte=models.F("on_hand"), quarantined__lte=models.F("on_hand")), name="batch_hold_within_stock"),
         ]
+        indexes = [models.Index(fields=["expiry_date", "status"], name="batch_expiry_status_idx")]
 
     @property
     def available(self):
-        return self.on_hand - self.reserved
+        if self.status != self.Status.ACTIVE:
+            return 0
+        from django.utils import timezone
+        if self.expiry_date < timezone.localdate():
+            return 0
+        return max(self.on_hand - self.reserved - self.damaged - self.quarantined, 0)
+
+    @property
+    def sellable(self):
+        """A batch may be sold or dispensed only when it is active and in date."""
+        from django.utils import timezone
+        return self.status == self.Status.ACTIVE and self.expiry_date >= timezone.localdate()
 
     def __str__(self):
         return f"{self.medicine.name} · {self.batch_number}"
@@ -1198,10 +1234,24 @@ class ImmutableLedgerQuerySet(models.QuerySet):
 class StockMovement(models.Model):
     batch = models.ForeignKey(MedicineBatch, on_delete=models.PROTECT, related_name="movements")
     quantity = models.IntegerField()
-    kind = models.CharField(max_length=12, choices=[("receipt", "Receipt"), ("issue", "Issue"), ("adjustment", "Adjustment")])
+    kind = models.CharField(max_length=20, choices=[
+        ("receipt", "Purchase / opening receipt"),
+        ("issue", "Prescription handover"),
+        ("sale", "Direct sale"),
+        ("sale_return", "Patient return"),
+        ("purchase_return", "Purchase return"),
+        ("adjustment", "Stock adjustment"),
+        ("transfer", "Stock transfer"),
+        ("damaged", "Damaged stock"),
+        ("expired", "Expired write-off"),
+        ("quarantine", "Quarantine movement"),
+        ("reversal", "Reversal"),
+    ])
     reason = models.CharField(max_length=255)
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     issue = models.ForeignKey(PharmacyIssue, on_delete=models.PROTECT, null=True, blank=True)
+    sale = models.ForeignKey("PharmacySale", on_delete=models.PROTECT, null=True, blank=True, related_name="movements")
+    purchase = models.ForeignKey("PharmacyPurchase", on_delete=models.PROTECT, null=True, blank=True, related_name="movements")
     request_key = models.UUIDField(unique=True, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     objects = ImmutableLedgerQuerySet.as_manager()
@@ -1220,6 +1270,246 @@ class StockMovement(models.Model):
         raise ValidationError("Stock movements cannot be deleted.")
 
 
+class PharmacySettings(models.Model):
+    """Singleton Pharmacy policy and configuration record."""
+
+    expiry_warning_days = models.PositiveSmallIntegerField(default=90)
+    default_gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    max_discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=10)
+    near_expiry_warn_days = models.PositiveSmallIntegerField(default=30)
+    allow_direct_sales = models.BooleanField(default=True)
+    require_controlled_authorisation = models.BooleanField(default=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="pharmacy_settings_updated")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Pharmacy settings"
+        verbose_name_plural = "Pharmacy settings"
+
+    @classmethod
+    def current(cls):
+        settings, _ = cls.objects.get_or_create(pk=1)
+        return settings
+
+    def __str__(self):
+        return "Pharmacy settings"
+
+
+class PharmacySupplier(models.Model):
+    name = models.CharField(max_length=200, unique=True)
+    contact_person = models.CharField(max_length=120, blank=True)
+    phone = models.CharField(max_length=40, blank=True)
+    email = models.EmailField(blank=True)
+    address = models.TextField(blank=True)
+    gstin = models.CharField(max_length=30, blank=True, verbose_name="GSTIN")
+    drug_licence = models.CharField(max_length=60, blank=True, verbose_name="Drug licence")
+    payment_terms = models.CharField(max_length=100, blank=True)
+    credit_period_days = models.PositiveSmallIntegerField(null=True, blank=True)
+    outstanding_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Pharmacy supplier"
+
+    def __str__(self):
+        return self.name
+
+
+class PharmacyPurchase(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        ORDERED = "ordered", "Ordered"
+        PARTIAL = "partial", "Partially received"
+        RECEIVED = "received", "Received"
+        CANCELLED = "cancelled", "Cancelled"
+
+    supplier = models.ForeignKey(PharmacySupplier, on_delete=models.PROTECT, related_name="purchases")
+    reference = models.CharField(max_length=120)
+    invoice_reference = models.CharField(max_length=100, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ORDERED)
+    ordered_at = models.DateTimeField(auto_now_add=True)
+    expected_at = models.DateField(null=True, blank=True)
+    total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    paid = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="pharmacy_purchases_created")
+    received_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="pharmacy_purchases_received")
+    received_at = models.DateTimeField(null=True, blank=True)
+    request_key = models.UUIDField(unique=True, null=True, blank=True)
+
+    class Meta:
+        ordering = ["-id"]
+        verbose_name = "Pharmacy purchase"
+
+    @property
+    def outstanding(self):
+        return max(self.total - self.paid, Decimal("0"))
+
+    def __str__(self):
+        return f"{self.reference} · {self.supplier.name}"
+
+
+class PharmacyPurchaseLine(models.Model):
+    purchase = models.ForeignKey(PharmacyPurchase, on_delete=models.PROTECT, related_name="lines")
+    medicine = models.ForeignKey(Medicine, on_delete=models.PROTECT)
+    batch_number = models.CharField(max_length=100, blank=True)
+    expiry_date = models.DateField(null=True, blank=True)
+    quantity_ordered = models.PositiveIntegerField(default=0)
+    quantity_received = models.PositiveIntegerField(default=0)
+    purchase_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    selling_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    mrp = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(quantity_ordered__gte=0, quantity_received__gte=0), name="purchase_quantities_nonnegative")]
+
+    @property
+    def total(self):
+        return self.quantity_ordered * self.purchase_cost
+
+
+class PharmacySale(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    class PaymentMethod(models.TextChoices):
+        CASH = "cash", "Cash"
+        UPI = "upi", "UPI"
+        CARD = "card", "Card"
+        CREDIT = "credit", "Authorised credit"
+
+    bill = models.OneToOneField(PatientBill, on_delete=models.PROTECT, null=True, blank=True, related_name="pharmacy_sale")
+    patient = models.ForeignKey(Patient, on_delete=models.PROTECT, null=True, blank=True, related_name="pharmacy_sales")
+    walk_in_name = models.CharField(max_length=200, blank=True, help_text="Name for a direct sale without a patient record.")
+    reference = models.CharField(max_length=60, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    discount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    amount_received = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices, blank=True)
+    payment_reference = models.CharField(max_length=100, blank=True)
+    controlled_authorisation = models.CharField(
+        max_length=120, blank=True,
+        help_text="Pharmacist authorisation captured for a controlled medicine sale.")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="pharmacy_sales_created")
+    completed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="pharmacy_sales_completed")
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    request_key = models.UUIDField(unique=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Pharmacy sale"
+
+    @property
+    def balance(self):
+        return max(self.total - self.amount_received, Decimal("0"))
+
+    def __str__(self):
+        return f"Sale #{self.pk or 'new'}"
+
+
+class PharmacySaleLine(models.Model):
+    sale = models.ForeignKey(PharmacySale, on_delete=models.PROTECT, related_name="lines")
+    medicine = models.ForeignKey(Medicine, on_delete=models.PROTECT)
+    batch = models.ForeignKey(MedicineBatch, on_delete=models.PROTECT, related_name="sale_lines")
+    quantity = models.PositiveIntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    tax = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    medicine_name = models.CharField(max_length=255)
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(quantity__gt=0, unit_price__gte=0, discount__gte=0, tax__gte=0), name="sale_line_values_nonnegative")]
+
+    @property
+    def total(self):
+        return self.quantity * self.unit_price - self.discount + self.tax
+
+    def __str__(self):
+        return f"{self.medicine_name} × {self.quantity} · sale #{self.sale_id}"
+
+
+class PharmacyReturn(models.Model):
+    class Kind(models.TextChoices):
+        PATIENT = "patient", "Patient return"
+        SUPPLIER = "supplier", "Supplier return"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending review"
+        QUARANTINED = "quarantined", "Quarantined"
+        COMPLETED = "completed", "Completed"
+        REJECTED = "rejected", "Rejected"
+
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    sale = models.ForeignKey(PharmacySale, on_delete=models.PROTECT, null=True, blank=True, related_name="returns")
+    sale_line = models.ForeignKey(PharmacySaleLine, on_delete=models.PROTECT, null=True, blank=True, related_name="returns")
+    batch = models.ForeignKey(MedicineBatch, on_delete=models.PROTECT, related_name="returns")
+    quantity = models.PositiveIntegerField()
+    reason = models.CharField(max_length=255)
+    refund = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="pharmacy_returns_created")
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="pharmacy_returns_reviewed")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    request_key = models.UUIDField(unique=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Pharmacy return"
+
+    def __str__(self):
+        return f"{self.get_kind_display()} · {self.batch} × {self.quantity}"
+
+
+class StockTransfer(models.Model):
+    batch = models.ForeignKey(MedicineBatch, on_delete=models.PROTECT, related_name="transfers")
+    from_location = models.CharField(max_length=100)
+    to_location = models.CharField(max_length=100)
+    quantity = models.PositiveIntegerField()
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="stock_transfers_requested")
+    completed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="stock_transfers_completed")
+    status = models.CharField(max_length=20, choices=[("pending", "Pending"), ("completed", "Completed")], default="pending")
+    request_key = models.UUIDField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.batch} · {self.from_location} → {self.to_location}"
+
+
+class PharmacyAudit(models.Model):
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="pharmacy_audits")
+    action = models.CharField(max_length=60)
+    entity = models.CharField(max_length=80, blank=True)
+    entity_id = models.CharField(max_length=40, blank=True)
+    summary = models.CharField(max_length=255)
+    before = models.JSONField(default=dict, blank=True)
+    after = models.JSONField(default=dict, blank=True)
+    reason = models.CharField(max_length=255, blank=True)
+    request_key = models.UUIDField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        if self.pk:
+            raise ValidationError("Pharmacy audit records are append-only.")
+        super().save(*args, **kwargs)
+
+
 class MedicineImport(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="medicine_imports")
     source = models.FileField(storage=private_report_storage, upload_to=pharmacy_import_path)
@@ -1231,6 +1521,7 @@ class MedicineImport(models.Model):
     mapping = models.JSONField(default=dict)
     rows = models.JSONField(default=list)
     result = models.JSONField(default=dict)
+    document = models.JSONField(default=dict, blank=True)
     revision = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     committed_at = models.DateTimeField(null=True, blank=True)

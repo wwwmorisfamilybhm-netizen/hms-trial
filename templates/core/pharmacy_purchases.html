@@ -1,0 +1,60 @@
+{% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · procurement{% endblock %}
+{% block operations_intro %}Record supplier orders, post goods receipts and track what is still owed. Stock only moves when goods are received.{% endblock %}
+{% block pharmacy_hero_actions %}
+<a class="ph-hero-btn ghost" href="{% url 'pharmacy_suppliers' %}">Suppliers</a>
+<a class="ph-hero-btn lime" href="{% url 'pharmacy_purchase_new' %}">＋ New purchase</a>
+{% endblock %}
+{% block operations_content %}
+<div class="ph-kpi-grid">
+  <a class="ph-kpi is-slate{% if not status %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_purchases' %}{% querystring status=None page=None %}">
+    <span>All purchases</span><strong>{{ total_count }}</strong><small>Orders and goods receipts</small>
+  </a>
+  <a class="ph-kpi is-amber{% if status == 'ordered' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_purchases' %}{% querystring status='ordered' page=None %}">
+    <span>Open orders</span><strong>{{ pending_count }}</strong><small>Awaiting goods</small>
+  </a>
+  <a class="ph-kpi is-teal{% if status == 'received' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_purchases' %}{% querystring status='received' page=None %}">
+    <span>Received</span><strong>{{ received_count }}</strong><small>Posted to stock</small>
+  </a>
+  <a class="ph-kpi is-violet" href="{% url 'pharmacy_suppliers' %}">
+    <span>Supplier balance</span><strong>₹{{ total_outstanding|floatformat:2 }}</strong><small>Outstanding across suppliers</small>
+  </a>
+</div>
+
+<section class="ph-panel">
+  <div class="ph-panel-head">
+    <h2>Purchase register</h2>
+    <form method="get" class="ph-search">
+      <input type="search" name="q" value="{{ query }}" placeholder="Reference, supplier or invoice" aria-label="Search purchases">
+      {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+      {% if supplier_filter %}<input type="hidden" name="supplier" value="{{ supplier_filter.pk }}">{% endif %}
+      <button class="np-btn">Search</button>
+    </form>
+  </div>
+  {% if supplier_filter %}
+  <p class="ops-warning" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+    <span>Showing purchases for <strong>{{ supplier_filter.name }}</strong> · ₹{{ supplier_filter.outstanding_balance|floatformat:2 }} outstanding.</span>
+    <a href="{% url 'pharmacy_purchases' %}">Show all purchases</a>
+  </p>
+  {% endif %}
+  <div class="ph-chip-row" style="margin:4px 0 14px;">
+    <a class="ph-chip{% if not status %} is-active{% endif %}" href="{% url 'pharmacy_purchases' %}{% querystring status=None page=None %}">All</a>
+    <a class="ph-chip{% if status == 'ordered' %} is-active{% endif %}" href="{% url 'pharmacy_purchases' %}{% querystring status='ordered' page=None %}">Ordered</a>
+    <a class="ph-chip{% if status == 'partial' %} is-active{% endif %}" href="{% url 'pharmacy_purchases' %}{% querystring status='partial' page=None %}">Partially received</a>
+    <a class="ph-chip{% if status == 'received' %} is-active{% endif %}" href="{% url 'pharmacy_purchases' %}{% querystring status='received' page=None %}">Received</a>
+    <a class="ph-chip{% if status == 'cancelled' %} is-active{% endif %}" href="{% url 'pharmacy_purchases' %}{% querystring status='cancelled' page=None %}">Cancelled</a>
+  </div>
+  <div class="ops-scroll"><table class="ops-table">
+    <thead><tr><th>Reference</th><th>Supplier</th><th>Ordered</th><th>Status</th><th>Total</th><th>Paid</th><th>Outstanding</th><th></th></tr></thead>
+    <tbody>{% for purchase in purchases %}<tr>
+      <td><a href="{% url 'pharmacy_purchase_detail' purchase.pk %}">{{ purchase.reference }}</a><div class="ops-muted">{{ purchase.invoice_reference|default:"No invoice reference" }}</div></td>
+      <td><a href="{% url 'pharmacy_supplier_edit' purchase.supplier.pk %}">{{ purchase.supplier.name }}</a></td>
+      <td>{{ purchase.ordered_at|date:"d M Y" }}</td>
+      <td><span class="ph-status {% if purchase.status == 'received' %}ready{% elif purchase.status == 'ordered' or purchase.status == 'partial' %}pending{% else %}muted{% endif %}">{{ purchase.get_status_display }}</span></td>
+      <td>₹{{ purchase.total|floatformat:2 }}</td><td>₹{{ purchase.paid|floatformat:2 }}</td><td>₹{{ purchase.outstanding|floatformat:2 }}</td>
+      <td><a class="np-btn" href="{% url 'pharmacy_purchase_detail' purchase.pk %}">Open</a></td>
+    </tr>{% empty %}<tr><td colspan="8" class="ops-empty">No purchases yet. <a href="{% url 'pharmacy_purchase_new' %}">Record a purchase</a>.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% include "core/pharmacy_pagination.html" with page=purchases %}
+</section>
+{% endblock %}

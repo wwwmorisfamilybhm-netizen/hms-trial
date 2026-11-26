@@ -1,33 +1,178 @@
 {% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · dispensary control{% endblock %}
 {% block operations_content %}
-<div class="ph-desk">
-<section class="ph-panel">
-  <div class="ph-panel-head"><h2>Prescription worklist</h2><form method="get" class="ph-search">
-    <input type="hidden" name="tab" value="{{ tab }}">{% if stale_only %}<input type="hidden" name="stale" value="1">{% endif %}
-    <input type="search" name="q" value="{{ query }}" aria-label="Patient, UHID or visit token" placeholder="Patient, UHID or visit token"><button class="np-btn">Search</button>
-  </form></div>
-  <nav class="ph-tabs" aria-label="Dispensing queues">
-    {% for key,title,count in tabs %}<a href="{% url 'pharmacy_dashboard' %}{% querystring tab=key page=None stale=None status=None %}" {% if tab == key %}aria-current="page"{% endif %}>{{ title }} <b>{{ count }}</b></a>{% endfor %}
-  </nav>
-  {% if stale_only %}<p class="ph-filter">Unpaid over 24 hours · <a href="{% querystring stale=None page=None %}">Show all awaiting payment</a></p>{% endif %}
-  {% for record in records %}
-  {% if tab == 'ready' or tab == 'payment' %}{% url 'pharmacy_issue' record.pk as detail %}
-    <article class="ph-row"><div><strong>{{ record.consultation.patient.full_name }}</strong><small>{{ record.consultation.patient.uhid }} · {{ record.consultation.visit_token }}</small></div>
-    <div><span class="ph-status {% if record.ready %}ready{% else %}pending{% endif %}">{{ label }}</span><small>Issue #{{ record.pk }} · ₹{{ record.bill.amount_due }}</small></div>
-    <div class="ph-time">Waiting {{ record.wait_since|timesince }}</div><a class="np-btn" href="{{ detail }}?{{ queue_state }}">{% if record.ready %}Review handover{% else %}Review issue{% endif %}</a></article>
-  {% else %}{% url 'pharmacy_consultation' record.pk as detail %}
-    <article class="ph-row"><div><strong>{{ record.patient.full_name }}</strong><small>{{ record.patient.uhid }} · {{ record.visit_token }}</small></div>
-    <div><span class="ph-status">{% if tab == 'prepare' %}To prepare{% else %}Released visit{% endif %}</span><small>{% firstof record.doctor.get_full_name record.doctor.username %}</small></div>
-    <div class="ph-time">{% if tab == 'prepare' %}Waiting {{ record.wait_since|timesince }}{% else %}Released {{ record.wait_since|date:"d M Y" }}{% endif %}</div><a class="np-btn" href="{{ detail }}?{{ queue_state }}">{% if tab == 'prepare' %}Prepare medicines{% else %}View visit{% endif %}</a></article>
-  {% endif %}
-  {% empty %}<div class="ph-empty"><h3>{% if query %}No matching records{% elif tab == 'ready' %}No medicines waiting for handover{% else %}This queue is clear{% endif %}</h3>
-  <p>{% if query %}Try another patient name, UHID, or visit token.{% elif tab == 'ready' %}Prepared issues appear here when the cashier records payment.{% elif tab == 'prepare' %}Doctor-released prescriptions with outstanding quantities appear here.{% elif tab == 'payment' %}Prepared issues awaiting cashier payment appear here.{% else %}Visits appear here when a doctor releases a prescription.{% endif %}</p></div>{% endfor %}
-  {% include "core/pharmacy_pagination.html" with page=records %}
+{% with today_iso=today|date:"Y-m-d" %}
+<section class="ph-kpi-grid" aria-label="Today's pharmacy performance">
+  <a class="ph-kpi is-teal" href="{% url 'pharmacy_reports' %}?from={{ today_iso }}&to={{ today_iso }}">
+    <span>Gross sales today</span><strong>₹{{ metrics.gross|floatformat:2 }}</strong>
+    <small>Direct sales + dispensed prescriptions</small>
+  </a>
+  <a class="ph-kpi is-teal" href="{% url 'pharmacy_reports' %}?from={{ today_iso }}&to={{ today_iso }}">
+    <span>Net sales today</span><strong>₹{{ metrics.net|floatformat:2 }}</strong>
+    <small>After ₹{{ metrics.discounts|floatformat:2 }} discounts</small>
+  </a>
+  <a class="ph-kpi is-lime" href="{% url 'pharmacy_sales_history' %}">
+    <span>Collections</span><strong>₹{{ metrics.collections|floatformat:2 }}</strong>
+    <small>Cash, card, UPI and recorded credit</small>
+  </a>
+  <a class="ph-kpi is-amber" href="{% url 'pharmacy_queue' %}?tab=prepare">
+    <span>Pending prescriptions</span><strong>{{ metrics.pending }}</strong>
+    <small>{{ metrics.urgent }} urgent · {{ metrics.partial }} partial · {{ metrics.completed }} completed</small>
+  </a>
+  <a class="ph-kpi is-slate" href="{% url 'medicine_catalogue' %}">
+    <span>Active medicines</span><strong>{{ metrics.active_medicines }}</strong>
+    <small>{{ metrics.low }} low · {{ metrics.out }} out of stock</small>
+  </a>
+  <a class="ph-kpi is-amber" href="{% url 'pharmacy_suppliers' %}">
+    <span>Supplier balance</span><strong>₹{{ metrics.supplier_balance|floatformat:2 }}</strong>
+    <small>{{ metrics.pending_purchases }} open order{{ metrics.pending_purchases|pluralize }}</small>
+  </a>
 </section>
-<aside class="ph-rail"><section class="ph-panel"><h2>Stock &amp; reservations</h2>
-  <a href="{% url 'pharmacy_stock_report' %}?filter=low"><span>Low-stock medicines</span><b>{{ low_count }}</b></a>
-  <a href="{% url 'pharmacy_stock_report' %}?filter=expiring"><span>Batches expiring in 90 days</span><b>{{ expiry_count }}</b></a>
-  <a href="{% url 'pharmacy_dashboard' %}?tab=payment&amp;stale=1"><span>Unpaid over 24 hours</span><b>{{ stale_count }}</b></a>
-</section>{% if not has_stock %}<section class="ph-panel ph-opening"><h2>Record opening stock</h2><p><a href="{% url 'medicine_catalogue' %}">Add your medicines</a>, then enter the first batch and pack count.</p><a class="np-btn teal" href="{% url 'pharmacy_receive' %}">Receive stock</a></section>{% endif %}</aside>
+
+<div class="ph-bento">
+  <div class="ph-col">
+    <section class="ph-panel">
+      <div class="ph-panel-head">
+        <h2>Handover desk</h2>
+        <a href="{% url 'pharmacy_queue' %}?tab=ready">Open queue →</a>
+      </div>
+      <p class="ph-note" style="margin:0 0 12px;">Paid prescriptions that are prepared and waiting for the patient.</p>
+      {% if ready_rows %}
+      <div class="ph-queue">
+        {% for issue in ready_rows %}
+        <a class="ph-qcard" href="{% url 'pharmacy_issue' issue.pk %}?tab=ready">
+          <span class="ph-token">#{{ issue.pk }}</span>
+          <span class="ph-qmain">
+            <span class="ph-qname">{{ issue.consultation.patient.full_name }}</span>
+            <span class="ph-qmeta">
+              <span>{{ issue.consultation.patient.uhid }}</span>
+              <span>{{ issue.consultation.visit_token }}</span>
+              <span>₹{{ issue.bill.amount_due }}</span>
+              <span>Waiting {{ issue.wait_since|timesince }}</span>
+            </span>
+          </span>
+          <span class="ph-qgo">Hand over →</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="ph-empty"><h3>No medicines waiting at the counter</h3><p>Paid prescriptions appear here the moment the cashier settles the bill.</p></div>
+      {% endif %}
+    </section>
+
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Today's trade</h2><a href="{% url 'pharmacy_sales_history' %}">Sales register →</a></div>
+      {% if recent_sales %}
+      <div class="ph-queue">
+        {% for sale in recent_sales %}
+        <a class="ph-qcard" href="{% url 'pharmacy_sale_invoice' sale.pk %}">
+          <span class="ph-token">{{ sale.completed_at|date:"H:i" }}</span>
+          <span class="ph-qmain">
+            <span class="ph-qname">{{ sale.reference }} · ₹{{ sale.total|floatformat:2 }}</span>
+            <span class="ph-qmeta">
+              <span>{% if sale.patient %}{{ sale.patient.full_name }}{% else %}{{ sale.walk_in_name|default:"Walk-in" }}{% endif %}</span>
+              <span>{{ sale.get_payment_method_display }}</span>
+              <span>{% firstof sale.completed_by.get_full_name sale.completed_by.username %}</span>
+            </span>
+          </span>
+          <span class="ph-qgo">Invoice →</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="ph-empty"><h3>No direct sales yet today</h3><p>Open the POS to scan or search an over-the-counter medicine.</p><a class="np-btn teal" href="{% url 'pharmacy_pos' %}">Start a sale</a></div>
+      {% endif %}
+    </section>
+
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Recent handovers</h2><a href="{% url 'pharmacy_dispense_history' %}">History →</a></div>
+      {% if recent_issues %}
+      <div class="ph-queue">
+        {% for issue in recent_issues %}
+        <a class="ph-qcard" href="{% url 'pharmacy_issue' issue.pk %}">
+          <span class="ph-token">{{ issue.dispensed_at|date:"H:i" }}</span>
+          <span class="ph-qmain">
+            <span class="ph-qname">{{ issue.consultation.patient.full_name }}</span>
+            <span class="ph-qmeta"><span>{{ issue.consultation.patient.uhid }}</span><span>₹{{ issue.bill.amount_due }}</span><span>{% firstof issue.dispensed_by.get_full_name issue.dispensed_by.username %}</span></span>
+          </span>
+          <span class="ph-qgo">Issue →</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="ph-empty"><h3>No handovers yet</h3><p>Dispensed prescriptions are archived here with their batch allocation.</p></div>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="ph-col">
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Needs attention</h2><a href="{% url 'pharmacy_stock_report' %}">Inventory →</a></div>
+      {% for key,title,count,url in alerts %}
+      <a class="ph-alert {{ key }}" href="{{ url }}"><span>{{ title }}</span><b>{{ count }}</b></a>
+      {% empty %}
+      <div class="ph-empty"><h3>Stock and expiry look healthy</h3><p>No expired, near-expiry, low or out-of-stock batches right now.</p></div>
+      {% endfor %}
+      {% if metrics.refunds_due or metrics.held_units %}
+      <div class="ph-summary" style="margin-top:12px;">
+        <div class="ph-summary-row"><span>Refunds to settle</span><strong>{{ metrics.refunds_due }}</strong></div>
+        <div class="ph-summary-row"><span>Quarantined units</span><strong>{{ metrics.held_units }} <small style="font-size:.72rem;color:var(--ph-muted);font-weight:600;">in {{ metrics.held_batches }} batch{{ metrics.held_batches|pluralize }}</small></strong></div>
+        <a class="ph-chip" href="{% url 'pharmacy_returns' %}">Open returns register</a>
+      </div>
+      {% endif %}
+    </section>
+
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Expiry watch</h2><a href="{% url 'pharmacy_expiry' %}?window=critical">All windows →</a></div>
+      <p class="ph-note" style="margin:0 0 10px;">{{ settings.near_expiry_warn_days }}-day critical window · {{ settings.expiry_warning_days }}-day watch list</p>
+      {% if critical_rows %}
+      <div class="ph-queue">
+        {% for batch in critical_rows %}
+        <a class="ph-qcard" href="{% url 'pharmacy_batch_detail' batch.pk %}">
+          <span class="ph-token">{{ batch.expiry_date|date:"d M" }}</span>
+          <span class="ph-qmain">
+            <span class="ph-qname">{{ batch.medicine.name }}</span>
+            <span class="ph-qmeta"><span>Batch {{ batch.batch_number }}</span><span>{{ batch.on_hand }} on hand</span></span>
+          </span>
+          <span class="ph-qgo">Review →</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="ph-empty"><h3>Nothing expiring soon</h3><p>Batches entering the critical window will be listed here first.</p></div>
+      {% endif %}
+    </section>
+
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Live activity</h2><a href="{% url 'pharmacy_audit' %}">Audit trail →</a></div>
+      {% if recent_audit %}
+      <ul class="ph-activity">
+        {% for row in recent_audit %}
+        <li>
+          <time>{{ row.created_at|date:"H:i" }}</time>
+          <span>{{ row.summary }}<br><span class="ph-activity-who">{% firstof row.actor.get_full_name row.actor.username "System" %} · {{ row.created_at|date:"d M" }}</span></span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="ph-empty"><h3>No activity logged</h3><p>Sales, receipts, returns and handovers each write an audit row.</p></div>
+      {% endif %}
+    </section>
+  </div>
 </div>
+
+<section class="ph-quick ph-panel">
+  <div class="ph-panel-head"><h2>Desk shortcuts</h2><span class="ph-note">Every action below is a live workflow</span></div>
+  <div class="ph-quick-grid">
+    <a href="{% url 'pharmacy_pos' %}"><strong>New sale</strong><span>Scan or search an OTC medicine</span></a>
+    <a href="{% url 'pharmacy_queue' %}"><strong>Prescription queue</strong><span>Prepare, bill and hand over</span></a>
+    <a href="{% url 'pharmacy_purchase_new' %}"><strong>Procurement</strong><span>Record an order or post a receipt</span></a>
+    <a href="{% url 'pharmacy_receive' %}"><strong>Opening stock</strong><span>Receive a batch without a supplier order</span></a>
+    <a href="{% url 'pharmacy_returns' %}"><strong>Returns &amp; refunds</strong><span>Quarantine patient returns</span></a>
+    <a href="{% url 'pharmacy_expiry' %}"><strong>Expiry desk</strong><span>Review critical and expired batches</span></a>
+    <a href="{% url 'pharmacy_reports' %}"><strong>Reports</strong><span>Sales, stock value and margin</span></a>
+    <a href="{% url 'pharmacy_settings' %}"><strong>Policy settings</strong><span>Thresholds, GST and discount caps</span></a>
+  </div>
+</section>
+{% endwith %}
 {% endblock %}

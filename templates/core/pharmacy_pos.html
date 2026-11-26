@@ -1,0 +1,302 @@
+{% extends "core/pharmacy_base.html" %}
+{% load static %}
+{% block pharmacy_kicker %}Pharmacy · dispense &amp; point of sale{% endblock %}
+{% block operations_intro %}Prepare prescriptions, collect payment and hand over medicines, or ring up an over-the-counter sale on the same desk.{% endblock %}
+{% block pharmacy_hero_actions %}
+<a class="ph-hero-btn ghost" href="{% url 'pharmacy_sales_history' %}">Sales history</a>
+<a class="ph-hero-btn lime" href="{% url 'pharmacy_queue' %}">Full prescription queue</a>
+{% endblock %}
+{% block operations_content %}
+<section class="ph-desk-queue-strip ph-panel" aria-label="Prescription queue">
+  <div class="ph-desk-queue-head">
+    <div>
+      <h2>Prescription queue</h2>
+      <p class="ph-note">Select a patient to prepare, collect payment or confirm handover without leaving the desk.</p>
+    </div>
+    <a href="{% url 'pharmacy_queue' %}">Full worklist →</a>
+  </div>
+  <div class="ph-desk-queue-tabs" role="tablist" aria-label="Prescription queues">
+    {% for key, title, count in queue_tabs %}
+    <a href="{% url 'pharmacy_pos' %}{% querystring tab=key consultation=None issue=None queue_page=None %}"
+       class="{% if active_queue_tab == key %}is-active{% endif %}"
+       {% if active_queue_tab == key %}aria-current="true"{% endif %}>
+      <span>{{ title }}</span><strong>{{ count }}</strong>
+    </a>
+    {% endfor %}
+  </div>
+  <div class="ph-desk-queue-cards">
+    {% for record in queue_records %}
+      {% if record.consultation_id %}
+      <a class="ph-desk-queue-card" href="{% url 'pharmacy_pos' %}{% querystring tab=active_queue_tab issue=record.pk consultation=None queue_page=None %}">
+        <span class="ph-desk-queue-card-top">
+          <strong>{{ record.consultation.patient.full_name }}</strong>
+          <span class="ph-status {% if record.ready %}ready{% else %}pending{% endif %}">{% if record.ready %}Ready{% else %}Awaiting payment{% endif %}</span>
+        </span>
+        <span class="ph-desk-queue-meta">{{ record.consultation.patient.uhid }} · Issue #{{ record.pk }} · ₹{{ record.bill.amount_due|floatformat:2 }}</span>
+        <span class="ph-desk-queue-go">{% if record.ready %}Hand over →{% else %}Collect payment →{% endif %}</span>
+      </a>
+      {% else %}
+      <a class="ph-desk-queue-card" href="{% url 'pharmacy_pos' %}{% querystring tab=active_queue_tab consultation=record.pk issue=None queue_page=None %}">
+        <span class="ph-desk-queue-card-top">
+          <strong>{{ record.patient.full_name }}</strong>
+          <span class="ph-status pending">To prepare</span>
+        </span>
+        <span class="ph-desk-queue-meta">{{ record.patient.uhid }} · {{ record.visit_token }}</span>
+        <span class="ph-desk-queue-go">Prepare →</span>
+      </a>
+      {% endif %}
+    {% empty %}
+      <p class="ph-desk-queue-empty">No patients in this queue.</p>
+    {% endfor %}
+  </div>
+  {% if queue_records.paginator.num_pages > 1 %}
+  <nav class="ph-desk-queue-pages" aria-label="Prescription queue pages">
+    {% if queue_records.has_previous %}<a href="{% querystring queue_page=queue_records.previous_page_number %}">← Previous</a>{% else %}<span></span>{% endif %}
+    <span>Page {{ queue_records.number }} of {{ queue_records.paginator.num_pages }}</span>
+    {% if queue_records.has_next %}<a href="{% querystring queue_page=queue_records.next_page_number %}">Next →</a>{% else %}<span></span>{% endif %}
+  </nav>
+  {% endif %}
+</section>
+
+{% if selected_consultation %}
+<section class="ph-panel ph-inline-prepare" id="prepare-prescription">
+  <header class="ph-panel-head">
+    <div>
+      <h2>Prepare prescription</h2>
+      <p class="ops-muted">{{ selected_consultation.patient.full_name }} · {{ selected_consultation.patient.uhid }} · {{ selected_consultation.visit_token }} · {% firstof selected_consultation.doctor.get_full_name selected_consultation.doctor.username "Doctor" %}</p>
+    </div>
+    <a href="{% url 'patient_detail' selected_consultation.patient.pk %}" target="_blank" rel="noopener">Patient record →</a>
+  </header>
+  <form method="post" action="{% url 'pharmacy_consultation' selected_consultation.pk %}?next=pos">
+    {% csrf_token %}
+    <input type="hidden" name="request_key" value="{{ prepare_request_key }}">
+    {% for rx in prescription_rows %}
+    <article class="ph-rx" data-rx data-remaining="{{ rx.remaining_quantity }}">
+      <header>
+        {% include "core/pharmacy_thumbnail.html" with medicine=rx.medicine %}
+        <h3>{{ rx.medicine_name }}</h3>
+        <span class="ph-status {% if rx.dispense_status == 'dispensed' %}ready{% elif rx.dispense_status == 'cancelled' %}blocked{% else %}pending{% endif %}">{{ rx.get_dispense_status_display }}</span>
+      </header>
+      <p class="ph-note">{{ rx.dose }} · {{ rx.route }} · {{ rx.frequency }} · {{ rx.duration }}{% if rx.instructions %}<br>{{ rx.instructions }}{% endif %}</p>
+      <dl class="ph-quantities">
+        <div><dt>Prescribed</dt><dd>{{ rx.prescribed_quantity|default_if_none:"—" }}</dd></div>
+        <div><dt>Already handed over</dt><dd>{{ rx.dispensed_quantity }}</dd></div>
+        <div><dt>Reserved</dt><dd>{{ rx.reserved_quantity }}</dd></div>
+        <div><dt>Available stock</dt><dd data-available>{{ rx.available_stock|default_if_none:"—" }}</dd></div>
+        <div><dt>Unreserved balance</dt><dd>{{ rx.remaining_quantity }}</dd></div>
+      </dl>
+      {% if rx.dispense_status != 'cancelled' and rx.dispense_status != 'dispensed' %}
+        {% if not rx.prescribed_quantity %}<p class="ops-warning">Doctor clarification needed · Prescribed quantity missing.</p>
+        {% elif rx.remaining_quantity and selected_consultation.status != 'cancelled' %}
+        <div class="ph-entry">
+          {% if rx.medicine_id %}<input type="hidden" name="medicine_{{ rx.pk }}" value="{{ rx.medicine_id }}">
+          {% else %}<label class="ops-field">Exact catalogue match<select name="medicine_{{ rx.pk }}" data-match>
+            <option value="">Choose a medicine</option>{% for m in rx.matches %}<option value="{{ m.pk }}" data-stock="{{ m.usable }}" {% if rx.selected_match == m.pk|stringformat:"s" %}selected{% endif %}>{{ m.name }} · {{ m.strength }} · {{ m.form }} · {{ m.get_unit_display }}</option>{% endfor %}
+          </select></label>{% if not rx.matches %}<p class="ops-warning">No exact catalogue match. Review the prescription with the prescriber.</p>{% endif %}{% endif %}
+          <label class="ops-field">Prepare now (units)<input type="number" name="quantity_{{ rx.pk }}" min="0" max="{{ rx.prepare_limit }}" value="{{ rx.entered_quantity }}" data-quantity></label>
+        </div>
+        <p class="ph-note" data-shortage aria-live="polite">{% if rx.available_stock != None and rx.available_stock < rx.remaining_quantity %}Only {{ rx.available_stock }} units available for this balance.{% endif %}</p>
+        {% endif %}{% endif %}
+    </article>
+    {% empty %}
+    <div class="ph-empty"><h3>No released prescription items</h3><p>Ask the prescriber to release this prescription with explicit quantities.</p></div>
+    {% endfor %}
+    <div class="ph-submit">
+      {% if can_prepare %}<button class="np-btn teal" type="submit">Prepare prescription &amp; reserve stock</button>
+      {% else %}<span class="ops-muted">There is no unreserved prescription balance ready to prepare.</span>{% endif %}
+    </div>
+  </form>
+  {% if consultation_issues %}
+  <div class="ph-inline-issue-links">
+    <span class="ops-muted">Issues for this visit</span>
+    {% for issue in consultation_issues %}<a href="{% url 'pharmacy_pos' %}{% querystring issue=issue.pk consultation=None %}">Issue #{{ issue.pk }} · ₹{{ issue.bill.amount_due|floatformat:2 }}</a>{% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if selected_issue %}
+<section class="ph-panel ph-inline-pay" id="collect-payment">
+  <header class="ph-panel-head">
+    <div>
+      <h2>Issue #{{ selected_issue.pk }} · {{ selected_issue.consultation.patient.full_name }}</h2>
+      <p class="ops-muted">{{ selected_issue.consultation.patient.uhid }} · {{ selected_issue.consultation.visit_token }} · {{ selected_issue.bill.bill_number }}</p>
+    </div>
+    <span class="ph-status {% if selected_issue.ready or selected_issue.status == 'dispensed' %}ready{% elif selected_issue.status == 'awaiting_payment' %}pending{% else %}blocked{% endif %}">
+      {% if selected_issue.ready %}Ready for handover{% else %}{{ selected_issue.get_status_display }}{% endif %}
+    </span>
+  </header>
+  <div class="ops-scroll">
+    <table class="ops-table">
+      <thead><tr><th>Medicine</th><th>Instructions</th><th>Batch / expiry</th><th>Quantity</th><th>Total</th></tr></thead>
+      <tbody>{% for line in lines %}
+        <tr>
+          <td>{% include "core/pharmacy_thumbnail.html" with medicine=line.medicine %}<strong>{{ line.medicine_name }}</strong></td>
+          <td>{{ line.prescription.dose }} · {{ line.prescription.route }} · {{ line.prescription.frequency }} · {{ line.prescription.duration }}<br>{{ line.prescription.instructions }}</td>
+          <td>{% for allocation in line.allocations.all %}{{ allocation.batch.batch_number }} · {{ allocation.batch.expiry_date|date:"d M Y" }} · {{ allocation.quantity }} units<br>{% endfor %}</td>
+          <td>{{ line.quantity }} {{ line.medicine.unit }}</td><td>₹{{ line.total|floatformat:2 }}</td>
+        </tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+  <div class="ops-total">Collect ₹{{ selected_issue.bill.amount_due|floatformat:2 }}</div>
+  {% if selected_issue.dispensed_at %}<p>Handed over by {% firstof selected_issue.dispensed_by.get_full_name selected_issue.dispensed_by.username '—' %} · {{ selected_issue.dispensed_at|date:'d M Y H:i' }}</p>{% endif %}
+  {% if other_dues %}<p class="ops-warning">Other patient dues are outstanding. This issue can be handed over once its own bill is paid.</p>{% endif %}
+  <div class="ops-actions ops-no-print">
+    {% if can_dispense and selected_issue.status == 'awaiting_payment' %}
+      {% if selected_issue.ready %}
+      <form method="post" action="{% url 'pharmacy_issue' selected_issue.pk %}?next=pos">{% csrf_token %}<button class="np-btn teal" name="action" value="handover">Confirm medicine handover</button></form>
+      {% elif selected_issue.bill.status == 'pending' %}
+      <form method="post" action="{% url 'pharmacy_issue' selected_issue.pk %}?next=pos" class="ph-inline-payment">{% csrf_token %}
+        <input type="hidden" name="action" value="pay">
+        <label class="ops-field">Payment method<select name="payment_method" required><option value="cash">Cash</option><option value="upi">UPI</option><option value="card">Card</option></select></label>
+        <label class="ops-field">Reference <span class="ops-muted">(optional)</span><input name="payment_reference" maxlength="100" placeholder="Card / UPI reference"></label>
+        <button class="np-btn teal" type="submit">Collect ₹{{ selected_issue.bill.amount_due|floatformat:2 }}</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{% url 'pharmacy_issue' selected_issue.pk %}?next=pos">{% csrf_token %}<button class="np-btn" name="action" value="reallocate">Refresh batch allocation</button></form>
+      {% if selected_issue.bill.status == 'pending' %}<form method="post" action="{% url 'pharmacy_issue' selected_issue.pk %}?next=pos">{% csrf_token %}<button class="np-btn" name="action" value="cancel">Cancel unpaid issue</button></form>{% endif %}
+    {% endif %}
+    <a class="np-btn" href="{% url 'pharmacy_issue' selected_issue.pk %}">Open full issue</a>
+  </div>
+</section>
+{% endif %}
+
+<form id="patientLookup" method="get" action="{% url 'pharmacy_pos' %}">
+  <input type="hidden" name="q" value="{{ query }}">
+  <input type="hidden" name="tab" value="{{ active_queue_tab }}">
+  {% if selected_consultation %}<input type="hidden" name="consultation" value="{{ selected_consultation.pk }}">{% endif %}
+  {% if selected_issue %}<input type="hidden" name="issue" value="{{ selected_issue.pk }}">{% endif %}
+</form>
+<div class="ph-pos">
+  <section class="ph-panel ph-pos-main">
+    <div class="ph-panel-head">
+      <h2>Find a medicine</h2>
+      <span class="ph-note">Over-the-counter only · {{ cart|length }} line{{ cart|length|pluralize }} in basket</span>
+    </div>
+    <form method="get" class="ph-search ph-pos-search">
+      <input type="search" name="q" value="{{ query }}" autofocus aria-label="Medicine, barcode or generic name" placeholder="Scan barcode or search brand / generic / strength">
+      <input type="hidden" name="tab" value="{{ active_queue_tab }}">
+      {% if selected_consultation %}<input type="hidden" name="consultation" value="{{ selected_consultation.pk }}">{% endif %}
+      {% if selected_issue %}<input type="hidden" name="issue" value="{{ selected_issue.pk }}">{% endif %}
+      {% if patient %}<input type="hidden" name="patient" value="{{ patient.pk }}">{% endif %}
+      <button class="np-btn teal">Search</button>
+    </form>
+
+    {% if not settings.allow_direct_sales %}
+    <p class="ops-warning">Direct sales are disabled. {% if request.user.is_superuser or request.user.profile.designation == 'admin' %}<a href="{% url 'pharmacy_settings' %}">Pharmacy settings</a>{% else %}Ask an administrator to enable them in Pharmacy settings.{% endif %}</p>
+    {% endif %}
+
+    {% if rx_matches %}
+    <p class="ops-warning">This search also matches {{ rx_matches }} prescription-only medicine{{ rx_matches|pluralize }}.
+      Those are dispensed from the <a href="{% url 'pharmacy_queue' %}">prescription queue</a> once a doctor releases them.</p>
+    {% endif %}
+
+    <div class="ops-scroll">
+      <table class="ops-table ph-pos-results">
+        <thead><tr><th>Medicine</th><th>Batch / expiry</th><th>Stock &amp; price</th><th>Add</th></tr></thead>
+        <tbody>
+        {% for row in results %}
+          <tr>
+            <td>
+              <strong>{{ row.medicine.name }}</strong>
+              <div class="ops-muted">{{ row.medicine.strength }} · {{ row.medicine.form }} · {{ row.medicine.generic_name|default:"Generic not recorded" }}</div>
+              {% if row.medicine.is_controlled %}<span class="ph-status blocked">Controlled</span>{% endif %}
+            </td>
+            <td>{% if row.batch %}{{ row.batch.batch_number }}<div class="ops-muted">Expires {{ row.batch.expiry_date|date:"d M Y" }}</div>{% else %}<span class="ph-status blocked">No sellable batch</span>{% endif %}</td>
+            <td>{% if row.batch %}<strong>{{ row.available }}</strong> {{ row.medicine.get_unit_display|lower }}<div class="ops-muted">₹{{ row.batch.selling_price }} each</div>{% else %}<span class="ph-status blocked">0</span>{% endif %}</td>
+            <td>{% if row.batch and row.available and settings.allow_direct_sales %}
+              <form method="post" action="{% url 'pharmacy_pos_add' %}" class="ph-inline-form">{% csrf_token %}
+                <input type="hidden" name="batch" value="{{ row.batch.pk }}">
+                {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+                <label class="ph-inline-qty">Qty <input type="number" name="quantity" value="1" min="1" max="{{ row.available }}"></label>
+                <button class="np-btn" type="submit">Add</button>
+              </form>
+            {% else %}<span class="ops-muted">Unavailable</span>{% endif %}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="ops-empty">{% if query %}No sellable over-the-counter medicine matches “{{ query }}”.{% else %}Search by brand, generic name, barcode or strength to begin a sale.{% endif %}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <aside class="ph-pos-side">
+    <section class="ph-panel ph-pos-customer">
+      <div class="ph-panel-head"><h2>Customer</h2>{% if patient %}<a href="{% url 'pharmacy_pos' %}{% querystring patient='' patient_q=None %}">Change</a>{% endif %}</div>
+      {% if patient %}
+        <p class="ph-patient-strip">Selling to <strong>{{ patient.full_name }}</strong> · {{ patient.uhid }}
+          {% if patient.pk %}<a href="{% url 'patient_detail' patient.pk %}" target="_blank" rel="noopener">Record ↗</a>{% endif %}
+        </p>
+      {% else %}
+        <div class="ph-patient-search">
+          <input type="search" name="patient_q" form="patientLookup" value="{{ patient_q }}" placeholder="Search a registered patient" aria-label="Search patients">
+          <button class="np-btn" type="submit" form="patientLookup">Look up</button>
+        </div>
+        {% if patient_results %}
+          <div class="ph-patient-results" aria-label="Matching patients">
+            {% for p in patient_results %}<a href="{% url 'pharmacy_pos' %}{% querystring patient=p.pk patient_q=None %}"><strong>{{ p.full_name }}</strong><span>{{ p.uhid }}</span></a>{% endfor %}
+          </div>
+        {% elif patient_q %}<p class="ops-muted">No patient matches “{{ patient_q }}”. This sale stays a walk-in.</p>{% endif %}
+        <p class="ph-note">Walk-in sales are allowed. Select a patient for credit or for a linked history.</p>
+      {% endif %}
+    </section>
+
+    <section class="ph-panel ph-pos-cart">
+      <div class="ph-panel-head"><h2>Basket</h2>{% if cart %}<form method="post" action="{% url 'pharmacy_pos_update' %}">{% csrf_token %}<input type="hidden" name="action" value="clear"><button class="ph-link-btn" type="submit">Clear</button></form>{% endif %}</div>
+      {% if cart %}
+        <div class="ph-cart-list">
+          {% for line in cart %}
+          <article class="ph-cart-line">
+            <div class="ph-cart-line-head">
+              <div><strong>{{ line.medicine.name }}</strong>
+                <div class="ops-muted">{{ line.batch.batch_number }} · ₹{{ line.unit_price }} each · {{ line.available }} sellable now</div>
+                {% if not line.sellable %}<span class="ph-status blocked">Batch no longer sellable</span>{% endif %}
+              </div>
+              <span class="ph-cart-line-total">₹{{ line.total|floatformat:2 }}</span>
+            </div>
+            <div class="ph-cart-line-controls">
+              <form method="post" action="{% url 'pharmacy_pos_update' %}" class="ph-cart-update">{% csrf_token %}
+                <input type="hidden" name="batch" value="{{ line.batch.pk }}">
+                <label>Qty<input type="number" name="quantity" value="{{ line.quantity }}" min="1" max="{{ line.available }}"></label>
+                <label>Discount<input type="number" name="discount" value="{{ line.discount }}" min="0" step="0.01"></label>
+                <button class="np-btn" type="submit">Update</button>
+              </form>
+              <form method="post" action="{% url 'pharmacy_pos_update' %}">{% csrf_token %}<input type="hidden" name="action" value="remove"><input type="hidden" name="batch" value="{{ line.batch.pk }}"><button class="ph-link-btn" type="submit">Remove</button></form>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+        <form method="post" action="{% url 'pharmacy_pos_checkout' %}" class="ph-checkout"
+              data-pos-checkout data-subtotal="{{ subtotal }}" data-line-discount="{{ line_discount }}"
+              data-tax="{{ tax }}" data-total="{{ total }}" data-max-discount="{{ max_discount_percent }}">{% csrf_token %}
+          <input type="hidden" name="request_key" value="{{ request_id|default:'' }}">
+          {% if not patient %}<label class="ops-field">Walk-in name<input name="walk_in_name" maxlength="200" placeholder="Optional name for a direct sale"></label>{% endif %}
+          <dl class="ph-totals">
+            <div><dt>Subtotal</dt><dd>₹{{ subtotal|floatformat:2 }}</dd></div>
+            <div><dt>Line discounts</dt><dd>− ₹{{ line_discount|floatformat:2 }}</dd></div>
+            <div><dt>Tax</dt><dd>₹{{ tax|floatformat:2 }}</dd></div>
+            <div><dt>Bill discount</dt><dd><input type="number" name="discount" value="{{ bill_discount }}" min="0" step="0.01" aria-label="Bill discount" data-pos-discount></dd></div>
+            <div class="ph-total-row"><dt>Net payable</dt><dd data-pos-total>₹{{ total|floatformat:2 }}</dd></div>
+          </dl>
+          <p class="ph-note" data-pos-discount-note>Maximum bill discount is {{ max_discount_percent }}% of the subtotal.</p>
+          <fieldset><legend>Payment</legend>
+            <label class="ops-field">Method<select name="payment_method" data-pos-method><option value="cash">Cash</option><option value="upi">UPI</option><option value="card">Card</option><option value="credit">Authorised credit</option></select></label>
+            <label class="ops-field">Amount received<input type="number" name="amount_received" step="0.01" min="0" value="{{ total|floatformat:2 }}" data-pos-amount></label>
+            <label class="ops-field">Reference<input name="payment_reference" maxlength="100" placeholder="Card / UPI reference"></label>
+            {% if has_controlled and settings.require_controlled_authorisation %}
+            <label class="ops-field">Controlled medicine authorisation<input name="controlled_authorisation" maxlength="120" required placeholder="Pharmacist name / licence reference"></label>
+            {% endif %}
+          </fieldset>
+          <p class="ph-note" data-pos-credit-note hidden>Credit sales need a registered patient selected above; the balance stays on the sale.</p>
+          <button class="np-btn teal ph-checkout-btn" type="submit">Finalise sale</button>
+        </form>
+      {% else %}
+        <div class="ph-empty"><h3>Basket is empty</h3><p>Search a medicine and add a batch to begin. Use the prescription queue above to dispense against a doctor’s order.</p>{% if not selected_consultation and not selected_issue %}<a class="np-btn" href="{% url 'pharmacy_queue' %}">Open prescription queue</a>{% endif %}</div>
+      {% endif %}
+    </section>
+  </aside>
+</div>
+{% endblock %}
+{% block tail_scripts %}{{ block.super }}<script src="{% static 'js/pharmacy.js' %}?v=ph-workspace-1"></script>{% endblock %}

@@ -2,6 +2,14 @@
 {% load static %}
 {% block operations_content %}
 <a class="ph-back" href="{% url 'pharmacy_stock_report' %}">← Inventory</a>
+{% if form.medicine %}
+<section class="ph-panel ph-follow">
+  <div class="ph-panel-head">
+    <div><h2>Import from PDF or invoice</h2><p class="ph-note">Upload a supplier invoice to automatically load all medicine lines, batches and quantities. You will review the extracted rows before stock is received.</p></div>
+    <a class="np-btn teal" href="{% url 'pharmacy_import' %}?kind=stock">Import invoice / PDF</a>
+  </div>
+</section>
+{% endif %}
 <form method="post" class="ph-panel ph-stock-form">
   {% csrf_token %}{{ form.request_key }}{{ form.request_key.errors }}{{ form.non_field_errors }}
   {% if form.medicine %}

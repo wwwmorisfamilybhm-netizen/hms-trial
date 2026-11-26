@@ -1,0 +1,45 @@
+{% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · suppliers{% endblock %}
+{% block operations_intro %}Supplier records, licences, credit terms and the live outstanding balance carried by purchases.{% endblock %}
+{% block pharmacy_hero_actions %}
+<a class="ph-hero-btn ghost" href="{% url 'pharmacy_purchases' %}">Purchases</a>
+<a class="ph-hero-btn lime" href="{% url 'pharmacy_supplier_new' %}">＋ Add supplier</a>
+{% endblock %}
+{% block operations_content %}
+<div class="ph-kpi-grid">
+  <a class="ph-kpi is-slate ph-kpi-current" href="{% url 'pharmacy_suppliers' %}">
+    <span>Suppliers</span><strong>{{ suppliers.paginator.count }}</strong><small>Active and inactive</small>
+  </a>
+  <a class="ph-kpi is-rose" href="{% url 'pharmacy_purchases' %}">
+    <span>Total outstanding</span><strong>₹{{ total_outstanding|floatformat:2 }}</strong><small>Across all purchases</small>
+  </a>
+  <a class="ph-kpi is-teal" href="{% url 'pharmacy_purchase_new' %}">
+    <span>New purchase</span><strong>＋</strong><small>Order or goods receipt</small>
+  </a>
+</div>
+
+<section class="ph-panel">
+  <div class="ph-panel-head">
+    <h2>Supplier management</h2>
+    <form method="get" class="ph-search"><input type="search" name="q" value="{{ query }}" placeholder="Name, contact, phone or GSTIN" aria-label="Search suppliers"><button class="np-btn">Search</button></form>
+  </div>
+  <div class="ops-scroll"><table class="ops-table">
+    <thead><tr><th>Supplier</th><th>Contact</th><th>Licence / GSTIN</th><th>Terms</th><th>Outstanding</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for supplier in suppliers %}<tr>
+      <td><a href="{% url 'pharmacy_supplier_edit' supplier.pk %}"><strong>{{ supplier.name }}</strong></a>{% if supplier.address %}<div class="ops-muted">{{ supplier.address|truncatechars:80 }}</div>{% endif %}</td>
+      <td>{{ supplier.contact_person|default:"—" }}<div class="ops-muted">{{ supplier.phone }}{% if supplier.email %} · {{ supplier.email }}{% endif %}</div></td>
+      <td>{{ supplier.drug_licence|default:"—" }}<div class="ops-muted">{{ supplier.gstin|default:"No GSTIN" }}</div></td>
+      <td>{{ supplier.payment_terms|default:"—" }}{% if supplier.credit_period_days %}<div class="ops-muted">{{ supplier.credit_period_days }} days credit</div>{% endif %}</td>
+      <td>₹{{ supplier.outstanding_balance|floatformat:2 }}</td>
+      <td><span class="ph-status {% if supplier.is_active %}ready{% else %}muted{% endif %}">{% if supplier.is_active %}Active{% else %}Inactive{% endif %}</span></td>
+      <td>
+        <div class="ops-actions">
+          <a class="np-btn" href="{% url 'pharmacy_supplier_edit' supplier.pk %}">Edit</a>
+          <a class="ph-chip" href="{% url 'pharmacy_purchases' %}?supplier={{ supplier.pk }}">Purchases</a>
+        </div>
+      </td>
+    </tr>{% empty %}<tr><td colspan="7" class="ops-empty">No suppliers yet. <a href="{% url 'pharmacy_supplier_new' %}">Add the first supplier</a>.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% include "core/pharmacy_pagination.html" with page=suppliers %}
+</section>
+{% endblock %}

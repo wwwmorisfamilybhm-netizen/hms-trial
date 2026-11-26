@@ -1,0 +1,92 @@
+{% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · batch detail{% endblock %}
+{% block operations_content %}
+<a class="ph-back" href="{% url 'pharmacy_stock_report' %}">← Batch inventory</a>
+<div class="ph-bento">
+  <div class="ph-col">
+    <section class="ph-panel">
+      <div class="ph-panel-head">
+        <div>
+          <h2>{{ batch.medicine.name }}</h2>
+          <p class="ops-muted">Batch {{ batch.batch_number }} · {{ batch.supplier }} · {{ batch.invoice_reference }}</p>
+        </div>
+        <span class="ph-status {% if batch.sellable %}ready{% else %}blocked{% endif %}">{{ batch.get_status_display }}</span>
+      </div>
+      <div class="ph-chip-row" style="margin-bottom:14px;">
+        <a class="ph-chip" href="{% url 'medicine_edit' batch.medicine.pk %}">Medicine master →</a>
+        <a class="ph-chip" href="{% url 'pharmacy_expiry' %}?window=expired">Expiry desk →</a>
+        <a class="ph-chip" href="{% url 'pharmacy_stock_report' %}?q={{ batch.batch_number|urlencode }}">All batches →</a>
+      </div>
+      <dl class="ph-quantities">
+        <div><dt>Expiry</dt><dd>{{ batch.expiry_date|date:"d M Y" }}{% if batch.expired %}<br><span class="ph-status blocked">Expired</span>{% endif %}</dd></div>
+        <div><dt>On hand</dt><dd>{{ batch.on_hand }}</dd></div>
+        <div><dt>Reserved</dt><dd>{{ batch.reserved }}</dd></div>
+        <div><dt>Quarantined</dt><dd>{{ batch.quarantined }}</dd></div>
+        <div><dt>Damaged</dt><dd>{{ batch.damaged }}</dd></div>
+        <div><dt>Sellable now</dt><dd>{{ available }}</dd></div>
+        <div><dt>Purchase cost</dt><dd>₹{{ batch.purchase_cost }}</dd></div>
+        <div><dt>Selling price</dt><dd>₹{{ batch.selling_price }}</dd></div>
+        <div><dt>MRP</dt><dd>{% if batch.mrp %}₹{{ batch.mrp }}{% else %}—{% endif %}</dd></div>
+        <div><dt>Storage</dt><dd>{{ batch.storage_location|default:"Not recorded" }}</dd></div>
+      </dl>
+      <div class="ops-actions">
+        <a class="np-btn" href="{% url 'pharmacy_batch_action' %}?action=damage&batch={{ batch.pk }}">Record damage</a>
+        <a class="np-btn" href="{% url 'pharmacy_batch_action' %}?action=quarantine&batch={{ batch.pk }}">Quarantine</a>
+        <a class="np-btn" href="{% url 'pharmacy_batch_action' %}?action=release&batch={{ batch.pk }}">Release quarantine</a>
+        <a class="np-btn" href="{% url 'pharmacy_batch_action' %}?action=transfer&batch={{ batch.pk }}">Transfer</a>
+        <a class="np-btn" href="{% url 'pharmacy_returns' %}?kind=supplier&batch={{ batch.pk }}">Return to supplier</a>
+        <a class="np-btn" href="{% url 'pharmacy_receive' %}?medicine={{ batch.medicine.pk }}">Receive more</a>
+      </div>
+    </section>
+
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Location transfers</h2></div>
+      {% if transfers %}
+      <div class="ops-scroll"><table class="ops-table">
+        <thead><tr><th>When</th><th>From</th><th>To</th><th>Units</th><th>Recorded by</th></tr></thead>
+        <tbody>{% for transfer in transfers %}<tr>
+          <td>{{ transfer.created_at|date:"d M Y H:i" }}</td>
+          <td>{{ transfer.from_location }}</td>
+          <td>{{ transfer.to_location }}</td>
+          <td>{{ transfer.quantity }}</td>
+          <td>{% firstof transfer.completed_by.get_full_name transfer.completed_by.username "—" %}</td>
+        </tr>{% endfor %}</tbody>
+      </table></div>
+      {% else %}
+      <div class="ph-empty"><h3>No location transfers</h3><p>Moving this batch to another shelf records a transfer here.</p></div>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="ph-col">
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Batch movement ledger</h2><a href="{% url 'pharmacy_stock_report' %}#ledger">Pharmacy ledger →</a></div>
+      <div class="ops-scroll"><table class="ops-table">
+        <thead><tr><th>When</th><th>Change</th><th>Kind</th><th>Source</th><th>Staff</th></tr></thead>
+        <tbody>{% for movement in movements %}<tr>
+          <td>{{ movement.created_at|date:"d M Y H:i" }}<div class="ops-muted">{{ movement.reason }}</div></td>
+          <td>{{ movement.quantity }}</td>
+          <td><span class="ops-badge">{{ movement.get_kind_display }}</span></td>
+          <td>
+            {% if movement.sale %}<a href="{% url 'pharmacy_sale_invoice' movement.sale_id %}">{{ movement.sale.reference }}</a>
+            {% elif movement.issue %}<a href="{% url 'pharmacy_issue' movement.issue_id %}">Issue #{{ movement.issue_id }}</a>
+            {% elif movement.purchase %}<a href="{% url 'pharmacy_purchase_detail' movement.purchase_id %}">{{ movement.purchase.reference }}</a>
+            {% else %}—{% endif %}
+          </td>
+          <td>{% firstof movement.actor.get_full_name movement.actor.username %}</td>
+        </tr>{% empty %}<tr><td colspan="5" class="ops-empty">No movements recorded for this batch.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </section>
+
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Quarantine &amp; returns</h2><a href="{% url 'pharmacy_returns' %}?batch={{ batch.pk }}">Register →</a></div>
+      <p class="ph-note">Held units are physical stock but cannot be sold; release them from the action bar above once assessed.</p>
+      <div class="ph-summary">
+        <div class="ph-summary-row"><span>Held units</span><strong>{{ batch.quarantined }}</strong></div>
+        <div class="ph-summary-row"><span>Damaged units</span><strong>{{ batch.damaged }}</strong></div>
+        <div class="ph-summary-row"><span>Reserved for issues</span><strong>{{ batch.reserved }}</strong></div>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

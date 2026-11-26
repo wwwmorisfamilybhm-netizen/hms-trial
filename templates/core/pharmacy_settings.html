@@ -1,0 +1,53 @@
+{% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · policy{% endblock %}
+{% block operations_intro %}Thresholds and sales policy shape every expiry alert, discount check and controlled-medicine sale.{% endblock %}
+{% block operations_content %}
+<div class="ph-bento">
+  <div class="ph-col">
+    <form method="post" class="ph-panel ph-stock-form" style="max-width:none;">
+      {% csrf_token %}{{ form.non_field_errors }}
+      <div class="ph-panel-head"><h2>Policy controls</h2><span class="ph-note">Applied immediately</span></div>
+      <fieldset><legend>Alert thresholds</legend>
+        {% include "core/pharmacy_field.html" with field=form.expiry_warning_days %}
+        {% include "core/pharmacy_field.html" with field=form.near_expiry_warn_days %}
+        <p class="ph-note">Critical must sit inside the watch window. The dashboard and hero capsules lead with the critical window.</p>
+      </fieldset>
+      <fieldset><legend>Sales policy</legend>
+        {% include "core/pharmacy_field.html" with field=form.default_gst_rate %}
+        {% include "core/pharmacy_field.html" with field=form.max_discount_percent %}
+        {% include "core/pharmacy_field.html" with field=form.allow_direct_sales %}
+        {% include "core/pharmacy_field.html" with field=form.require_controlled_authorisation %}
+      </fieldset>
+      <p class="ph-note">Last updated {{ settings.updated_at|date:"d M Y H:i" }}{% if settings.updated_by %} by {% firstof settings.updated_by.get_full_name settings.updated_by.username %}{% endif %}.</p>
+      <button class="np-btn teal" type="submit">Save pharmacy settings</button>
+    </form>
+  </div>
+
+  <div class="ph-col">
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Current policy</h2><a href="{% url 'pharmacy_audit' %}?action=settings_updated">Change log →</a></div>
+      <div class="ph-summary">
+        <div class="ph-summary-row"><span>Critical expiry</span><strong>{{ settings.near_expiry_warn_days }} days</strong></div>
+        <div class="ph-summary-row"><span>Watch window</span><strong>{{ settings.expiry_warning_days }} days</strong></div>
+        <div class="ph-summary-row"><span>Default GST</span><strong>{{ settings.default_gst_rate }}%</strong></div>
+        <div class="ph-summary-row"><span>Maximum discount</span><strong>{{ settings.max_discount_percent }}%</strong></div>
+        <div class="ph-summary-row"><span>Direct sales</span><strong>{% if settings.allow_direct_sales %}Enabled{% else %}Disabled{% endif %}</strong></div>
+        <div class="ph-summary-row"><span>Controlled authorisation</span><strong>{% if settings.require_controlled_authorisation %}Required{% else %}Optional{% endif %}</strong></div>
+      </div>
+      {% if not settings.allow_direct_sales %}
+      <p class="ops-warning">The POS is disabled for all staff while direct sales are off. Prescription dispensing still works.</p>
+      {% endif %}
+    </section>
+
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>See the effect</h2></div>
+      <div class="ph-quick-grid">
+        <a href="{% url 'pharmacy_expiry' %}?window=critical"><strong>Critical window</strong><span>Batches within {{ settings.near_expiry_warn_days }} days</span></a>
+        <a href="{% url 'pharmacy_expiry' %}?window=watch"><strong>Watch list</strong><span>Batches within {{ settings.expiry_warning_days }} days</span></a>
+        <a href="{% url 'pharmacy_pos' %}"><strong>POS policy</strong><span>{% if settings.allow_direct_sales %}Direct sales enabled{% else %}Direct sales disabled{% endif %}</span></a>
+        <a href="{% url 'pharmacy_audit' %}"><strong>Audit trail</strong><span>Every settings change is logged</span></a>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

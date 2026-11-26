@@ -91,10 +91,11 @@ class PatientRegistrationForm(forms.ModelForm):
             "centre", "date_of_birth", "phone", "email", "care_of", "aadhar_no", "abha_no",
             "nationality", "state", "district", "pin_code", "zone", "block", "village",
             "religion", "address", "reg_fee", "con_fee", "discount", "payment_type",
-            "patient_category", "reference_no", "billing_type", "mlc", "photo",
+            "patient_category", "reference_no", "valid_upto", "billing_type", "mlc", "photo",
         ]
         widgets = {
             "date_of_birth": forms.DateInput(attrs={"type": "date"}),
+            "valid_upto": forms.DateInput(attrs={"type": "date"}),
             "address": forms.Textarea(attrs={"rows": 2}),
             "gender": forms.Select(),
             "marital_status": forms.Select(),

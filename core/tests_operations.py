@@ -26,6 +26,14 @@ def staff(name, role):
     return user
 
 
+def close_file_without_request_finished(response):
+    # Django's test client wraps streaming content. response.close() emits
+    # request_finished, which closes PostgreSQL's TestCase transaction.
+    for close in response._resource_closers:
+        close()
+    response._resource_closers.clear()
+
+
 class PharmacyWorkflowTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -129,8 +137,12 @@ class PharmacyWorkflowTests(TestCase):
     def test_pharmacy_pages_cashier_and_role_boundaries(self):
         self.receipt();issue=self.issue()
         self.client.force_login(self.pharmacist)
-        for name in ['pharmacy_dashboard','pharmacy_queue','medicine_catalogue','pharmacy_receive','pharmacy_stock_report','pharmacy_adjust','pharmacy_dispense_history']:
+        for name in ['pharmacy_dashboard','pharmacy_queue','medicine_catalogue','pharmacy_receive','pharmacy_stock_report','pharmacy_dispense_history']:
             self.assertEqual(self.client.get(reverse(name)).status_code,200,name)
+        self.assertEqual(self.client.get(reverse('pharmacy_adjust')).status_code,403)
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(reverse('pharmacy_adjust')).status_code,200)
+        self.client.force_login(self.pharmacist)
         self.assertEqual(self.client.get(reverse('pharmacy_consultation',args=[self.consultation.pk])).status_code,200)
         self.assertContains(self.client.get(reverse('pharmacy_issue',args=[issue.pk])),'Confirm',count=0)
         self.assertEqual(self.client.get(reverse('pharmacy_stock_report')+'?export=csv').status_code,200)
@@ -170,12 +182,12 @@ class PharmacyWorkflowTests(TestCase):
         session=self.client.session;session['designation']='pharmacy';session.save()
         response=self.client.get(reverse('pharmacy_dashboard'))
         self.assertContains(response,'class="brand" href="/pharmacy/"')
-        self.assertContains(response,'Medicine catalogue',count=1)
+        self.assertContains(response,'Medicine master',count=1)
 
     def test_desk_follows_a_partial_prescription_through_handover(self):
         self.receipt(packs=2)
         self.client.force_login(self.pharmacist)
-        desk = reverse("pharmacy_dashboard")
+        desk = reverse("pharmacy_queue")
         detail = reverse("pharmacy_consultation", args=[self.consultation.pk])
         state = "?tab=prepare&q=OPS-TEST&page=1"
         self.assertEqual(self.client.get(desk).context["tab"], "ready")
@@ -202,7 +214,7 @@ class PharmacyWorkflowTests(TestCase):
         self.receipt(packs=3)
         Medicine.objects.create(name="Unreceived item")
         self.client.force_login(self.pharmacist)
-        self.assertEqual(self.client.get(reverse("pharmacy_dashboard")).context["low_count"], 1)
+        self.assertEqual(self.client.get(reverse("pharmacy_dashboard")).context["metrics"]["low"], 1)
         url = reverse("pharmacy_stock_report")
         self.assertContains(self.client.get(url, {"filter": "low"}), "No batch received")
         csv = self.client.get(url, {"filter": "low", "export": "csv"})
@@ -215,7 +227,7 @@ class PharmacyWorkflowTests(TestCase):
         newer = self.issue(quantity=2)
         PharmacyIssue.objects.filter(pk=older.pk).update(created_at=timezone.now() - timedelta(days=2))
         self.client.force_login(self.pharmacist)
-        url = reverse("pharmacy_dashboard")
+        url = reverse("pharmacy_queue")
         response = self.client.get(url, {"tab": "payment"})
         self.assertEqual(list(response.context["records"]), [older, newer])
         self.assertEqual(response.context["stale_count"], 1)
@@ -259,9 +271,9 @@ class PharmacyWorkflowTests(TestCase):
         url=reverse('medicine_catalogue')
         page=self.client.get(url)
         self.assertEqual(page.context['counts'],{'total':4,'active':3,'low':2,'unstocked':2,'expiring':2})
-        self.assertContains(page,'tablets available')
+        self.assertContains(page,'<strong>20</strong> tablets')
         self.assertContains(page,'No stock yet')
-        self.assertContains(page,'Expiring ≤ 90 d')
+        self.assertContains(page,'Exp ≤ 90d')
         self.assertContains(page,'is-inactive')
         # Search covers barcode and manufacturer, not just the name.
         self.assertContains(self.client.get(url,{'q':'8900000001'}),'Unstocked syrup')
@@ -377,7 +389,7 @@ class ServiceOperationsTests(TestCase):
                 self.assertEqual(self.client.get(reverse('report_download',args=[report.pk])).status_code,404)
             self.client.force_login(self.doctor)
             download=self.client.get(reverse('report_download',args=[report.pk]))
-            self.assertEqual(download.status_code,200);download.close()
+            self.assertEqual(download.status_code,200);close_file_without_request_finished(download)
             self.assertContains(self.client.get(reverse('service_reports')),'Lab report')
             self.client.post(reverse('report_review',args=[report.pk]));report.refresh_from_db()
             timestamp=report.reviewed_at;self.assertEqual(report.reviewed_by,self.doctor)
@@ -498,7 +510,7 @@ class PharmacyConcurrencyTests(TransactionTestCase):
     def test_two_counters_cannot_reserve_the_same_stock(self):
         from concurrent.futures import ThreadPoolExecutor
         from threading import Barrier
-        from django.db import close_old_connections, OperationalError, IntegrityError
+        from django.db import close_old_connections, connections, OperationalError, IntegrityError
         pharmacist=staff('concurrent_pharmacist','pharmacy')
         patient=Patient.objects.create(first_name='Concurrency')
         medicine=Medicine.objects.create(name='Concurrent medicine')
@@ -518,7 +530,7 @@ class PharmacyConcurrencyTests(TransactionTestCase):
             except (ValidationError,OperationalError,IntegrityError):
                 return None
             finally:
-                close_old_connections()
+                connections.close_all()
         with ThreadPoolExecutor(max_workers=2) as pool:
             results=list(pool.map(reserve,range(2)))
         # SQLite may reject both contending transactions; a retry must still allow only one winner.

@@ -6,7 +6,7 @@
   <div class="mb-header">
     <div>
       <div class="mb-welcome">Patient Directory</div>
-      <h1 class="mb-desk-name">Patients ({{ patients|length }})</h1>
+      <h1 class="mb-desk-name">Patients ({{ patient_total }})</h1>
       <p class="page-sub" style="margin:6px 0 0; color:var(--mb-text-muted); font-size:13px;">Master outpatient registration list · Complete records and history</p>
     </div>
     <div class="mb-header-tools">
@@ -52,7 +52,7 @@
           <td>
             <div style="display:flex; align-items:center; gap:12px;">
               {% if patient.photo %}
-                <img src="{{ patient.photo.url }}" alt="{{ patient.full_name }}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:2px solid var(--line); flex-shrink:0;">
+                <img src="{{ patient.photo.url }}" alt="{{ patient.full_name }}" width="40" height="40" loading="lazy" decoding="async" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:2px solid var(--line); flex-shrink:0;">
               {% else %}
                 <div style="width:40px; height:40px; border-radius:50%; background:var(--lav-soft); color:var(--ink); display:grid; place-items:center; font-size:13px; font-weight:750; flex-shrink:0;">
                   {{ patient.first_name|first }}{{ patient.last_name|first }}
@@ -113,4 +113,14 @@
     </div>
   {% endif %}
 </section>
+{% if patients.paginator.num_pages > 1 %}
+<nav class="patient-pagination" aria-label="Patient directory pages" style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:16px;">
+  <span class="muted">Showing {{ patients.start_index }}–{{ patients.end_index }} of {{ patient_total }}</span>
+  <div style="display:flex; gap:8px; align-items:center;">
+    {% if patients.has_previous %}<a class="btn btn-outline" href="?q={{ query|urlencode }}&page={{ patients.previous_page_number }}">Previous</a>{% endif %}
+    <span class="muted">Page {{ patients.number }} of {{ patients.paginator.num_pages }}</span>
+    {% if patients.has_next %}<a class="btn btn-outline" href="?q={{ query|urlencode }}&page={{ patients.next_page_number }}">Next</a>{% endif %}
+  </div>
+</nav>
+{% endif %}
 {% endblock %}

@@ -1,0 +1,64 @@
+{% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · expiry control{% endblock %}
+{% block operations_intro %}Expired and blocked batches cannot be sold or dispensed. Review each window, then return stock or write it off from the batch page.{% endblock %}
+{% block operations_content %}
+<div class="ph-kpi-grid">
+  <a class="ph-kpi is-slate{% if not window or window == 'all' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_expiry' %}{% querystring window=None page=None %}">
+    <span>All batches</span><strong>{{ counts.all }}</strong><small>With physical stock</small>
+  </a>
+  <a class="ph-kpi is-rose{% if window == 'critical' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_expiry' %}{% querystring window='critical' page=None %}">
+    <span>Critical</span><strong>{{ counts.critical }}</strong><small>Within {{ settings.near_expiry_warn_days }} days</small>
+  </a>
+  <a class="ph-kpi is-amber{% if window == 'watch' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_expiry' %}{% querystring window='watch' page=None %}">
+    <span>Watch list</span><strong>{{ counts.watch }}</strong><small>Within {{ settings.expiry_warning_days }} days</small>
+  </a>
+  <a class="ph-kpi is-teal{% if window == '30' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_expiry' %}{% querystring window='30' page=None %}">
+    <span>Next 30 days</span><strong>{{ counts.30 }}</strong><small>Batches expiring</small>
+  </a>
+  <a class="ph-kpi is-violet{% if window == '90' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_expiry' %}{% querystring window='90' page=None %}">
+    <span>Next 90 days</span><strong>{{ counts.90 }}</strong><small>Batches expiring</small>
+  </a>
+  <a class="ph-kpi is-rose{% if window == 'expired' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_expiry' %}{% querystring window='expired' page=None %}">
+    <span>Expired</span><strong>{{ counts.expired }}</strong><small>Blocked from dispensing</small>
+  </a>
+</div>
+
+<section class="ph-panel">
+  <div class="ph-panel-head">
+    <h2>Batches by expiry window</h2>
+    <form method="get" class="ph-search">
+      <input type="hidden" name="window" value="{{ window }}">
+      <input type="search" name="q" value="{{ query }}" placeholder="Medicine or batch" aria-label="Search expiry">
+      <button class="np-btn">Search</button>
+    </form>
+  </div>
+  <div class="ph-chip-row" style="margin:4px 0 14px;">
+    <a class="ph-chip{% if window == 'all' %} is-active{% endif %}" href="{% url 'pharmacy_expiry' %}{% querystring window=None page=None %}">All</a>
+    <a class="ph-chip{% if window == 'critical' %} is-active{% endif %}" href="{% url 'pharmacy_expiry' %}{% querystring window='critical' page=None %}">Critical</a>
+    <a class="ph-chip{% if window == 'watch' %} is-active{% endif %}" href="{% url 'pharmacy_expiry' %}{% querystring window='watch' page=None %}">Watch</a>
+    <a class="ph-chip{% if window == '30' %} is-active{% endif %}" href="{% url 'pharmacy_expiry' %}{% querystring window='30' page=None %}">30 days</a>
+    <a class="ph-chip{% if window == '60' %} is-active{% endif %}" href="{% url 'pharmacy_expiry' %}{% querystring window='60' page=None %}">60 days</a>
+    <a class="ph-chip{% if window == '90' %} is-active{% endif %}" href="{% url 'pharmacy_expiry' %}{% querystring window='90' page=None %}">90 days</a>
+    <a class="ph-chip{% if window == 'expired' %} is-active{% endif %}" href="{% url 'pharmacy_expiry' %}{% querystring window='expired' page=None %}">Expired</a>
+  </div>
+  <div class="ops-scroll"><table class="ops-table">
+    <thead><tr><th>Medicine / batch</th><th>Expiry</th><th>Days left</th><th>On hand</th><th>Reserved</th><th>Quarantined</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for batch in batches %}<tr>
+      <td><a href="{% url 'pharmacy_batch_detail' batch.pk %}"><strong>{{ batch.medicine.name }}</strong></a><div class="ops-muted">{{ batch.batch_number }} · {{ batch.supplier }}</div></td>
+      <td>{{ batch.expiry_date|date:"d M Y" }}</td>
+      <td class="ph-expiry-days">{% if batch.expiry_date < today %}<span class="ph-status blocked">Expired</span>{% else %}{{ batch.expiry_date|timeuntil }}{% endif %}</td>
+      <td>{{ batch.on_hand }}</td><td>{{ batch.reserved }}</td><td>{{ batch.quarantined }}</td>
+      <td><span class="ph-status {% if batch.status == 'active' and batch.expiry_date >= today %}ready{% else %}blocked{% endif %}">{{ batch.get_status_display }}</span></td>
+      <td>
+        <div class="ops-actions">
+          <a class="np-btn" href="{% url 'pharmacy_batch_detail' batch.pk %}">Open</a>
+          {% if batch.expiry_date < today or window == 'critical' or window == 'expired' %}
+          <a class="ph-chip" href="{% url 'pharmacy_returns' %}?kind=supplier&batch={{ batch.pk }}">Return to supplier</a>
+          {% endif %}
+        </div>
+      </td>
+    </tr>{% empty %}<tr><td colspan="8" class="ops-empty">No batches match this expiry window.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% include "core/pharmacy_pagination.html" with page=batches %}
+</section>
+{% endblock %}

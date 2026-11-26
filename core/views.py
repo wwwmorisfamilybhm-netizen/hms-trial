@@ -6,10 +6,9 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, OperationalError, transaction
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
-from django.http import FileResponse, HttpResponseForbidden
+from django.http import FileResponse, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.views.decorators.cache import never_cache
@@ -29,6 +28,7 @@ from .operations import (
 )
 from .operations_views import accessible_reports
 from .backup import BackupArchiveError, build_patient_backup, import_patient_backup
+from .registration import create_opd_visit_for_patient, find_potential_duplicates
 
 
 def home(request):
@@ -2399,6 +2399,8 @@ def registration_desk(request):
         emergency=emergency,
     )
 
+    collection_summary = _collection_summary(rows, selected_date)
+
     recent_registered = Patient.objects.order_by("-created_at")[:5]
 
     return render(request, "core/registration_desk.html", {
@@ -2414,22 +2416,32 @@ def registration_desk(request):
         "can_register": can_register,
         "recent_registered": recent_registered,
         "last_registered": recent_registered[0] if recent_registered else None,
+        "collection_summary": collection_summary,
         "user": request.user,
     })
 
 
-@login_required(login_url="login")
-def registration_desk_new(request):
-    """New patient registration form — Registration Desk counter."""
+def _registration_access_denied(request):
+    """Shared gate for the registration counter: doctors are not allowed."""
     user_desig = normalize_designation(
         getattr(getattr(request.user, "profile", None), "designation", None)
         or request.session.get("designation")
     )
     if user_desig == "doctor" and not request.user.is_superuser:
-        from django.contrib import messages
-        messages.warning(request, "Access restricted: Patient Registration counter is for Registration Desk staff only.")
+        messages.warning(
+            request,
+            "Access restricted: Patient Registration counter is for Registration Desk staff only.",
+        )
         return redirect("dashboard")
-    from decimal import Decimal
+    return None
+
+
+@login_required(login_url="login")
+def registration_desk_new(request):
+    """New patient registration form — Registration Desk counter."""
+    denied = _registration_access_denied(request)
+    if denied:
+        return denied
 
     from patients.models import Patient
 
@@ -2470,30 +2482,14 @@ def registration_desk_new(request):
                 # New registrations automatically generate an OPD appointment. No
                 # doctor is chosen here; the OPD assistant assigns one from the
                 # central pool.
-                from django.utils import timezone as _tz
-                from appointments.models import Appointment as _Appointment
-                appointment = _Appointment.objects.create(
-                    patient=patient,
-                    doctor=None,
-                    date=_tz.localdate(),
-                    start_time=__import__("datetime").datetime.now().time().replace(second=0, microsecond=0),
-                    duration_minutes=30,
-                    status=_Appointment.Status.SCHEDULED,
+                create_opd_visit_for_patient(
+                    patient,
+                    user=request.user,
+                    reg_fee=patient.reg_fee,
+                    con_fee=patient.con_fee,
+                    discount=patient.discount,
                     reason="New patient registration - OPD",
                 )
-
-                registration_total = (patient.reg_fee or Decimal("0")) + (patient.con_fee or Decimal("0"))
-                registration_discount = min(patient.discount or Decimal("0"), registration_total)
-                if registration_total - registration_discount > 0:
-                    PatientBill.objects.create(
-                        patient=patient,
-                        source=PatientBill.Source.REGISTRATION,
-                        appointment=appointment,
-                        description="Patient registration & consultation fee",
-                        amount=registration_total,
-                        discount=registration_discount,
-                        created_by=request.user,
-                    )
             return redirect("patient_print_card", patient_id=patient.pk)
     else:
         from patients.forms import PatientRegistrationForm
@@ -2522,6 +2518,127 @@ def registration_desk_new(request):
         "default_consultation_fee": form.default_consultation_fee,
         "default_discount": form.default_discount,
     })
+
+
+@login_required(login_url="login")
+def registration_check_duplicate(request):
+    """JSON lookup for possible existing patients matching phone/Aadhar.
+
+    Used by the live, non-blocking duplicate warning on the registration form.
+    """
+    matches = find_potential_duplicates(
+        phone=request.GET.get("phone", ""),
+        aadhar_no=request.GET.get("aadhar_no", ""),
+    )
+    return JsonResponse({"matches": matches})
+
+
+@require_POST
+@login_required(login_url="login")
+def registration_desk_revisit(request, patient_id):
+    """Start a new OPD visit for an already-registered patient."""
+    denied = _registration_access_denied(request)
+    if denied:
+        return denied
+
+    from decimal import Decimal
+
+    from patients.models import PatientCategoryConfig, RegistrationFeeSettings
+
+    patient = get_object_or_404(Patient, pk=patient_id)
+
+    # Prefer the fee snapshot already stored on the patient; fall back to the
+    # category/default configuration when the record carries no fees at all.
+    reg_fee = patient.reg_fee
+    con_fee = patient.con_fee
+    discount = patient.discount
+    if not (reg_fee or con_fee):
+        category = PatientCategoryConfig.objects.filter(
+            code=patient.patient_category, is_active=True
+        ).first()
+        fee_settings = RegistrationFeeSettings.objects.order_by("pk").first()
+        reg_fee = (
+            (category.registration_fee if category else None)
+            or (fee_settings.default_registration_fee if fee_settings else None)
+            or Decimal("0")
+        )
+        con_fee = (
+            (fee_settings.default_consultation_fee if fee_settings else None)
+            or Decimal("0")
+        )
+        discount = (
+            (fee_settings.default_discount if fee_settings else None)
+            or Decimal("0")
+        )
+
+    appointment, bill = create_opd_visit_for_patient(
+        patient,
+        user=request.user,
+        reg_fee=reg_fee,
+        con_fee=con_fee,
+        discount=discount,
+        reason="OPD Revisit",
+    )
+
+    if bill is not None:
+        messages.success(
+            request,
+            f"New OPD visit started for {patient.full_name} (UHID #{patient.uhid or patient.pk}). "
+            f"Bill {bill.bill_number} for ₹{bill.amount_due:,.2f} raised for collection.",
+        )
+    else:
+        messages.success(
+            request,
+            f"New OPD visit started for {patient.full_name} (UHID #{patient.uhid or patient.pk}). "
+            "No fee is due for this visit.",
+        )
+    return redirect("patient_print_card", patient_id=patient.pk)
+
+
+@login_required(login_url="login")
+def registration_desk_export(request):
+    """Download the filtered OPD register as a CSV file."""
+    import csv
+    from datetime import datetime
+
+    query = request.GET.get("q", "").strip()
+    status = request.GET.get("status", "").strip()
+    date_str = request.GET.get("date", "").strip()
+    emergency = request.GET.get("emergency") == "1"
+    selected_date = None
+    if date_str:
+        try:
+            selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            selected_date = None
+
+    rows = _history_rows(
+        query=query,
+        status=status,
+        selected_date=selected_date,
+        include_appointments=True,
+        emergency=emergency,
+    )
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="opd_register.csv"'
+    writer = csv.writer(response)
+    writer.writerow(["Date", "Time", "Type", "Patient / Record", "Detail", "C/O", "Status", "Emergency"])
+    for row in rows:
+        when = row.get("when")
+        when_date = when.strftime("%Y-%m-%d") if when else ""
+        when_time = when.strftime("%H:%M") if when else ""
+        writer.writerow([
+            when_date,
+            when_time,
+            "Patient" if row["kind"] == "patient" else "Appointment",
+            row["title"],
+            row.get("detail") or "",
+            row.get("care_of") or "",
+            row.get("status") or "Registered",
+            "Yes" if row.get("is_emergency") else "No",
+        ])
+    return response
 
 
 @login_required(login_url="login")
@@ -2669,6 +2786,64 @@ def patient_print_card(request, patient_id):
 
 # ── History ───────────────────────────────────────────────────────────────────
 
+def _collection_summary(rows, selected_date=None):
+    """Payment-method collection totals for the records shown in the register.
+
+    Bills belong to patients, so the strip totals the bills of every patient
+    visible in the filtered rows: paid money for the register day (the date
+    filter, or today) split by method, plus everything still pending.
+    """
+    from decimal import Decimal
+
+    from django.db.models import Sum
+    from django.utils import timezone
+
+    summary = {
+        "cash": Decimal("0"),
+        "upi": Decimal("0"),
+        "card": Decimal("0"),
+        "pending": Decimal("0"),
+        "paid_total": Decimal("0"),
+        "count": 0,
+        "pending_count": 0,
+    }
+
+    patient_ids = {row.get("patient_id") for row in rows if row.get("patient_id")}
+    if not patient_ids:
+        return summary
+
+    bills = PatientBill.objects.filter(patient_id__in=patient_ids)
+    day = selected_date or timezone.localdate()
+
+    def _method_total(*methods):
+        totals = bills.filter(
+            status=PatientBill.Status.PAID,
+            paid_at__date=day,
+            payment_method__in=methods,
+        ).aggregate(amount=Sum("amount"), discount=Sum("discount"))
+        return (totals["amount"] or Decimal("0")) - (totals["discount"] or Decimal("0"))
+
+    summary["cash"] = _method_total(PatientBill.PaymentMethod.CASH)
+    summary["upi"] = _method_total(PatientBill.PaymentMethod.UPI)
+    summary["card"] = _method_total(PatientBill.PaymentMethod.CARD)
+
+    paid = bills.filter(status=PatientBill.Status.PAID, paid_at__date=day)
+    paid_totals = paid.aggregate(amount=Sum("amount"), discount=Sum("discount"))
+    summary["paid_total"] = (paid_totals["amount"] or Decimal("0")) - (
+        paid_totals["discount"] or Decimal("0")
+    )
+    summary["count"] = paid.count()
+
+    pending = bills.filter(status=PatientBill.Status.PENDING)
+    pending_totals = pending.aggregate(amount=Sum("amount"), discount=Sum("discount"))
+    summary["pending"] = (pending_totals["amount"] or Decimal("0")) - (
+        pending_totals["discount"] or Decimal("0")
+    )
+    summary["pending_count"] = pending.count()
+
+    return summary
+
+
 def _history_rows(query="", status="", selected_date=None, include_appointments=False, emergency=False):
     """Build the history rows (patient registrations and, optionally, appointments).
 
@@ -2741,6 +2916,7 @@ def _history_rows(query="", status="", selected_date=None, include_appointments=
             )
             rows.append({
                 "kind": "appointment",
+                "patient_id": appointment.patient_id,
                 "when": start,
                 "badge": f"Appointment · {appointment.doctor}",
                 "title": appointment.patient.full_name,

@@ -1,17 +1,26 @@
 {% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · issue detail{% endblock %}
 {% block operations_content %}
 {% if can_dispense %}
   {% if request.GET.source == 'history' %}<a class="ph-back ops-no-print" href="{% url 'pharmacy_dispense_history' %}{% querystring source=None %}">← Dispensing history</a>
-  {% else %}<a class="ph-back ops-no-print" href="{% url 'pharmacy_dashboard' %}{% querystring %}">← Back to work queue</a>{% endif %}
+  {% else %}<a class="ph-back ops-no-print" href="{% url 'pharmacy_queue' %}{% querystring %}">← Back to work queue</a>{% endif %}
 {% endif %}
-<article class="ops-card">
-  <header class="ops-header">
-    <div><h2 class="ops-patient">{{ issue.consultation.patient.full_name }}</h2>
-      <p class="ops-muted">{{ issue.consultation.patient.uhid }} · {{ issue.consultation.visit_token }}<br>
-        Issue #{{ issue.pk }} · {{ issue.created_at|date:'d M Y H:i' }} · {{ issue.bill.bill_number }}</p></div>
-    <div class="ops-actions"><span class="ph-status {% if issue.ready %}ready{% elif issue.status == 'awaiting_payment' %}pending{% endif %}">
-      {% if issue.ready %}Ready for handover{% else %}{{ issue.get_status_display }}{% endif %}</span>
-      <button type="button" class="np-btn ops-no-print" onclick="window.print()">Print issue slip</button></div>
+<article class="ph-panel">
+  <header class="ph-panel-head">
+    <div>
+      <h2>{{ issue.consultation.patient.full_name }}</h2>
+      <p class="ops-muted">
+        <a href="{% url 'patient_detail' issue.consultation.patient.pk %}" target="_blank" rel="noopener">{{ issue.consultation.patient.uhid }}</a>
+        · {{ issue.consultation.visit_token }} · Issue #{{ issue.pk }} · {{ issue.created_at|date:'d M Y H:i' }}
+        · <a href="{% url 'patient_bill_slip' issue.bill_id %}">{{ issue.bill.bill_number }}</a>
+      </p>
+    </div>
+    <div class="ops-actions">
+      <span class="ph-status {% if issue.ready %}ready{% elif issue.status == 'awaiting_payment' %}pending{% endif %}">
+        {% if issue.ready %}Ready for handover{% else %}{{ issue.get_status_display }}{% endif %}
+      </span>
+      <button type="button" class="np-btn ops-no-print" onclick="window.print()">Print issue slip</button>
+    </div>
   </header>
   {% if issue.stale %}<p class="ops-warning">Unpaid for over 24 hours. Review this reservation.</p>{% endif %}
   <div class="ops-scroll"><table class="ops-table"><thead><tr>
@@ -19,7 +28,7 @@
   </tr></thead><tbody>{% for line in lines %}
     <tr><td>{% include "core/pharmacy_thumbnail.html" with medicine=line.medicine %}<strong>{{ line.medicine_name }}</strong></td>
       <td>{{ line.prescription.dose }} · {{ line.prescription.route }} · {{ line.prescription.frequency }} · {{ line.prescription.duration }}<br>{{ line.prescription.instructions }}</td>
-      <td>{% for allocation in line.allocations.all %}{{ allocation.batch.batch_number }} · {{ allocation.batch.expiry_date|date:'d M Y' }} · {{ allocation.quantity }} units<br>{% endfor %}</td>
+      <td>{% for allocation in line.allocations.all %}<a href="{% url 'pharmacy_batch_detail' allocation.batch_id %}">{{ allocation.batch.batch_number }}</a> · {{ allocation.batch.expiry_date|date:'d M Y' }} · {{ allocation.quantity }} units<br>{% endfor %}</td>
       <td>{{ line.quantity }} {{ line.medicine.unit }}</td><td>₹{{ line.unit_price }}</td><td>₹{{ line.total|floatformat:2 }}</td></tr>
   {% endfor %}</tbody></table></div>
   <div class="ops-total">Total ₹{{ issue.bill.amount_due|floatformat:2 }}</div>
@@ -29,10 +38,18 @@
     {% if not can_dispense %}<a class="np-btn teal" href="{% url 'patient_bill_slip' issue.bill_id %}">Open cashier payment slip</a>{% endif %}
     {% if can_dispense and issue.status == 'awaiting_payment' %}
       {% if issue.ready %}<form method="post">{% csrf_token %}<button class="np-btn teal" name="action" value="handover">Confirm medicine handover</button></form>
-      {% else %}<span class="ops-muted">Awaiting cashier payment for {{ issue.bill.bill_number }}.</span>{% endif %}
+      {% elif issue.bill.status == 'pending' %}
+      <form method="post" class="ph-inline-payment">{% csrf_token %}
+        <input type="hidden" name="action" value="pay">
+        <label class="ops-field">Payment method<select name="payment_method" required><option value="cash">Cash</option><option value="upi">UPI</option><option value="card">Card</option></select></label>
+        <label class="ops-field">Reference <span class="ops-muted">(optional)</span><input name="payment_reference" maxlength="100" placeholder="Card / UPI reference"></label>
+        <button class="np-btn teal" type="submit">Collect ₹{{ issue.bill.amount_due|floatformat:2 }}</button>
+      </form>
+      {% else %}<span class="ops-muted">Awaiting payment confirmation for {{ issue.bill.bill_number }}.</span>{% endif %}
       <form method="post">{% csrf_token %}<button class="np-btn" name="action" value="reallocate">Refresh batch allocation</button></form>
       {% if issue.bill.status == 'pending' %}<form method="post">{% csrf_token %}<button class="np-btn" name="action" value="cancel">Cancel unpaid issue</button></form>{% endif %}
     {% endif %}
+    {% if request.user.is_superuser or request.user.profile.designation == 'admin' %}<a class="np-btn" href="{% url 'pharmacy_audit' %}?q=Issue%20%23{{ issue.pk }}">Audit entries</a>{% endif %}
   </div>
 </article>
 {% endblock %}

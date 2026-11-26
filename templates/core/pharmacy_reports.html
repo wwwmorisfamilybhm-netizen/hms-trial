@@ -1,0 +1,96 @@
+{% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · analytics{% endblock %}
+{% block operations_intro %}Sales, dispensing, stock value and supplier position for the selected period.{% endblock %}
+{% block operations_content %}
+<section class="ph-panel" style="margin-bottom:18px;">
+  <div class="ph-panel-head">
+    <h2>Period performance</h2>
+    <form method="get" class="ph-search">
+      <input type="date" name="from" value="{{ from }}" aria-label="From date">
+      <input type="date" name="to" value="{{ to }}" aria-label="To date">
+      <button class="np-btn">Apply</button>
+      <a class="np-btn" href="{% querystring export='csv' %}">Export sales CSV</a>
+    </form>
+  </div>
+  <div class="ph-kpi-grid">
+    <a class="ph-kpi is-teal" href="{% url 'pharmacy_sales_history' %}">
+      <span>Direct sales</span><strong>₹{{ sale_totals.gross|floatformat:2 }}</strong>
+      <small>₹{{ sale_totals.tax|floatformat:2 }} tax · ₹{{ sale_totals.discount|floatformat:2 }} discounts</small>
+    </a>
+    <a class="ph-kpi is-violet" href="{% url 'pharmacy_dispense_history' %}">
+      <span>Dispensed prescriptions</span><strong>₹{{ issue_totals.value|floatformat:2 }}</strong>
+      <small>{{ issue_totals.count }} handover{{ issue_totals.count|pluralize }}</small>
+    </a>
+    <a class="ph-kpi is-slate" href="{% url 'pharmacy_stock_report' %}">
+      <span>Stock valuation</span><strong>₹{{ inventory_value.value|floatformat:2 }}</strong>
+      <small>At purchase cost</small>
+    </a>
+    <a class="ph-kpi is-amber" href="{% url 'pharmacy_queue' %}">
+      <span>Pending prescriptions</span><strong>{{ pending_prescriptions }}</strong>
+      <small>Awaiting dispensing</small>
+    </a>
+    <a class="ph-kpi is-rose" href="{% url 'pharmacy_suppliers' %}">
+      <span>Supplier balance</span><strong>₹{{ supplier_balance.total|floatformat:2 }}</strong>
+      <small>Outstanding across purchases</small>
+    </a>
+  </div>
+</section>
+
+<div class="ph-bento">
+  <div class="ph-col">
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Medicine-wise sales</h2><a href="{% url 'medicine_catalogue' %}">Catalogue →</a></div>
+      <div class="ops-scroll"><table class="ops-table"><thead><tr><th>Medicine</th><th>Units</th><th>Revenue</th></tr></thead>
+        <tbody>{% for row in medicine_sales %}<tr>
+          <td><a href="{% url 'medicine_catalogue' %}?q={{ row.medicine__name|urlencode }}">{{ row.medicine__name }}</a></td>
+          <td>{{ row.units }}</td><td>₹{{ row.revenue|floatformat:2 }}</td>
+        </tr>{% empty %}<tr><td colspan="3" class="ops-empty">No direct sales in this period.</td></tr>{% endfor %}</tbody></table></div>
+    </section>
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Recent sales</h2><a href="{% url 'pharmacy_sales_history' %}">Register →</a></div>
+      <div class="ops-scroll"><table class="ops-table"><thead><tr><th>Reference</th><th>Customer</th><th>Total</th><th>When</th></tr></thead>
+        <tbody>{% for sale in sales %}<tr>
+          <td><a href="{% url 'pharmacy_sale_invoice' sale.pk %}">{{ sale.reference }}</a></td>
+          <td>{% if sale.patient %}{{ sale.patient.full_name }}{% else %}{{ sale.walk_in_name|default:"Walk-in" }}{% endif %}</td>
+          <td>₹{{ sale.total|floatformat:2 }}</td><td>{{ sale.completed_at|date:"d M Y H:i" }}</td>
+        </tr>{% empty %}<tr><td colspan="4" class="ops-empty">No sales in this period.</td></tr>{% endfor %}</tbody></table></div>
+    </section>
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Category-wise sales</h2><a href="{% url 'medicine_catalogue' %}">Catalogue →</a></div>
+      <div class="ops-scroll"><table class="ops-table"><thead><tr><th>Category</th><th>Units</th><th>Revenue</th></tr></thead>
+        <tbody>{% for row in category_sales %}<tr><td><a href="{% url 'medicine_catalogue' %}?q={{ row.medicine__category|default:''|urlencode }}">{{ row.medicine__category|default:"Uncategorised" }}</a></td><td>{{ row.units }}</td><td>₹{{ row.revenue|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="3" class="ops-empty">No category sales.</td></tr>{% endfor %}</tbody></table></div>
+    </section>
+  </div>
+
+  <div class="ph-col">
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Payment methods</h2><a href="{% url 'pharmacy_sales_history' %}">Sales →</a></div>
+      <div class="ops-scroll"><table class="ops-table"><thead><tr><th>Method</th><th>Sales</th><th>Amount</th></tr></thead>
+        <tbody>{% for row in payment %}<tr>
+          <td><a href="{% url 'pharmacy_sales_history' %}?payment={{ row.payment_method|default:''|urlencode }}">{{ row.payment_method|default:"—"|title }}</a></td>
+          <td>{{ row.count }}</td><td>₹{{ row.amount|floatformat:2 }}</td>
+        </tr>{% empty %}<tr><td colspan="3" class="ops-empty">No payments recorded.</td></tr>{% endfor %}</tbody></table></div>
+    </section>
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Returns and supplier activity</h2><a href="{% url 'pharmacy_returns' %}">Returns →</a></div>
+      <div class="ops-scroll"><table class="ops-table"><thead><tr><th>Measure</th><th>Count</th><th>Value</th></tr></thead><tbody>
+        {% for row in returns %}<tr>
+          <td><a href="{% url 'pharmacy_returns' %}?kind={{ row.kind }}">{{ row.kind|title }} returns</a></td>
+          <td>{{ row.count }}</td><td>₹{{ row.refund|floatformat:2 }}</td>
+        </tr>{% endfor %}
+        <tr><td><a href="{% url 'pharmacy_purchases' %}">Purchases in period</a></td><td>—</td><td>₹{{ purchase_totals.total|floatformat:2 }}</td></tr>
+        <tr><td><a href="{% url 'pharmacy_purchases' %}">Payments in period</a></td><td>—</td><td>₹{{ purchase_totals.paid|floatformat:2 }}</td></tr>
+      </tbody></table></div>
+    </section>
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Period</h2></div>
+      <div class="ph-summary">
+        <div class="ph-summary-row"><span>From</span><strong style="font-size:.9rem;">{{ from }}</strong></div>
+        <div class="ph-summary-row"><span>To</span><strong style="font-size:.9rem;">{{ to }}</strong></div>
+        <div class="ph-summary-row"><span>Prescriptions billed</span><strong>₹{{ issue_totals.billed|floatformat:2 }}</strong></div>
+      </div>
+      <p class="ph-note">Sales CSV contains every completed direct sale in the period. Stock and expiry registers export from the inventory page.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}

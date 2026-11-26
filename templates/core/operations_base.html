@@ -7,7 +7,7 @@
 {% load static %}<link rel="stylesheet" href="{% static 'css/operations.css' %}?v=20261113">
 {% block operations_nav %}<nav class="ops-nav" aria-label="Operations">
 {% if request.user.profile.designation == 'pharmacy' or request.user.is_superuser or request.user.profile.designation == 'admin' %}
-<a class="np-btn" href="{% url 'pharmacy_dashboard' %}">Pharmacy desk</a><a class="np-btn" href="{% url 'pharmacy_queue' %}">Prescriptions</a><a class="np-btn" href="{% url 'medicine_catalogue' %}">Medicines</a><a class="np-btn" href="{% url 'pharmacy_receive' %}">Receive stock</a><a class="np-btn" href="{% url 'pharmacy_stock_report' %}">Inventory</a><a class="np-btn" href="{% url 'pharmacy_dispense_history' %}">Handovers</a>
+<a class="np-btn" href="{% url 'pharmacy_dashboard' %}">Pharmacy overview</a><a class="np-btn" href="{% url 'pharmacy_queue' %}">Prescriptions</a><a class="np-btn" href="{% url 'pharmacy_pos' %}">POS</a><a class="np-btn" href="{% url 'medicine_catalogue' %}">Medicines</a><a class="np-btn" href="{% url 'pharmacy_receive' %}">Receive stock</a><a class="np-btn" href="{% url 'pharmacy_stock_report' %}">Inventory</a><a class="np-btn" href="{% url 'pharmacy_dispense_history' %}">Handovers</a>
 {% endif %}
 {% if request.user.profile.designation == 'registration_desk' or request.user.is_superuser or request.user.profile.designation == 'admin' %}<a class="np-btn" href="{% url 'pharmacy_billing' %}">Pharmacy billing</a>{% endif %}
 {% if request.user.profile.designation == 'service_staff' or request.user.is_superuser or request.user.profile.designation == 'admin' %}<a class="np-btn" href="{% url 'service_staff_dashboard' %}">Service desk</a><a class="np-btn" href="{% url 'service_completed_today' %}">Completed today</a>{% endif %}

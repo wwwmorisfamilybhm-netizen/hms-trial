@@ -1,13 +1,14 @@
 {% extends "core/pharmacy_base.html" %}
 {% block operations_content %}
 <div class="ops-grid">
-<div class="ops-actions ph-back"><a href="{% url 'medicine_catalogue' %}">← Medicine catalogue</a></div>
-<section class="ph-panel"><h2>Upload a medicine list or invoice</h2>
+<div class="ops-actions ph-back">{% if stock_mode %}<a href="{% url 'pharmacy_receive' %}">← Receive stock</a>{% else %}<a href="{% url 'medicine_catalogue' %}">← Medicine catalogue</a>{% endif %}</div>
+<section class="ph-panel"><h2>{% if stock_mode %}Import a supplier invoice into stock{% else %}Upload a medicine list or invoice{% endif %}</h2>
 <p>CSV, Excel (.xlsx), PDF, JPG or PNG · Up to 10 MB, 10 PDF pages and 500 rows. Review extracted values before receiving stock.</p>
+{% if stock_mode %}<p class="ph-note">Recognised PDF invoices automatically fill the supplier, invoice number, medicines, batches, expiry dates, quantities, pack sizes, MRP, rates, HSN and GST. You will confirm everything before inventory changes.</p>{% endif %}
 <p>Download a <a href="{% url 'pharmacy_import_template' %}">CSV template</a> or <a href="{% url 'pharmacy_import_template' %}?format=xlsx">Excel template</a>.</p>
 <form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.non_field_errors }}
 {% for field in form %}{% include "core/pharmacy_field.html" %}{% endfor %}
-<p class="ph-note">For a scan or a PDF without a heading row, clear “First extracted row contains column headings”.</p>
+<p class="ph-note">For a scan or a PDF without a heading row, clear “First extracted row contains column headings”. Unrecognised invoice layouts use the manual mapping screen.</p>
 <button class="np-btn teal">Extract &amp; review</button></form></section>
 <section class="ph-panel"><h2>Recent imports</h2><ul class="ops-list">{% for draft in drafts %}<li><a href="{% url 'pharmacy_import_review' draft.pk %}">{{ draft.filename }}</a><small class="ph-note"> · {{ draft.created_at|date:"d M Y H:i" }} · {% if draft.committed_at %}Saved{% else %}Draft{% endif %}</small></li>{% empty %}<li>No files imported yet.</li>{% endfor %}</ul></section></div>
 {% endblock %}

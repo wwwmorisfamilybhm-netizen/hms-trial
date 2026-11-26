@@ -1,0 +1,55 @@
+{% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · sale invoice{% endblock %}
+{% block operations_intro %}Finalised receipt with batch, tax and payment detail. Returns and reversal start here.{% endblock %}
+{% block operations_content %}
+<a class="ph-back" href="{% url 'pharmacy_sales_history' %}">← Sales history</a>
+<article class="ph-panel ph-invoice">
+  <header class="ph-panel-head">
+    <div>
+      <h2>{{ sale.reference }}</h2>
+      <p class="ops-muted">{{ sale.completed_at|date:"d M Y H:i" }} · {% firstof sale.completed_by.get_full_name sale.completed_by.username %}</p>
+    </div>
+    <div class="ops-actions">
+      <span class="ph-status {% if sale.status == 'completed' %}ready{% elif sale.status == 'cancelled' %}blocked{% else %}muted{% endif %}">{{ sale.get_status_display }}</span>
+      <button type="button" class="np-btn ops-no-print" onclick="window.print()">Print invoice</button>
+    </div>
+  </header>
+  <dl class="ph-quantities">
+    <div><dt>Patient</dt><dd>{% if sale.patient %}<a href="{% url 'patient_detail' sale.patient.pk %}" target="_blank" rel="noopener">{{ sale.patient.full_name }}</a>{% else %}{{ sale.walk_in_name|default:"Walk-in" }}{% endif %}</dd></div>
+    <div><dt>UHID</dt><dd>{{ sale.patient.uhid|default:"—" }}</dd></div>
+    <div><dt>Payment</dt><dd>{{ sale.get_payment_method_display|default:"—" }}</dd></div>
+    <div><dt>Reference</dt><dd>{{ sale.payment_reference|default:"—" }}</dd></div>
+  </dl>
+  <div class="ops-scroll"><table class="ops-table">
+    <thead><tr><th>Medicine</th><th>Batch / expiry</th><th>HSN / GST</th><th>Qty</th><th>Unit price</th><th>Discount</th><th>Tax</th><th>Total</th></tr></thead>
+    <tbody>{% for line in lines %}<tr>
+      <td><strong>{{ line.medicine_name }}</strong></td>
+      <td><a href="{% url 'pharmacy_batch_detail' line.batch_id %}">{{ line.batch.batch_number }}</a><div class="ops-muted">{{ line.batch.expiry_date|date:"d M Y" }}</div></td>
+      <td>{{ line.medicine.hsn_code|default:"—" }}<div class="ops-muted">{{ line.medicine.gst_rate }}%</div></td>
+      <td>{{ line.quantity }}</td><td>₹{{ line.unit_price }}</td><td>₹{{ line.discount }}</td><td>₹{{ line.tax|floatformat:2 }}</td><td>₹{{ line.total|floatformat:2 }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  <dl class="ph-totals">
+    <div><dt>Subtotal</dt><dd>₹{{ sale.subtotal|floatformat:2 }}</dd></div>
+    <div><dt>Discount</dt><dd>− ₹{{ sale.discount|floatformat:2 }}</dd></div>
+    <div><dt>Tax</dt><dd>₹{{ sale.tax|floatformat:2 }}</dd></div>
+    <div class="ph-total-row"><dt>Net payable</dt><dd>₹{{ sale.total|floatformat:2 }}</dd></div>
+    <div><dt>Received</dt><dd>₹{{ sale.amount_received|floatformat:2 }}</dd></div>
+    <div><dt>Balance</dt><dd>₹{{ sale.balance|floatformat:2 }}</dd></div>
+  </dl>
+  {% if sale.controlled_authorisation %}
+  <p class="ph-note">Controlled medicine authorisation: <strong>{{ sale.controlled_authorisation }}</strong></p>
+  {% endif %}
+  <div class="ops-actions ops-no-print" style="margin-bottom:14px;">
+    <a class="np-btn" href="{% url 'pharmacy_returns' %}?sale={{ sale.pk }}">Record a return for this sale</a>
+    <a class="np-btn" href="{% url 'pharmacy_audit' %}?q={{ sale.reference|urlencode }}">Audit entries</a>
+    {% if sale.patient %}<a class="np-btn" href="{% url 'pharmacy_pos' %}?patient={{ sale.patient.pk }}">New sale for this patient</a>{% endif %}
+  </div>
+  {% if sale.status == 'completed' %}
+  <form method="post" action="{% url 'pharmacy_sale_cancel' sale.pk %}" class="ph-cancel-sale ops-no-print">{% csrf_token %}
+    <label class="ops-field">Cancellation reason<input name="reason" maxlength="255" required placeholder="Why is this sale being reversed?"></label>
+    <button class="np-btn" type="submit">Cancel sale and restore stock</button>
+  </form>
+  {% endif %}
+</article>
+{% endblock %}

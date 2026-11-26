@@ -82,6 +82,8 @@ class UserProfile(models.Model):
 @receiver(post_save, sender=User)
 def create_or_save_user_profile(sender, instance, created, **kwargs):
     """Automatically ensure a UserProfile exists for every User."""
+    if kwargs.get('raw'):
+        return
     if created:
         default_desig = (
             UserProfile.Designation.ADMIN

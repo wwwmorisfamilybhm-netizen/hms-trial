@@ -55,6 +55,6 @@ Service prices are configured in **Service catalogue & routing** (Service Staff/
 
 Report files are stored in `private_reports/`, outside public `MEDIA_ROOT`, and downloaded through authenticated views. Keep this directory persistent and include it in infrastructure backups alongside the database. The existing per-patient export is not a complete operational/database backup. `PRIVATE_REPORT_ROOT` can override the private storage directory in Django settings.
 
-Run `.venv/bin/python manage.py test` for regression and workflow tests. Concurrency tests cover competing stock reservations using conditional database writes. The implementation supports SQLite and PostgreSQL, but PostgreSQL deployment-specific testing should also be run against the deployment database.
+On the local Homebrew setup, run `DATABASE_URL='postgresql:///hms?host=/tmp' .venv/bin/python manage.py test --noinput` for regression and workflow tests. This uses the local PostgreSQL administrator account to create and remove Django's temporary test database without granting that permission to the application role. Concurrency tests cover competing stock reservations using conditional database writes. Run deployment checks against a disposable PostgreSQL test database.
 
 Purchasing, supplier accounts, walk-in sales, automatic dosing, medicine substitutions, returns/refunds, structured laboratory panels and equipment integrations are not implemented.

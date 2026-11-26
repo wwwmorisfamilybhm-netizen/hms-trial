@@ -1,0 +1,126 @@
+{% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · prescription flow{% endblock %}
+{% block operations_intro %}Every doctor-released prescription in one worklist: prepare, collect payment, then hand over.{% endblock %}
+{% block operations_content %}
+<section class="ph-kpi-grid" aria-label="Prescription worklists">
+  {% for key,title,count in tabs %}
+  <a class="ph-kpi {% if key == 'ready' %}is-lime{% elif key == 'payment' %}is-amber{% elif key == 'prepare' %}is-teal{% else %}is-slate{% endif %}{% if tab == key %} ph-kpi-current{% endif %}"
+     href="{% url 'pharmacy_queue' %}{% querystring tab=key page=None stale=None status=None %}">
+    <span>{{ title }}</span><strong>{{ count }}</strong>
+    <small>{% if key == 'ready' %}Paid and ready to hand over{% elif key == 'prepare' %}Released, waiting to be prepared{% elif key == 'payment' %}Prepared, waiting for the cashier{% else %}Every released visit{% endif %}</small>
+  </a>
+  {% endfor %}
+</section>
+
+<div class="ph-bento">
+  <div class="ph-col">
+    <section class="ph-panel">
+      <div class="ph-panel-head">
+        <div><h2>Prescription worklist</h2><span class="ph-note">{{ label }}</span></div>
+        <form method="get" class="ph-search">
+          <input type="hidden" name="tab" value="{{ tab }}">
+          {% if stale_only %}<input type="hidden" name="stale" value="1">{% endif %}
+          <input type="search" name="q" value="{{ query }}" aria-label="Patient, UHID or visit token" placeholder="Patient, UHID or visit token">
+          <button class="np-btn">Search</button>
+        </form>
+      </div>
+
+      <div class="ph-chip-row" style="margin:4px 0 14px;">
+        {% if tab == 'payment' %}
+          {% if stale_only %}
+          <a class="ph-chip ph-chip-reset" href="{% querystring stale=None page=None %}">Clear 24h filter</a>
+          {% elif stale_count %}
+          <a class="ph-chip ph-chip-reset" href="{% querystring stale='1' page=None %}">{{ stale_count }} unpaid over 24h</a>
+          {% endif %}
+        {% endif %}
+        {% if query %}<a class="ph-chip ph-chip-reset" href="{% url 'pharmacy_queue' %}{% querystring q=None page=None %}">Clear search</a>{% endif %}
+        {% if not query and not stale_only %}<span class="ph-note">Switching tabs keeps your search and paging state.</span>{% endif %}
+      </div>
+
+      {% if stale_only %}<p class="ops-warning">Showing only prescriptions unpaid for more than 24 hours. Reservations can be cancelled from the issue page.</p>{% endif %}
+
+      {% if records %}
+      <div class="ph-queue">
+        {% for record in records %}
+        {% if tab == 'ready' or tab == 'payment' %}
+        <a class="ph-qcard" href="{% url 'pharmacy_issue' record.pk %}?{{ queue_state }}">
+          <span class="ph-token">#{{ record.pk }}</span>
+          <span class="ph-qmain">
+            <span class="ph-qname">{{ record.consultation.patient.full_name }}</span>
+            <span class="ph-qmeta">
+              <span>{{ record.consultation.patient.uhid }}</span>
+              <span>{{ record.consultation.visit_token }}</span>
+              <span>₹{{ record.bill.amount_due }}</span>
+              <span>Waiting {{ record.wait_since|timesince }}</span>
+            </span>
+          </span>
+          <span class="ph-status {% if record.ready %}ready{% else %}pending{% endif %}">{% if record.ready %}Ready{% else %}Awaiting payment{% endif %}</span>
+          <span class="ph-qgo">{% if record.ready %}Hand over →{% else %}Review →{% endif %}</span>
+        </a>
+        {% else %}
+        <a class="ph-qcard" href="{% url 'pharmacy_consultation' record.pk %}?{{ queue_state }}">
+          <span class="ph-token">{{ record.visit_token }}</span>
+          <span class="ph-qmain">
+            <span class="ph-qname">{{ record.patient.full_name }}</span>
+            <span class="ph-qmeta">
+              <span>{{ record.patient.uhid }}</span>
+              <span>{% firstof record.doctor.get_full_name record.doctor.username "Doctor" %}</span>
+              <span>{% if tab == 'prepare' %}Waiting {{ record.wait_since|timesince }}{% else %}Released {{ record.wait_since|date:"d M Y" }}{% endif %}</span>
+            </span>
+          </span>
+          <span class="ph-status {% if tab == 'prepare' %}pending{% else %}muted{% endif %}">{% if tab == 'prepare' %}To prepare{% else %}Released{% endif %}</span>
+          <span class="ph-qgo">{% if tab == 'prepare' %}Prepare →{% else %}View →{% endif %}</span>
+        </a>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="ph-empty">
+        <h3>{% if query %}No matching prescriptions{% elif tab == 'ready' %}No medicines waiting for handover{% else %}This queue is clear{% endif %}</h3>
+        <p>{% if query %}Try another patient name, UHID, or visit token.{% elif tab == 'ready' %}Prepared issues appear here when the cashier records payment.{% elif tab == 'prepare' %}Doctor-released prescriptions with outstanding quantities appear here.{% elif tab == 'payment' %}Prepared issues awaiting cashier payment appear here.{% else %}Visits appear here when a doctor releases a prescription.{% endif %}</p>
+        {% if not query %}<a class="np-btn" href="{% url 'pharmacy_pos' %}">Open the POS</a>{% endif %}
+      </div>
+      {% endif %}
+      {% include "core/pharmacy_pagination.html" with page=records %}
+    </section>
+  </div>
+
+  <div class="ph-col">
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Desk attention</h2></div>
+      {% if stale_count and tab != 'payment' %}
+      <a class="ph-alert expired" href="{% url 'pharmacy_queue' %}?tab=payment&amp;stale=1"><span>Unpaid prescriptions over 24 hours</span><b>{{ stale_count }}</b></a>
+      {% endif %}
+      {% if expiry_count %}
+      <a class="ph-alert expiring" href="{% url 'pharmacy_expiry' %}?window=watch"><span>Batches inside the expiry watch window</span><b>{{ expiry_count }}</b></a>
+      {% endif %}
+      {% if low_count %}
+      <a class="ph-alert low" href="{% url 'pharmacy_stock_report' %}?filter=low"><span>Medicines at or below reorder level</span><b>{{ low_count }}</b></a>
+      {% endif %}
+      {% if not stale_count and not expiry_count and not low_count %}
+      <div class="ph-empty"><h3>No pressure on this desk</h3><p>No stale bills, expiring batches or reorder alerts right now.</p></div>
+      {% endif %}
+    </section>
+
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>How the flow works</h2></div>
+      <ul class="ph-activity">
+        <li><time>01</time><span>Prepare reserves stock from the earliest-expiring usable batch (FEFO).</span></li>
+        <li><time>02</time><span>The cashier records payment against the pharmacy bill.</span></li>
+        <li><time>03</time><span>Handover deducts the reserved units and writes the ledger row.</span></li>
+        <li><time>04</time><span>Unpaid issues can be reallocated or cancelled to release stock.</span></li>
+      </ul>
+    </section>
+
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Desk shortcuts</h2></div>
+      <div class="ph-quick-grid">
+        <a href="{% url 'pharmacy_pos' %}"><strong>Direct sale</strong><span>Over-the-counter checkout</span></a>
+        <a href="{% url 'pharmacy_stock_report' %}"><strong>Stock &amp; batches</strong><span>Balances and ledger</span></a>
+        <a href="{% url 'pharmacy_expiry' %}"><strong>Expiry desk</strong><span>Critical and expired</span></a>
+        <a href="{% url 'pharmacy_returns' %}"><strong>Returns</strong><span>Quarantine and refunds</span></a>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

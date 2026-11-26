@@ -1030,7 +1030,9 @@ class ServiceDesignationAccessTests(TestCase):
 
         dashboard = self.client.get(reverse("pharmacy_dashboard"))
         self.assertEqual(dashboard.status_code, 200)
-        self.assertContains(dashboard, "Prescription worklist")
+        self.assertContains(dashboard, "Pharmacy overview")
+        self.assertContains(dashboard, "Pending prescriptions")
+        self.assertContains(self.client.get(reverse("pharmacy_queue")), "Prescription worklist")
         self.assertEqual(self.client.get(reverse("opd_service_queue", args=["pharmacy"])).status_code, 200)
         self.assertEqual(self.client.get(reverse("opd_service_queue", args=["laboratory"])).status_code, 403)
         self.assertEqual(self.client.get(reverse("opd_patient_queue")).status_code, 302)
@@ -1082,3 +1084,124 @@ class ServiceDesignationAccessTests(TestCase):
             })
             self.assertEqual(response.status_code, 302)
             self.assertEqual(User.objects.get(username=username).profile.designation, designation)
+
+class RegistrationDeskBenchmarkTests(TestCase):
+    """OPD Patient Register benchmark: duplicate warning, revisits, CSV export."""
+
+    def setUp(self):
+        from patients.models import PatientCategoryConfig, RegistrationFeeSettings
+
+        PatientCategoryConfig.objects.update_or_create(
+            code="GENERAL",
+            defaults={"name": "General", "is_active": True, "registration_fee": Decimal("50")},
+        )
+        RegistrationFeeSettings.objects.update_or_create(
+            pk=1,
+            defaults={
+                "default_registration_fee": Decimal("50"),
+                "default_consultation_fee": Decimal("100"),
+                "default_discount": Decimal("0"),
+            },
+        )
+        self.user = User.objects.create_user(username="bench_reg", password="password123")
+        self.user.profile.designation = UserProfile.Designation.REGISTRATION_DESK
+        self.user.profile.save()
+        self.client.login(username="bench_reg", password="password123")
+        self.patient = Patient.objects.create(
+            first_name="Kavita",
+            last_name="Devi",
+            uhid="200001",
+            phone="+919876543210",
+            aadhar_no="123456789012",
+        )
+
+    def test_check_duplicate_returns_json_matches(self):
+        url = reverse("registration_check_duplicate")
+        response = self.client.get(url, {"phone": "9876543210"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/json")
+        payload = response.json()
+        self.assertEqual(len(payload["matches"]), 1)
+        self.assertEqual(payload["matches"][0]["pk"], self.patient.pk)
+        self.assertEqual(payload["matches"][0]["uhid"], "200001")
+        self.assertEqual(payload["matches"][0]["full_name"], "Kavita Devi")
+
+    def test_check_duplicate_needs_enough_characters(self):
+        response = self.client.get(reverse("registration_check_duplicate"), {"phone": "98765"})
+        self.assertEqual(response.json()["matches"], [])
+
+    def test_check_duplicate_matches_aadhar(self):
+        response = self.client.get(reverse("registration_check_duplicate"), {"aadhar_no": "4567"})
+        self.assertEqual(response.json()["matches"][0]["pk"], self.patient.pk)
+
+    def test_revisit_creates_new_visit_without_duplicating_patient(self):
+        from appointments.models import Appointment
+
+        url = reverse("registration_desk_revisit", args=[self.patient.pk])
+        response = self.client.post(url)
+
+        self.assertRedirects(
+            response, reverse("patient_print_card", args=[self.patient.pk])
+        )
+        self.assertEqual(Patient.objects.count(), 1)
+        self.assertEqual(Patient.objects.get().pk, self.patient.pk)
+        appointment = Appointment.objects.get(patient=self.patient, reason="OPD Revisit")
+        self.assertIsNone(appointment.doctor)
+        bill = PatientBill.objects.get(appointment=appointment)
+        self.assertEqual(bill.source, PatientBill.Source.REGISTRATION)
+        self.assertEqual(bill.description, "OPD revisit registration & consultation fee")
+        self.assertEqual(bill.amount, Decimal("150"))
+        self.assertEqual(bill.created_by, self.user)
+
+    def test_revisit_rejects_get_and_doctors(self):
+        url = reverse("registration_desk_revisit", args=[self.patient.pk])
+        self.assertEqual(self.client.get(url).status_code, 405)
+
+        doctor = User.objects.create_user(username="bench_doctor", password="password123")
+        doctor.profile.designation = UserProfile.Designation.DOCTOR
+        doctor.profile.save()
+        self.client.login(username="bench_doctor", password="password123")
+        response = self.client.post(url)
+        self.assertRedirects(response, reverse("dashboard"))
+
+    def test_register_export_returns_csv_with_filters(self):
+        Patient.objects.create(first_name="Other", last_name="Patient", uhid="200002")
+        url = reverse("registration_desk_export")
+        response = self.client.get(url, {"q": "Kavita"})
+        self.assertEqual(response["Content-Type"], "text/csv")
+        self.assertIn('attachment; filename="opd_register.csv"', response["Content-Disposition"])
+        body = response.content.decode()
+        self.assertIn("Kavita Devi", body)
+        self.assertNotIn("Other Patient", body)
+
+    def test_upi_payment_type_is_accepted_on_new_registration(self):
+        from appointments.models import Appointment
+
+        response = self.client.post(reverse("registration_desk_new"), {
+            "first_name": "Upi",
+            "last_name": "Payer",
+            "phone": "9876543211",
+            "patient_category": "GENERAL",
+            "payment_type": Patient.PaymentType.UPI,
+            "billing_type": "Individual",
+            "con_fee": "100",
+            "discount": "0",
+            "nationality": "India",
+            "state": "Bihar",
+        })
+
+        self.assertEqual(response.status_code, 302)
+        patient = Patient.objects.get(first_name="Upi")
+        self.assertEqual(patient.payment_type, Patient.PaymentType.UPI)
+        self.assertTrue(Appointment.objects.filter(patient=patient).exists())
+        self.assertTrue(
+            PatientBill.objects.filter(patient=patient, source=PatientBill.Source.REGISTRATION).exists()
+        )
+
+    def test_registration_desk_renders_collection_strip_and_export_link(self):
+        response = self.client.get(reverse("registration_desk"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Daily Collection")
+        self.assertContains(response, reverse("registration_desk_export"))
+        self.assertContains(response, "New Visit")
+

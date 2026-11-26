@@ -1,0 +1,101 @@
+{% extends "core/pharmacy_base.html" %}
+{% block pharmacy_kicker %}Pharmacy · purchase{% endblock %}
+{% block operations_content %}
+<a class="ph-back" href="{% url 'pharmacy_purchases' %}">← Purchases</a>
+<div class="ph-bento">
+  <div class="ph-col">
+    <section class="ph-panel">
+      <div class="ph-panel-head">
+        <div>
+          <h2>{{ purchase.reference }}</h2>
+          <p class="ops-muted">{{ purchase.supplier.name }} · {{ purchase.invoice_reference|default:"No invoice reference" }} · {{ purchase.ordered_at|date:"d M Y H:i" }}</p>
+        </div>
+        <span class="ph-status {% if purchase.status == 'received' %}ready{% elif purchase.status == 'cancelled' %}muted{% else %}pending{% endif %}">{{ purchase.get_status_display }}</span>
+      </div>
+      <div class="ph-chip-row" style="margin-bottom:14px;">
+        <a class="ph-chip" href="{% url 'pharmacy_supplier_edit' purchase.supplier.pk %}">Supplier record →</a>
+        <a class="ph-chip" href="{% url 'pharmacy_purchases' %}?q={{ purchase.reference|urlencode }}">All purchases →</a>
+      </div>
+      <div class="ops-scroll"><table class="ops-table">
+        <thead><tr><th>Medicine</th><th>Batch</th><th>Expiry</th><th>Ordered</th><th>Received</th><th>Cost</th><th>Total</th></tr></thead>
+        <tbody>{% for line in lines %}<tr>
+          <td>{{ line.medicine.name }}</td>
+          <td>{{ line.batch_number|default:"—" }}</td>
+          <td>{{ line.expiry_date|date:"d M Y"|default:"—" }}</td>
+          <td>{{ line.quantity_ordered }}</td>
+          <td>{{ line.quantity_received }}{% if line.remaining %}<div class="ph-status pending">{{ line.remaining }} due</div>{% endif %}</td>
+          <td>₹{{ line.purchase_cost }}</td><td>₹{{ line.total|floatformat:2 }}</td>
+        </tr>{% empty %}<tr><td colspan="7" class="ops-empty">No lines recorded.</td></tr>{% endfor %}</tbody>
+      </table></div>
+      <dl class="ph-totals">
+        <div><dt>Order value</dt><dd>₹{{ purchase.total|floatformat:2 }}</dd></div>
+        <div><dt>Paid</dt><dd>₹{{ purchase.paid|floatformat:2 }}</dd></div>
+        <div class="ph-total-row"><dt>Outstanding</dt><dd>₹{{ purchase.outstanding|floatformat:2 }}</dd></div>
+      </dl>
+      {% if can_receive %}
+      <form method="post" class="ops-actions">{% csrf_token %}
+        <input type="hidden" name="action" value="receive">
+        <button class="np-btn teal" type="submit">Receive all lines with batch details</button>
+        <span class="ph-note">Lines without a batch number and expiry are left open.</span>
+      </form>
+      {% endif %}
+    </section>
+
+    {% if open_lines %}
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Batch details for open lines</h2></div>
+      <p class="ph-note">Capture the batch number and expiry before receiving an ordered line.</p>
+      {% for line in open_lines %}
+      <form method="post" class="ph-stock-form" style="max-width:none;margin-bottom:10px;">{% csrf_token %}
+        <input type="hidden" name="action" value="line">
+        <input type="hidden" name="line_id" value="{{ line.pk }}">
+        <fieldset style="margin:0;">
+          <legend>{{ line.medicine.name }} · {{ line.remaining }} due</legend>
+          <label class="ops-field">Batch number<input name="batch_number" maxlength="100" value="{{ line.batch_number }}" required></label>
+          <label class="ops-field">Expiry date<input type="date" name="expiry_date" value="{% if line.expiry_date %}{{ line.expiry_date|date:'Y-m-d' }}{% endif %}" required></label>
+          <button class="np-btn" type="submit">Save batch details</button>
+        </fieldset>
+      </form>
+      {% endfor %}
+    </section>
+    {% endif %}
+  </div>
+
+  <div class="ph-col">
+    {% if purchase.status == 'ordered' or purchase.status == 'partial' %}
+    <section class="ph-panel">
+      <h2>Payment</h2>
+      <div class="ph-empty">
+        <h3>{% if purchase.status == 'ordered' %}Payment opens after goods arrive{% else %}Pay only for goods received{% endif %}</h3>
+        <p>{% if purchase.status == 'ordered' %}Receiving this order posts stock and adds the payable; paying before then would not match the supplier ledger.{% else %}This order is partially received. The payable below is capped at the value actually received.{% endif %}</p>
+      </div>
+    </section>
+    {% endif %}
+    {% if payable %}
+    <section class="ph-panel">
+      <h2>Record supplier payment</h2>
+      <p class="ph-note">Payments reduce both this purchase and the supplier's outstanding balance in one guarded step.</p>
+      <form method="post" action="{% url 'pharmacy_purchase_pay' purchase.pk %}" class="ph-stock-form">{% csrf_token %}
+        <label class="ops-field">Amount<input type="number" name="amount" min="0.01" max="{{ payable }}" step="0.01" value="{{ payable }}"></label>
+        <button class="np-btn teal" type="submit">Record payment</button>
+      </form>
+    </section>
+    {% elif purchase.status == 'received' %}
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Payments</h2></div>
+      <div class="ph-empty"><h3>Nothing outstanding</h3><p>This purchase is fully paid{% if purchase.outstanding == 0 %} or not yet received{% endif %}.</p></div>
+    </section>
+    {% endif %}
+
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>What happens next</h2></div>
+      <ul class="ph-activity">
+        <li><time>01</time><span>Add batch details to every open line.</span></li>
+        <li><time>02</time><span>Receive goods — stock and the supplier balance update together.</span></li>
+        <li><time>03</time><span>Pay the supplier from this page; overpayment is blocked.</span></li>
+        <li><time>04</time><span>Return damaged or expired units from the batch page.</span></li>
+      </ul>
+    </section>
+  </div>
+</div>
+{% endblock %}

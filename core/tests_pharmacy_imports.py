@@ -15,8 +15,9 @@ from django.utils import timezone
 from PIL import Image
 
 from patients.models import Medicine, MedicineBatch, MedicineImport, StockMovement
-from .tests_operations import staff
-from .pharmacy_imports import extract_rows, commit_import, ImportReviewError
+from .tests_operations import staff, close_file_without_request_finished
+from .pharmacy_imports import extract_rows, commit_import, ImportReviewError, prepare_invoice_rows
+from .pharmacy_invoice_parser import parse_invoice_pdf
 from .pharmacy_photos import validated_photo, public_get, photo_candidates, linked_photo
 
 
@@ -135,11 +136,27 @@ class PharmacyImportTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertIn("no-store", response["Cache-Control"])
-        response.close()
+        close_file_without_request_finished(response)
         self.client.force_login(staff("other-pharmacist", "pharmacy"))
         self.assertEqual(self.client.get(url).status_code, 404)
         self.client.force_login(staff("doctor-reader", "doctor"))
         self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_inline_pdf_source_uses_a_safe_image_preview(self):
+        output = io.BytesIO()
+        Image.new("RGB", (120, 160), "white").save(output, "PDF")
+        draft = MedicineImport.objects.create(
+            owner=self.pharmacist, source=SimpleUploadedFile("invoice.pdf", output.getvalue()),
+            filename="invoice.pdf", fingerprint=str(uuid4()), kind="stock",
+        )
+        url = reverse("pharmacy_import_source", args=[draft.pk])
+        response = self.client.get(url, {"inline": "1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertIn("sandbox", response["Content-Security-Policy"])
+        download = self.client.get(url)
+        self.assertEqual(download["Content-Type"], "application/pdf")
+        close_file_without_request_finished(download)
 
     def test_xlsx_dates_csv_limits_and_downloadable_templates(self):
         from openpyxl import Workbook
@@ -166,6 +183,117 @@ class PharmacyImportTests(TestCase):
                 self.assertEqual(rows, [["Sample", "20"]])
                 self.assertEqual(columns, ["Medicine", "Quantity"])
                 ocr.assert_called_once()
+
+    def invoice_table(self):
+        header = ["SN", "HSN\nCODE", "PRODUCT NAME", "", "PACK\nSIZE", "CASE\nLOT", "", "",
+                  "MFG.BY/\nMKTD BY", "BATCH NO", "QTY", "QTY\nDISC", "M.R.P.", "EXP\nDT",
+                  "P.T.R.", "", "P.T.S.", "DISC\n%", "GST%", "AMOUNT"]
+        return [header,
+            ["1", "30049099", "NOZCALM NASAL SPRAY 20ML", "NSL", "1X20ML", "600", "", "", "WELLNES",
+             "DLSZ6002", "30", "0", "50.00", "07/28", "18.00", "", "18.00", "0.00", "5.00", "540.00"],
+            ["2 30049081", "", "GABIPENTA 100 TAB", "TAB", "10X1X10", "30", "", "", "WELLNES",
+             "9226003", "4", "0", "750.00", "06/28", "240.00", "", "240.00", "0.00", "5.00", "960.00"]]
+
+    def test_ivaans_style_pdf_parser_extracts_invoice_and_stock_fields(self):
+        table = self.invoice_table()
+        text = ("IVAANS BIOCARE PRIVATE LIMITED\n"
+                "Inv. No. : TI01910/26\n"
+                "Date : 06/11/2026\n"
+                "TOTAL AMOUNT 1500.00\n"
+                "ADD GST 75.00\n"
+                "NET AMOUNT 1575.10\n")
+
+        class Page:
+            def extract_tables(self):
+                return [table]
+
+            def extract_text(self):
+                return text
+
+        class PDF:
+            pages = [Page()]
+
+            def __len__(self):
+                return len(self.pages)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        with patch("pdfplumber.open", return_value=PDF()):
+            parsed = parse_invoice_pdf(SimpleUploadedFile("invoice.pdf", b"%PDF-1.4 sample", content_type="application/pdf"))
+        self.assertEqual(parsed["document"]["supplier"], "IVAANS BIOCARE PRIVATE LIMITED")
+        self.assertEqual(parsed["document"]["invoice_reference"], "TI01910/26")
+        self.assertEqual(parsed["document"]["invoice_date"], "2026-11-06")
+        self.assertEqual(parsed["document"]["total_amount"], "1575.10")
+        self.assertTrue(any("does not equal" in warning for warning in parsed["document"]["warnings"]))
+        self.assertEqual(len(parsed["items"]), 2)
+        spray, tablets = parsed["items"]
+        self.assertEqual((spray["name"], spray["unit"], spray["pack_size"]), ("NOZCALM", "bottle", "1"))
+        self.assertEqual(spray["expiry_date"], "2028-07-31")
+        self.assertEqual(spray["gst_rate"], "5.00")
+        self.assertEqual(tablets["hsn_code"], "30049081")
+        self.assertEqual((tablets["name"], tablets["strength"], tablets["pack_size"]), ("GABIPENTA", "100", "100"))
+        self.assertEqual(tablets["mrp"], "7.50")
+        self.assertEqual(tablets["expiry_date"], "2028-06-30")
+
+    def test_pdf_upload_auto_maps_reviews_and_commits_inventory(self):
+        tablets = {
+            "name": "GABIPENTA", "generic_name": "", "strength": "100", "form": "Tablet", "unit": "tablet",
+            "pack_size": "100", "reorder_level": "10", "manufacturer": "WELLNES", "barcode": "",
+            "hsn_code": "30049081", "batch_number": "9226003", "expiry_date": "2028-06-30",
+            "quantity": "4", "quantity_basis": "packs", "purchase_cost": "240.00", "selling_price": "250.00",
+            "price_basis": "packs", "mrp": "7.50", "gst_rate": "5.00", "source_description": "GABIPENTA 100 TAB",
+            "source_pack_size": "10X1X10", "source_amount": "960.00",
+        }
+        parsed = {"items": [tablets], "fingerprint": "invoice-fingerprint", "document": {
+            "supplier": "IVAANS BIOCARE PRIVATE LIMITED", "invoice_reference": "TI01910/26",
+            "invoice_date": "2026-11-06", "item_count": 1, "warnings": [],
+        }}
+        with patch("core.pharmacy_import_views.parse_invoice_pdf", return_value=parsed):
+            response = self.client.post(reverse("pharmacy_import"), {
+                "kind": "stock", "header": "on", "source": SimpleUploadedFile("invoice.pdf", b"%PDF-1.4 sample"),
+            })
+        draft = MedicineImport.objects.get()
+        review = reverse("pharmacy_import_review", args=[draft.pk])
+        self.assertRedirects(response, review)
+        self.assertEqual(draft.rows[0]["supplier"], "IVAANS BIOCARE PRIVATE LIMITED")
+        self.assertTrue(draft.document["auto_mapped"])
+        self.assertContains(self.client.get(review), "Detected invoice")
+        self.assertContains(self.client.get(review), "TI01910/26")
+        payload = {f"row-0-{name}": value for name, value in draft.rows[0].items()}
+        payload.update({"row-0-include": "on", "action": "commit", "revision": draft.revision})
+        self.client.post(review, payload)
+        draft.refresh_from_db()
+        self.assertIsNotNone(draft.committed_at)
+        medicine = Medicine.objects.get()
+        batch = MedicineBatch.objects.get()
+        self.assertEqual(medicine.hsn_code, "30049081")
+        self.assertEqual(str(medicine.gst_rate), "5.00")
+        self.assertEqual(batch.on_hand, 400)
+        self.assertEqual(str(batch.purchase_cost), "2.40")
+        self.assertEqual(str(batch.selling_price), "2.50")
+        self.assertEqual(str(batch.mrp), "7.50")
+
+    def test_duplicate_invoice_brands_are_disambiguated_and_existing_strength_matches(self):
+        Medicine.objects.create(name="ZEFWAY 200", strength="200", form="Tablet", unit="tablet", pack_size=100)
+        items = []
+        for strength in ("200", "100"):
+            items.append({"name": "ZEFWAY", "strength": strength, "form": "Tablet", "unit": "tablet",
+                          "pack_size": "100", "source_description": f"ZEFWAY {strength} DT TAB"})
+        rows, warnings = prepare_invoice_rows(items)
+        self.assertEqual(rows[0]["name"], "ZEFWAY 200")
+        self.assertEqual(rows[0]["medicine"], Medicine.objects.get(name="ZEFWAY 200").pk)
+        self.assertEqual(rows[1]["name"], "ZEFWAY 100")
+        self.assertNotIn("medicine", rows[1])
+        self.assertEqual(warnings, [])
+
+    def test_receive_stock_page_links_to_pdf_import(self):
+        response = self.client.get(reverse("pharmacy_receive"))
+        self.assertContains(response, reverse("pharmacy_import") + "?kind=stock")
+        self.assertContains(response, "Import invoice / PDF")
 
     def photo_bytes(self):
         output = io.BytesIO()

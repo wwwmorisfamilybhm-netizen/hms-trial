@@ -1,7 +1,138 @@
 {% extends "core/pharmacy_base.html" %}
-{% block operations_intro %}Physical stock, reservations, available units, and expiry by batch.{% endblock %}
+{% block pharmacy_kicker %}Pharmacy · inventory{% endblock %}
+{% block operations_intro %}Physical stock, reservations, holds, sellable units and every ledger movement by batch.{% endblock %}
+{% block pharmacy_hero_actions %}
+<a class="ph-hero-btn ghost" href="{% url 'pharmacy_expiry' %}">Expiry desk</a>
+<a class="ph-hero-btn lime" href="{% url 'pharmacy_receive' %}">＋ Receive stock</a>
+{% endblock %}
 {% block operations_content %}
-<section class="ops-card"><div class="ops-header"><h2>Batch inventory</h2><div class="ops-actions"><a class="np-btn" href="{% url 'pharmacy_import' %}">Import medicines / stock</a><a class="np-btn teal" href="{% url 'pharmacy_receive' %}">Receive stock</a><a class="np-btn" href="{% url 'pharmacy_adjust' %}">Adjust stock</a><a class="np-btn" href="{% url 'medicine_catalogue' %}">Catalogue</a><a class="np-btn" href="{% querystring export="csv" page=None %}">Export CSV</a></div></div><form method="get" class="ops-search"><input type="search" name="q" value="{{ query }}" placeholder="Medicine or batch" aria-label="Search stock"><select name="filter" aria-label="Stock filter"><option value="">All inventory</option><option value="low" {% if stock_filter == 'low' %}selected{% endif %}>Low stock</option><option value="expiring" {% if stock_filter == 'expiring' %}selected{% endif %}>Expiring in 90 days</option><option value="expired" {% if stock_filter == 'expired' %}selected{% endif %}>Expired</option></select><button class="np-btn" type="submit">Filter</button></form><div class="ops-scroll"><table class="ops-table"><thead><tr><th>Medicine / batch</th><th>Expiry</th><th>On hand</th><th>Reserved</th><th>Available</th><th>Unit price</th></tr></thead><tbody>{% for batch in batches %}<tr><td><strong>{{ batch.medicine.name }}</strong><div class="ops-muted">{{ batch.batch_number }} · {{ batch.supplier }} · {{ batch.invoice_reference }}</div></td><td>{{ batch.expiry_date|date:'d M Y' }}{% if batch.expired %}<div class="ops-badge">Expired · excluded</div>{% elif batch.expiring %}<div class="ops-badge">Approaching expiry</div>{% endif %}</td><td>{{ batch.on_hand }}</td><td>{{ batch.reserved }}</td><td>{% if batch.expired %}0{% else %}{{ batch.available }}{% endif %} {{ batch.medicine.unit }}</td><td>₹{{ batch.selling_price }}</td></tr>{% endfor %}{% for m in unstocked %}<tr><td>{{ m.name }}</td><td>No batch received</td><td>0</td><td>0</td><td>0 {{ m.unit }}</td><td>—</td></tr>{% endfor %}{% if not batches and not unstocked %}<tr><td colspan="6" class="ops-empty">No matching batches.</td></tr>{% endif %}</tbody></table></div></section>
-<section class="ops-card"><h2>Reorder watch</h2><ul class="ops-list">{% for medicine in low_medicines %}<li>{{ medicine.name }} — {{ medicine.usable }} {{ medicine.unit }} available · Reorder level {{ medicine.reorder_level }}</li>{% empty %}<li class="ops-empty">No matching medicines at or below their reorder level.</li>{% endfor %}</ul></section>
-<section class="ops-card"><h2>Recent stock movements</h2><div class="ops-scroll"><table class="ops-table"><thead><tr><th>When</th><th>Medicine / batch</th><th>Change</th><th>Reason</th><th>Staff</th></tr></thead><tbody>{% for movement in movements %}<tr><td>{{ movement.created_at|date:'d M Y H:i' }}</td><td>{{ movement.batch }}</td><td>{{ movement.quantity }}</td><td>{{ movement.reason }}</td><td>{{ movement.actor.get_full_name|default:movement.actor.username }}</td></tr>{% empty %}<tr><td colspan="5" class="ops-empty">Receipts, corrections, and handovers appear here.</td></tr>{% endfor %}</tbody></table></div>{% include 'core/pharmacy_pagination.html' with page=movements %}</section>
+<div class="ph-kpi-grid">
+  <a class="ph-kpi is-slate{% if not stock_filter %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_stock_report' %}{% querystring filter=None page=None %}">
+    <span>All batches</span><strong>{{ counts.all }}</strong><small>Every batch ever received</small>
+  </a>
+  <a class="ph-kpi is-amber{% if stock_filter == 'low' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_stock_report' %}{% querystring filter='low' page=None %}">
+    <span>Low stock</span><strong>{{ counts.low }}</strong><small>At or below reorder level</small>
+  </a>
+  <a class="ph-kpi is-rose{% if stock_filter == 'out' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_stock_report' %}{% querystring filter='out' page=None %}">
+    <span>Out of stock</span><strong>{{ counts.out }}</strong><small>No sellable units left</small>
+  </a>
+  <a class="ph-kpi is-violet{% if stock_filter == 'quarantined' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_stock_report' %}{% querystring filter='quarantined' page=None %}">
+    <span>Quarantined</span><strong>{{ counts.quarantined }}</strong><small>Held for review</small>
+  </a>
+  <a class="ph-kpi is-teal{% if stock_filter == 'expiring' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_stock_report' %}{% querystring filter='expiring' page=None %}">
+    <span>Expiring soon</span><strong>{{ counts.expiring }}</strong><small>Inside the watch window</small>
+  </a>
+  <a class="ph-kpi is-rose{% if stock_filter == 'expired' %} ph-kpi-current{% endif %}" href="{% url 'pharmacy_stock_report' %}{% querystring filter='expired' page=None %}">
+    <span>Expired</span><strong>{{ counts.expired }}</strong><small>Blocked from dispensing</small>
+  </a>
+</div>
+
+<section class="ph-panel">
+  <div class="ph-panel-head">
+    <h2>Batches in stock</h2>
+    <div class="ops-actions">
+      <a class="np-btn" href="{% url 'pharmacy_import' %}">Import</a>
+      <a class="np-btn" href="{% url 'pharmacy_adjust' %}">Adjust</a>
+      <a class="np-btn" href="{% url 'pharmacy_batch_action' %}?action=transfer">Transfer</a>
+      <a class="np-btn" href="{% querystring export='csv' page=None %}">Export CSV</a>
+    </div>
+  </div>
+  <form method="get" class="ops-search">
+    <input type="search" name="q" value="{{ query }}" placeholder="Medicine or batch" aria-label="Search stock">
+    <select name="filter" aria-label="Stock filter">
+      <option value="">All inventory</option>
+      <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>Low stock</option>
+      <option value="out" {% if stock_filter == 'out' %}selected{% endif %}>Out of stock</option>
+      <option value="quarantined" {% if stock_filter == 'quarantined' %}selected{% endif %}>Quarantined</option>
+      <option value="expiring" {% if stock_filter == 'expiring' %}selected{% endif %}>Expiring soon</option>
+      <option value="expired" {% if stock_filter == 'expired' %}selected{% endif %}>Expired</option>
+    </select>
+    <button class="np-btn" type="submit">Filter</button>
+  </form>
+  <div class="ops-scroll"><table class="ops-table ph-stock-table">
+    <thead><tr><th>Medicine / batch</th><th>Location</th><th>Expiry</th><th>On hand</th><th>Reserved</th><th>Quarantined</th><th>Available</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for batch in batches %}
+      <tr>
+        <td><a href="{% url 'pharmacy_batch_detail' batch.pk %}"><strong>{{ batch.medicine.name }}</strong></a><div class="ops-muted">{{ batch.batch_number }} · {{ batch.supplier }} · {{ batch.invoice_reference }}</div></td>
+        <td>{{ batch.storage_location|default:"—" }}</td>
+        <td>{{ batch.expiry_date|date:"d M Y" }}{% if batch.expired %}<div class="ph-status blocked">Expired · blocked</div>{% elif batch.expiring %}<div class="ph-status pending">Approaching expiry</div>{% endif %}</td>
+        <td>{{ batch.on_hand }}</td><td>{{ batch.reserved }}</td><td>{{ batch.quarantined }}</td>
+        <td><strong>{% if batch.expired or batch.status != 'active' %}0{% else %}{{ batch.available }}{% endif %}</strong> {{ batch.medicine.unit }}</td>
+        <td><span class="ph-status {% if batch.status == 'active' and not batch.expired %}ready{% else %}blocked{% endif %}">{{ batch.get_status_display }}</span></td>
+        <td><a class="np-btn" href="{% url 'pharmacy_batch_detail' batch.pk %}">Open</a></td></tr>
+    {% endfor %}
+    {% for m in unstocked %}<tr><td>{{ m.name }}</td><td>—</td><td>No batch received</td><td>0</td><td>0</td><td>0</td><td>0 {{ m.unit }}</td><td><span class="ph-status muted">No stock</span></td><td><a href="{% url 'pharmacy_receive' %}?medicine={{ m.pk }}">Receive</a></td></tr>{% endfor %}
+    {% if not batches and not unstocked %}<tr><td colspan="9" class="ops-empty">No batches match this stock view.</td></tr>{% endif %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="ph-panel" id="ledger">
+  <div class="ph-panel-head">
+    <h2>Stock ledger</h2>
+    <a href="{% url 'pharmacy_audit' %}">Audit trail →</a>
+  </div>
+  <form method="get" class="ops-search">
+    {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+    {% if stock_filter %}<input type="hidden" name="filter" value="{{ stock_filter }}">{% endif %}
+    <input type="search" name="movement_q" value="{{ movement_q }}" placeholder="Medicine, batch or reason" aria-label="Search ledger">
+    <select name="movement_kind" aria-label="Movement type">
+      <option value="">All movement types</option>
+      {% for value,label in movement_kinds %}<option value="{{ value }}" {% if movement_kind == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <button class="np-btn" type="submit">Filter</button>
+    <a class="np-btn" href="{% url 'pharmacy_stock_report' %}#ledger">Reset</a>
+  </form>
+  <div class="ops-scroll"><table class="ops-table">
+    <thead><tr><th>When</th><th>Batch</th><th>Change</th><th>Type</th><th>Source</th><th>Reason</th><th>Staff</th></tr></thead>
+    <tbody>{% for movement in movements %}<tr>
+      <td>{{ movement.created_at|date:"d M Y H:i" }}</td>
+      <td><a href="{% url 'pharmacy_batch_detail' movement.batch_id %}">{{ movement.batch.medicine.name }}</a><div class="ops-muted">{{ movement.batch.batch_number }}</div></td>
+      <td>{{ movement.quantity }}</td>
+      <td><span class="ops-badge">{{ movement.get_kind_display }}</span></td>
+      <td>
+        {% if movement.sale %}<a href="{% url 'pharmacy_sale_invoice' movement.sale_id %}">{{ movement.sale.reference }}</a>
+        {% elif movement.issue %}<a href="{% url 'pharmacy_issue' movement.issue_id %}">Issue #{{ movement.issue_id }}</a>
+        {% elif movement.purchase %}<a href="{% url 'pharmacy_purchase_detail' movement.purchase_id %}">{{ movement.purchase.reference }}</a>
+        {% else %}—{% endif %}
+      </td>
+      <td>{{ movement.reason }}</td>
+      <td>{% firstof movement.actor.get_full_name movement.actor.username %}</td>
+    </tr>{% empty %}<tr><td colspan="7" class="ops-empty">Receipts, sales, returns and handovers appear here.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% include 'core/pharmacy_pagination.html' with page=movements %}
+</section>
+
+<div class="ph-bento">
+  <div class="ph-col">
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Reorder watch</h2><a href="{% url 'pharmacy_purchase_new' %}">New order →</a></div>
+      <ul class="ops-list">
+        {% for medicine in low_medicines %}
+        <li>
+          <a href="{% url 'medicine_edit' medicine.pk %}">{{ medicine.name }}</a>
+          <span class="ops-muted"> — {{ medicine.usable }} {{ medicine.unit }} available · reorder at {{ medicine.reorder_level }}</span>
+          <div class="ops-actions" style="margin-top:6px;">
+            <a class="ph-chip" href="{% url 'pharmacy_purchase_new' %}?medicine={{ medicine.pk }}">Order</a>
+            <a class="ph-chip" href="{% url 'pharmacy_receive' %}?medicine={{ medicine.pk }}">Receive</a>
+          </div>
+        </li>
+        {% empty %}<li class="ops-empty">No medicines at or below reorder level.</li>{% endfor %}
+      </ul>
+    </section>
+  </div>
+  <div class="ph-col">
+    <section class="ph-panel">
+      <div class="ph-panel-head"><h2>Batch actions</h2></div>
+      <p class="ph-note">Every hold, release, damage record and transfer writes a ledger row and an audit entry.</p>
+      <div class="ph-quick-grid">
+        <a href="{% url 'pharmacy_batch_action' %}?action=damage"><strong>Record damage</strong><span>Move sellable units to damaged</span></a>
+        <a href="{% url 'pharmacy_batch_action' %}?action=quarantine"><strong>Quarantine</strong><span>Hold stock for review</span></a>
+        <a href="{% url 'pharmacy_batch_action' %}?action=release"><strong>Release hold</strong><span>Return, damage or write off</span></a>
+        <a href="{% url 'pharmacy_batch_action' %}?action=transfer"><strong>Transfer</strong><span>Move a batch location</span></a>
+      </div>
+    </section>
+  </div>
+</div>
 {% endblock %}

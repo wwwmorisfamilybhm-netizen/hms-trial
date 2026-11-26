@@ -5,6 +5,20 @@
 <div class="ph-import-layout">
 <div>
 <section class="ph-panel"><h2>{{ draft.filename }}</h2><p>{{ draft.get_kind_display }} · {{ draft.raw_rows|length }} extracted rows.</p>
+{% if document %}
+<section class="ph-panel"><h2>Detected invoice</h2>
+<dl class="ph-quantities">
+  <div><dt>Supplier</dt><dd>{{ document.supplier|default:"Needs review" }}</dd></div>
+  <div><dt>Invoice</dt><dd>{{ document.invoice_reference|default:"Needs review" }}</dd></div>
+  {% if document.invoice_date %}<div><dt>Invoice date</dt><dd>{{ document.invoice_date }}</dd></div>{% endif %}
+  <div><dt>Medicine rows</dt><dd>{{ document.item_count }}</dd></div>
+  {% if document.subtotal %}<div><dt>Subtotal</dt><dd>₹{{ document.subtotal }}</dd></div>{% endif %}
+  {% if document.tax_amount %}<div><dt>GST</dt><dd>₹{{ document.tax_amount }}</dd></div>{% endif %}
+  {% if document.total_amount %}<div><dt>Printed net total</dt><dd>₹{{ document.total_amount }}</dd></div>{% endif %}
+</dl>
+{% if document.warnings %}<div class="ops-warning" role="alert"><strong>Review these invoice warnings:</strong><ul>{% for warning in document.warnings %}<li>{{ warning }}</li>{% endfor %}</ul></div>{% endif %}
+</section>
+{% endif %}
 <details {% if not draft.rows %}open{% endif %}><summary>Map file columns and defaults</summary>
 <form method="post">{% csrf_token %}<input type="hidden" name="revision" value="{{ draft.revision }}">
 <p>Choose the column for each field. Defaults fill fields that have no mapped column. Use YYYY-MM-DD for dates. Enter an existing medicine’s exact name and product details to match it.</p>
